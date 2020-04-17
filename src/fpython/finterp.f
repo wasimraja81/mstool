@@ -73,7 +73,7 @@ chelp-
                  endif
                  OutArr(i) = InArr(i)*FlagArr(i)
               enddo 
-              write(*,*)"Points masked during interp stage: ",iter
+              !write(*,*)"Points masked during interp stage: ",iter
 
               do iter = 1,niter
                 do i = 1,npts

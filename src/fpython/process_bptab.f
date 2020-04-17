@@ -65,7 +65,7 @@ chelp-
          endif
          outArr(ichan) = InArr(ichan)*flagArr(ichan)
       enddo
-      write(*,*)"Points masked during fitting: ",iter
+      !write(*,*)"Points masked during fitting: ",iter
       !======================================================= 
       
       ! Interpolate bandpass solutions: 
