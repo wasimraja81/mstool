@@ -70,7 +70,7 @@ chelp-
       
       ! Interpolate bandpass solutions: 
       ! Smooth representation of inArr: 
-      call mov_poly_harm_fit(inArr,ichan,flagArr,
+      call mov_poly_harm_fit(inArr,npts,flagArr,
      -                      nSampPerFit,nStagger,nPoly, 
      -                      nHarm, thresh, outArr) 
 
