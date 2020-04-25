@@ -26,11 +26,13 @@ chelp-
       !---------------------------------------------------
 
       subroutine process_bptab(inArr,flagArr,maskVal,npts,nSampPerFit,
-     -                   nStagger, nPoly,nHarm,refAnt,outArr)
+     -                   nStagger, nPoly,nHarm,refAnt,
+     -                   nSkipLeft,nSkipRight,outArr)
 
 
       !implicit none 
       integer*4, intent(in) :: npts  
+      integer*4, intent(in) :: nSkipLeft,nSkipRight   
       integer*4, intent(in) :: refAnt
       real*4, intent(in),dimension(npts) :: inArr 
       real*4, intent(out),dimension(npts) :: outArr 
@@ -72,7 +74,8 @@ chelp-
       ! Smooth representation of inArr: 
       call mov_poly_harm_fit(inArr,npts,flagArr,
      -                      nSampPerFit,nStagger,nPoly, 
-     -                      nHarm, thresh, outArr) 
+     -                      nHarm, thresh, nSkipLeft, nSkipRight, 
+     -                      outArr) 
 
 
 

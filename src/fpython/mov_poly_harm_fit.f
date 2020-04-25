@@ -26,7 +26,7 @@ chelp-
 
         subroutine mov_poly_harm_fit(InArr,npts,flag_arr,
      -         nsamp_per_fit,n_stagger,order_p,order_h,thresh,
-     -         OutArr)
+     -         nskip_left,nskip_right,OutArr)
         ! -----------------------------------------------------------
         implicit none
 
@@ -35,6 +35,7 @@ chelp-
         parameter(maxpfit=128)
         integer*4, intent(in) :: npts, order_p, order_h
         integer*4, intent(in) :: nsamp_per_fit, n_stagger
+        integer*4, intent(in) :: nskip_left, nskip_right
         real*4,    intent(in) :: thresh
         real*4,    intent(in), dimension(npts) :: InArr
         real*4,    intent(out),dimension(npts) :: OutArr
@@ -82,8 +83,28 @@ chelp-
 
         !------------------------------------------------------------
         ! Set up the variables for poly_harm_fit routine:
-        nleft = 1
-        nright = nsamp_per_fit_now
+        nleft = 1 + nskip_left
+        nright = nsamp_per_fit_now - nskip_right
+
+        if (nleft.lt.1 .or. nleft.gt.nsamp_per_fit_now)then  
+            nleft = 1
+        endif
+        if (nright.lt.1 .or. nright.gt.nsamp_per_fit_now)then
+            nright = nsamp_per_fit_now
+        endif
+        if (nleft .ge. nright) then
+            nleft = 1 
+            nright = nsamp_per_fit_now
+        endif
+        ! Also make sure you have enough  points left for fitting 
+        if ((nright - nleft + 1) .lt. 
+     -                 (int(0.8*nsamp_per_fit_now)) )then
+            nleft = 1
+            nright = nsamp_per_fit_now
+            write(*,*)"**WARNING**: mov_poly_harm_fit."
+            write(*,*)"Large skip values specified!"
+            write(*,*)"No data will be skipped near edges.."
+        endif
         lr_exclude = .true. !if true,include l-to-r data,else exclude
         silent = .true.
         data_tag = ' '

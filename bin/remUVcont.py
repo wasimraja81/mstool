@@ -34,6 +34,10 @@ def parse_args():
                         default='100', type=int)
     parser.add_argument('-r','--refant', dest='ref_ant', help='Reference Antenna',
                         default='1', type=int)
+    parser.add_argument('-nl','--nleft', dest='n_left', help='Number of points to skip at the beginning of a window',
+                        default='0', type=int)
+    parser.add_argument('-nr','--nright', dest='n_right', help='Number of points to skip at the end of a window',
+                        default='0', type=int)
     parser.add_argument('-o','--overwrite', dest='over_write', help='If True, input ms will be overwritten',
                         default=False, type=bool)
 
@@ -58,6 +62,20 @@ if __name__ == "__main__":
     n_win = args.n_win
     fit_54 = args.fit_54
     overWrite = args.over_write
+    n_right = args.n_right 
+    n_left = args.n_left 
+
+    if n_left > n_right: 
+	# Use all data to fit
+	n_left = 0
+	n_right = 0
+    if n_left < 0: 
+	# Start from the first data point on the left
+	n_left = 0
+    if n_right < 0: 
+	# Use all data for fitting:
+	n_left = 0
+	n_right = 0
 
 
     nTaper = args.n_Taper #15 
@@ -101,8 +119,8 @@ if __name__ == "__main__":
 
     # If fitting to be done in beam-forming interval: 
     if (fit_54 > 0):
-        n_p = 1 
-        n_h = 2 
+        #n_p = 1 
+        #n_h = 2 
 
         nSampPerFit = 54*fit_54 #nchan # nchan
         nStagger = nSampPerFit 
@@ -155,7 +173,7 @@ if __name__ == "__main__":
         
                 xrtmp = np.multiply(v[ibase,:,0].real, flagInv)  
                 xr = fi.finterp(inarr=xrtmp,flagarr=flagInv,maskval=0.0,npts=nChan,ntaper=nTaper,niter=nIter,refant=0)
-                xr_fit = pbp.process_bptab(inarr=xr,flagarr=flagInv,maskval=0.0,npts=nChan,nsampperfit=nSampPerFit,nstagger=nStagger,npoly=n_p,nharm=n_h,refant=0) 
+                xr_fit = pbp.process_bptab(inarr=xr,flagarr=flagInv,maskval=0.0,npts=nChan,nsampperfit=nSampPerFit,nstagger=nStagger,npoly=n_p,nharm=n_h,refant=0,nskipleft=n_left,nskipright=n_right) 
             
       
                 flagMS = np.array(f[ibase,:,0].astype(dtype="float32",casting='same_kind'))   
@@ -163,7 +181,7 @@ if __name__ == "__main__":
         
                 xitmp = np.multiply(v[ibase,:,0].imag, flagInv)
                 xi = fi.finterp(inarr=xitmp,flagarr=flagInv,maskval=0.0,npts=nChan,ntaper=nTaper,niter=nIter,refant=0)
-                xi_fit = pbp.process_bptab(inarr=xi,flagarr=flagInv,maskval=0.0,npts=nChan,nsampperfit=nSampPerFit,nstagger=nStagger,npoly=n_p,nharm=n_h,refant=0) 
+                xi_fit = pbp.process_bptab(inarr=xi,flagarr=flagInv,maskval=0.0,npts=nChan,nsampperfit=nSampPerFit,nstagger=nStagger,npoly=n_p,nharm=n_h,refant=0,nskipleft=n_left,nskipright=n_right) 
             
                 xr_resi = np.array(xr - xr_fit) 
                 xi_resi = np.array(xi - xi_fit)
@@ -175,14 +193,14 @@ if __name__ == "__main__":
         
                 yrtmp = np.multiply(v[ibase,:,3].real, flagInv)  
                 yr = fi.finterp(inarr=yrtmp,flagarr=flagInv,maskval=0.0,npts=nChan,ntaper=nTaper,niter=nIter,refant=0)
-                yr_fit = pbp.process_bptab(inarr=yr,flagarr=flagInv,maskval=0.0,npts=nChan,nsampperfit=nSampPerFit,nstagger=nStagger,npoly=n_p,nharm=n_h,refant=0) 
+                yr_fit = pbp.process_bptab(inarr=yr,flagarr=flagInv,maskval=0.0,npts=nChan,nsampperfit=nSampPerFit,nstagger=nStagger,npoly=n_p,nharm=n_h,refant=0,nskipleft=n_left,nskipright=n_right) 
             
                 flagMS = np.array(f[ibase,:,3].astype(dtype="float32",casting='same_kind'))   
                 flagInv =  np.array(np.logical_not(f[ibase,:,3]).astype(dtype="float32",casting='same_kind'))  
         
                 yitmp = np.multiply(v[ibase,:,3].imag, flagInv)  
                 yi = fi.finterp(inarr=yitmp,flagarr=flagInv,maskval=0.0,npts=nChan,ntaper=nTaper,niter=nIter,refant=0)
-                yi_fit = pbp.process_bptab(inarr=yi,flagarr=flagInv,maskval=0.0,npts=nChan,nsampperfit=nSampPerFit,nstagger=nStagger,npoly=n_p,nharm=n_h,refant=0) 
+                yi_fit = pbp.process_bptab(inarr=yi,flagarr=flagInv,maskval=0.0,npts=nChan,nsampperfit=nSampPerFit,nstagger=nStagger,npoly=n_p,nharm=n_h,refant=0,nskipleft=n_left,nskipright=n_right) 
             
                 #v_sub[ibase,:,3] = (v[ibase,:,3].real - yr_fit) + 1j*(v[ibase,:,3].imag - yi_fit)
                 yr_resi = np.array(yr - yr_fit)
