@@ -135,15 +135,13 @@ if __name__ == "__main__":
     bRec = 0 
     eRec = nRec
     irow = bRec*nBase
-    # Compute the flagging statistics of all channels in time-baseline space: 
-    nBadChan_AllBaseAllTime = 0 
 
     for itime in range(bRec, eRec):
         print ("# Processing Integration Number: %5d, MJD: %f " % (itime,time[irow]/86400.0))
         #print ("#-------------------------------------------------------------- ")
         #print ("#%6s %5s %7s %5s %5s  %10s %10s  " %("Row","Rec","Base","Ant1","Ant2","nBadChan-0","nBadChan-final"))
         #print ("#-------------------------------------------------------------- ")
-        nBadChan_AllBase = 0 
+
         # For ASKAP single beam 16k channels, 14hours observation, 
         # you will have: 
         # 16000chan * (14 x 3600s / 5s)integrations * 666 baselines = 400GB! 
@@ -155,6 +153,67 @@ if __name__ == "__main__":
         v_sub = td.getcol('DATA',startrow=irow,nrow=nBase,rowincr=1) 
         a1 = td.getcol('ANTENNA1',startrow=irow,nrow=nBase,rowincr=1) 
         a2 = td.getcol('ANTENNA2',startrow=irow,nrow=nBase,rowincr=1) 
+
+        nBadChan_AllBase = 0 
+	#++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+	# Find channels that stand out as outliers when all 
+	# baselines are averaged for this time: 
+	# 1. get the baseline-averaged spectra
+	# 2. Detetct  outlier channels (could be RFI/Lines
+	# 3. Update the flagArray to further exclude these points 
+	#    from the fit.
+	ave_x = np.zeros((nChan),dtype="complex")
+	ave_y = np.zeros((nChan),dtype="complex")
+	ave_ispec = np.zeros((nChan),dtype="float32")
+	sumFlag_x = np.zeros((nChan),dtype="float32")
+	sumFlag_y = np.zeros((nChan),dtype="float32")
+	flagArr = np.ones((nChan),dtype="float32")
+	for jbase in range(0,nBase):
+	    if a1[jbase] != a2[jbase]:
+		# For xx
+                flagInv =  np.array(np.logical_not(f[jbase,:,0]).astype(dtype="float32",casting='same_kind'))  
+                #ave_x = np.array(ave_x + np.multiply(np.abs(v[jbase,:,0]), flagInv))
+                ave_x = np.array(ave_x + np.multiply(v[jbase,:,0], flagInv))
+		# Sum the flag spectra (count of good points)
+		sumFlag_x = np.array(sumFlag_x + flagInv)
+		#
+		# Now for yy
+                flagInv =  np.array(np.logical_not(f[jbase,:,3]).astype(dtype="float32",casting='same_kind'))  
+                #ave_y = np.array(ave_y + np.multiply(np.abs(v[jbase,:,3]), flagInv))
+                ave_y = np.array(ave_y + np.multiply(v[jbase,:,3], flagInv))
+		# Sum the flag spectra (count of good points)
+		sumFlag_y = np.array(sumFlag_y + flagInv)
+	# Get the average spectra & avoid Inf:
+	for jchan in range(0,nChan):
+	    if sumFlag_x[jchan] > 0 and sumFlag_y[jchan] > 0:
+		ave_x[jchan] = ave_x[jchan]/sumFlag_x[jchan]
+		ave_y[jchan] = ave_y[jchan]/sumFlag_y[jchan]
+		flagInv[jchan] = 1.0
+	    else:
+		ave_x[jchan] = 0.0
+		ave_y[jchan] = 0.0
+		flagInv[jchan] = 0.0
+	    ave_ispec[jchan] = np.abs(ave_x[jchan] + ave_y[jchan]) 
+	# Derive outlier channels:
+        ave_ispec_fit = pbp.process_bptab(inarr=ave_ispec,flagarr=flagInv,maskval=0.0,npts=nChan,nsampperfit=nSampPerFit,nstagger=nStagger,npoly=n_p,nharm=n_h,refant=0,nskipleft=n_left,nskipright=n_right) 
+	resi = np.array(ave_ispec - ave_ispec_fit)
+	sigma,mu = musigma.meanrms(a=resi,np=nChan)
+	thresh = 1.2
+	jcnt = 0
+	for jchan in range(0,nChan):
+	    #if np.abs(resi[jchan] - mu) > thresh*sigma :
+	    if np.abs(resi[jchan]) > thresh*sigma :
+		flagArr[jchan] = 0.0
+		jcnt = jcnt  + 1
+		#print ("# Excluded Channel: %6d , jchan/54: %f " % (jchan,jchan/54.0))
+	    else: 
+		flagArr[jchan] = 1.0
+	print ("# Excluded: %6d channels for Integration Number: %5d, MJD: %f " % (jcnt,itime,time[irow]/86400.0))
+	print ("# sigma: %f, mu: %f " % (sigma,mu))
+	#print ("# flagInv.shape: ",flagInv.shape)
+	#print ("# flagArr.shape: ",flagArr.shape)
+	#++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
         brow = itime 
         erow = brow + nBase 
@@ -169,7 +228,10 @@ if __name__ == "__main__":
                 # But the flag=1 in msdata means bad data. So, invert the flag Array to 
                 # match the  definition in finterp & process_bptab. 
                 flagMS = np.array(f[ibase,:,0].astype(dtype="float32",casting='same_kind'))   
-                flagInv =  np.array(np.logical_not(f[ibase,:,0]).astype(dtype="float32",casting='same_kind'))  
+                #flagInv =  np.array(np.logical_not(f[ibase,:,0]).astype(dtype="float32",casting='same_kind'))  
+                flagInv =  np.multiply(flagArr,np.array(np.logical_not(f[ibase,:,0]).astype(dtype="float32",casting='same_kind')))
+	        #print ("# flagInv.shape Now: ",flagInv.shape)
+	        #print ("# flagArr.shape Now: ",flagArr.shape)
         
                 xrtmp = np.multiply(v[ibase,:,0].real, flagInv)  
                 xr = fi.finterp(inarr=xrtmp,flagarr=flagInv,maskval=0.0,npts=nChan,ntaper=nTaper,niter=nIter,refant=0)
@@ -177,34 +239,41 @@ if __name__ == "__main__":
             
       
                 flagMS = np.array(f[ibase,:,0].astype(dtype="float32",casting='same_kind'))   
-                flagInv =  np.array(np.logical_not(f[ibase,:,0]).astype(dtype="float32",casting='same_kind')) 
+                #flagInv =  np.array(np.logical_not(f[ibase,:,0]).astype(dtype="float32",casting='same_kind')) 
+                flagInv =  np.multiply(flagArr,np.array(np.logical_not(f[ibase,:,0]).astype(dtype="float32",casting='same_kind')))
         
                 xitmp = np.multiply(v[ibase,:,0].imag, flagInv)
                 xi = fi.finterp(inarr=xitmp,flagarr=flagInv,maskval=0.0,npts=nChan,ntaper=nTaper,niter=nIter,refant=0)
                 xi_fit = pbp.process_bptab(inarr=xi,flagarr=flagInv,maskval=0.0,npts=nChan,nsampperfit=nSampPerFit,nstagger=nStagger,npoly=n_p,nharm=n_h,refant=0,nskipleft=n_left,nskipright=n_right) 
             
-                xr_resi = np.array(xr - xr_fit) 
-                xi_resi = np.array(xi - xi_fit)
+                #xr_resi = np.array(xr - xr_fit) 
+                #xi_resi = np.array(xi - xi_fit)
+		xr_resi = np.array(v[ibase,:,0].real - xr_fit) 
+		xi_resi = np.array(v[ibase,:,0].imag - xi_fit)
             
                 v_sub[ibase,:,0] = np.array(xr_resi + 1j*xi_resi) 
         
                 flagMS = np.array(f[ibase,:,3].astype(dtype="float32",casting='same_kind'))   
-                flagInv =  np.array(np.logical_not(f[ibase,:,3]).astype(dtype="float32",casting='same_kind'))  
+                #flagInv =  np.array(np.logical_not(f[ibase,:,3]).astype(dtype="float32",casting='same_kind'))  
+                flagInv =  np.multiply(flagArr,np.array(np.logical_not(f[ibase,:,3]).astype(dtype="float32",casting='same_kind')))
         
                 yrtmp = np.multiply(v[ibase,:,3].real, flagInv)  
                 yr = fi.finterp(inarr=yrtmp,flagarr=flagInv,maskval=0.0,npts=nChan,ntaper=nTaper,niter=nIter,refant=0)
                 yr_fit = pbp.process_bptab(inarr=yr,flagarr=flagInv,maskval=0.0,npts=nChan,nsampperfit=nSampPerFit,nstagger=nStagger,npoly=n_p,nharm=n_h,refant=0,nskipleft=n_left,nskipright=n_right) 
             
                 flagMS = np.array(f[ibase,:,3].astype(dtype="float32",casting='same_kind'))   
-                flagInv =  np.array(np.logical_not(f[ibase,:,3]).astype(dtype="float32",casting='same_kind'))  
+                #flagInv =  np.array(np.logical_not(f[ibase,:,3]).astype(dtype="float32",casting='same_kind'))  
+                flagInv =  np.multiply(flagArr,np.array(np.logical_not(f[ibase,:,3]).astype(dtype="float32",casting='same_kind')))
         
                 yitmp = np.multiply(v[ibase,:,3].imag, flagInv)  
                 yi = fi.finterp(inarr=yitmp,flagarr=flagInv,maskval=0.0,npts=nChan,ntaper=nTaper,niter=nIter,refant=0)
                 yi_fit = pbp.process_bptab(inarr=yi,flagarr=flagInv,maskval=0.0,npts=nChan,nsampperfit=nSampPerFit,nstagger=nStagger,npoly=n_p,nharm=n_h,refant=0,nskipleft=n_left,nskipright=n_right) 
             
                 #v_sub[ibase,:,3] = (v[ibase,:,3].real - yr_fit) + 1j*(v[ibase,:,3].imag - yi_fit)
-                yr_resi = np.array(yr - yr_fit)
-                yi_resi = np.array(yi - yi_fit) 
+                #yr_resi = np.array(yr - yr_fit)
+                #yi_resi = np.array(yi - yi_fit) 
+		yr_resi = np.array(v[ibase,:,3].real - yr_fit) 
+		yi_resi = np.array(v[ibase,:,3].imag - yi_fit)
             
                 v_sub[ibase,:,3] = np.array(yr_resi + 1j*yi_resi)
             
