@@ -70,7 +70,7 @@ if __name__ == "__main__":
     tf = table("%s/ANTENNA" %(ms), readonly=True,ack=False)
     antNames = tf.getcol("NAME")   
     nAnt = len(antNames)
-    nBase = nAnt * (nAnt + 1) / 2
+    nBase = nAnt * (nAnt + 1) // 2
     tf.close() 
     #
     tf = table("%s/OBSERVATION/" %(ms), readonly=True,ack=False)
@@ -79,7 +79,7 @@ if __name__ == "__main__":
 
     dT = (eTime - bTime )
     tInt = dT/nRows*nBase 
-    nRec = nRows/nBase
+    nRec = nRows//nBase
     #
     # 
     bTime = Time(bTime/86400.0,format='mjd')
@@ -87,26 +87,26 @@ if __name__ == "__main__":
 
     print ("%s   Observations between: %s - %s" % (telescope[0],bTime.iso,eTime.iso))
     print ("In UTC seconds from MJD=0: %f - %f" % (bTime.mjd*86400.0,eTime.mjd*86400.0))
-    print "===================================="
-    print "      Obs duration(s): ",dT
-    print "  Reference Frequency: ",rFreq[0]
-    print "   Number of Channels: ",nChan[0]
-    print "        Channel Width: ",dChan[0,0]
-    print "      Total Bandwidth: ",BW[0,0]
-    print "          Beam Number: ",beamNum[0]
-    print "   Number of Antennas: ",nAnt
-    print "  Number of Baselines: ",nBase
-    print "                nRows: ",nRows
-    print "    Number of Records: ",nRec
-    print "Effective integration: ",tInt
-    print "===================================="
+    print ("====================================")
+    print ("      Obs duration(s): ",dT)
+    print ("  Reference Frequency: ",rFreq[0])
+    print ("   Number of Channels: ",nChan[0])
+    print ("        Channel Width: ",dChan[0,0])
+    print ("      Total Bandwidth: ",BW[0,0])
+    print ("          Beam Number: ",beamNum[0])
+    print ("   Number of Antennas: ",nAnt)
+    print ("  Number of Baselines: ",nBase)
+    print ("                nRows: ",nRows)
+    print ("    Number of Records: ",nRec)
+    print ("Effective integration: ",tInt)
+    print ("====================================")
 
     if recNum > nRec: 
-	    print "Specified Record Number outside Range."
-	    sys.exit(1)
+            print ("Specified Record Number outside Range.")
+            sys.exit(1)
     if chanNum > nChan[0]: 
-	    print "Specified Channel Number outside Range."
-	    sys.exit(1)
+            print ("Specified Channel Number outside Range.")
+            sys.exit(1)
     #
     tf = table("%s/" %(ms), readonly=True,ack=False)
     dArray = tf.getcol("DATA")
@@ -114,10 +114,10 @@ if __name__ == "__main__":
     a2Array = tf.getcol("ANTENNA2")
     nPol = dArray.shape[2]
     tf.close()
-    print dArray.shape
+    print (dArray.shape)
     if polNum > nPol: 
-	    print "Specified Polarisation Number outside Range."
-	    sys.exit(1)
+            print ("Specified Polarisation Number outside Range.")
+            sys.exit(1)
     bRow = (recNum-1)*nBase
     eRow = recNum*nBase 
     print ( "%48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
@@ -125,11 +125,11 @@ if __name__ == "__main__":
     print ( "%6s %4s %4s %12s %12s" % ("Row","Ant1","Ant2","Real","Imag"))
     print ( "%48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
     for iRow in range(bRow,eRow):
-	    re = np.real(dArray[iRow,chanNum-1,polNum-1])
-	    im = np.imag(dArray[iRow,chanNum-1,polNum-1])
-	    a1 = a1Array[iRow]
-	    a2 = a2Array[iRow]
-	    print ( "%6d %4d %4d %12.7f %12.7f" % (iRow,a1,a2,re,im))
+            re = np.real(dArray[iRow,chanNum-1,polNum-1])
+            im = np.imag(dArray[iRow,chanNum-1,polNum-1])
+            a1 = a1Array[iRow]
+            a2 = a2Array[iRow]
+            print ( "%6d %4d %4d %12.7f %12.7f" % (iRow,a1,a2,re,im))
     print ( "%6s %4s %4s %12s %12s" % ("Row","Ant1","Ant2","Real","Imag"))
     print ( "%48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
     print ( "RecNum: %9d ChanNum: %6d PolNum: %1d " % (recNum,chanNum,polNum))
