@@ -2,5 +2,5 @@
 #module load askapsoft/prerelease
 f2py -c -m process_bptab process_bptab.f 
 f2py -c -m meanrms robust_meanrms.f 
-cp process_bptab.so ../../lib/.
-cp meanrms.so ../../lib/.
+cp process_bptab*.so ../../lib/process_bptab.so
+cp meanrms*.so ../../lib/meanrms.so
