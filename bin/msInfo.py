@@ -12,8 +12,8 @@ from astropy.time import Time
 """
 Code for getting metadata info from msdata.
 metadata currently output include: 
-	1. beamID (FeedID in casa)
-	2. Frequency information
+        1. beamID (FeedID in casa)
+        2. Frequency information
 The need for this code arose when ingest 
 had to write msdata split-by-beam-and-frequency. 
 The ordering of the files apparently was not 
@@ -63,195 +63,196 @@ if __name__ == "__main__":
     query = args.query_type
     outType = args.out_type
     if outType == "detailed": 
-	    detailed = True
+            detailed = True
     else: 
-	    detailed = False 
+            detailed = False 
     # Open up the SPECTRAL_WINDOW table of the current ms
     if query == "freq":
-	    tf = table("%s/SPECTRAL_WINDOW" %(ms), readonly=True,ack=False)
-	    # Read the REF_FREQUENCY information
-	    rFreq = tf.getcol("REF_FREQUENCY")   
-	    if detailed == True:
-		    print "REFERENCE_FREQUENCY: ",rFreq[0]
-	    else: 
-		    print rFreq[0]
-	    # Close the ms
-	    tf.close()
+            tf = table("%s/SPECTRAL_WINDOW" %(ms), readonly=True,ack=False)
+            # Read the REF_FREQUENCY information
+            rFreq = tf.getcol("REF_FREQUENCY")   
+            if detailed == True:
+                    print ("REFERENCE_FREQUENCY: ",rFreq[0])
+            else: 
+                    print (rFreq[0])
+            # Close the ms
+            tf.close()
     elif query == "nchan":
-	    tf = table("%s/SPECTRAL_WINDOW" %(ms), readonly=True,ack=False)
-	    # Read the REF_FREQUENCY information
-	    nChan = tf.getcol("NUM_CHAN")   
-	    if detailed == True: 
-		    print "NUM_CHAN: ",nChan[0]
-	    else: 
-		    print nChan[0]
-	    # Close the ms
-	    tf.close()
+            tf = table("%s/SPECTRAL_WINDOW" %(ms), readonly=True,ack=False)
+            # Read the REF_FREQUENCY information
+            nChan = tf.getcol("NUM_CHAN")   
+            if detailed == True: 
+                    print ("NUM_CHAN: ",nChan[0])
+            else: 
+                    print (nChan[0])
+            # Close the ms
+            tf.close()
     elif query == "nant":
-	    tf = table("%s/ANTENNA" %(ms), readonly=True,ack=False)
-	    # Read the ANTENNA information
-	    antNames = tf.getcol("NAME")   
-	    if detailed == True: 
-		    print "NANT: ",nAnt
-	    else: 
-		    print nAnt
-	    # Close the ms
-	    tf.close()
+            tf = table("%s/ANTENNA" %(ms), readonly=True,ack=False)
+            # Read the ANTENNA information
+            antNames = tf.getcol("NAME")   
+            nAnt = len(antNames)
+            if detailed == True: 
+                    print ("NANT: ",nAnt)
+            else: 
+                    print (nAnt)
+            # Close the ms
+            tf.close()
     elif query == "beam":
-	    # Open up the msdata
-	    tf = table("%s/" %(ms), readonly=True,ack=False)
-	    # Read the FEED information
-	    beamNum = tf.getcol("FEED1")   
-	    if detailed == True:
-		    print "BEAM_ID: ",beamNum[0]
-	    else: 
-		    print beamNum[0]
-	    # Close the ms
-	    tf.close()
+            # Open up the msdata
+            tf = table("%s/" %(ms), readonly=True,ack=False)
+            # Read the FEED information
+            beamNum = tf.getcol("FEED1")   
+            if detailed == True:
+                    print ("BEAM_ID: ",beamNum[0])
+            else: 
+                    print (beamNum[0])
+            # Close the ms
+            tf.close()
     elif query == "tobs":
-	    # Open up the msdata
-	    tf = table("%s/" %(ms), readonly=True,ack=False)
-	    # Read the INTERVAL information
-	    tInt = tf.getcol("INTERVAL")   
-	    nSpectra = len(tInt)
-	    interval = tInt[0]
-	    # Close the ms
-	    tf.close()
-	    # Read the number of baselines: 
-	    tf = table("%s/ANTENNA" %(ms), readonly=True,ack=False)
-	    # Read the ANTENNA information
-	    antNames = tf.getcol("NAME")   
-	    nAnt = len(antNames)
-	    nBase = nAnt*(nAnt+1)/2
-	    # Close the ms
-	    tf.close()
-	    tObs = nSpectra*interval/nBase
-	    if detailed == True:
-		    print "TOBS: ",tObs
-	    else:
-		    print tObs
+            # Open up the msdata
+            tf = table("%s/" %(ms), readonly=True,ack=False)
+            # Read the INTERVAL information
+            tInt = tf.getcol("INTERVAL")   
+            nSpectra = len(tInt)
+            interval = tInt[0]
+            # Close the ms
+            tf.close()
+            # Read the number of baselines: 
+            tf = table("%s/ANTENNA" %(ms), readonly=True,ack=False)
+            # Read the ANTENNA information
+            antNames = tf.getcol("NAME")   
+            nAnt = len(antNames)
+            nBase = nAnt*(nAnt+1)//2
+            # Close the ms
+            tf.close()
+            tObs = nSpectra*interval/nBase
+            if detailed == True:
+                    print ("TOBS: ",tObs)
+            else:
+                    print (tObs)
     elif query == "antname":
-	    tf = table("%s/ANTENNA" %(ms), readonly=True,ack=False)
-	    # Read the ANTENNA information
-	    antNames = tf.getcol("NAME")   
-	    nAnt = len(antNames)
-	    if detailed == True: 
-	            print("%15s" % ("#==============="))
-	            print("%6s %7s" % ("#Index","Name"))
-	            print("%15s" % ("#==============="))
-	            for i in range(0,nAnt):
-		            print("%5d %8s" % (i,antNames[i]))
-	            # Close the ms
-	            tf.close()
-	            print("%15s" % ("#==============="))
-	            print("%6s %7s" % ("#Index","Name"))
-	            print("%15s" % ("#==============="))
-	    else:
-	            for i in range(0,nAnt):
-		            print("%5d %8s" % (i,antNames[i]))
+            tf = table("%s/ANTENNA" %(ms), readonly=True,ack=False)
+            # Read the ANTENNA information
+            antNames = tf.getcol("NAME")   
+            nAnt = len(antNames)
+            if detailed == True: 
+                    print("%15s" % ("#==============="))
+                    print("%6s %7s" % ("#Index","Name"))
+                    print("%15s" % ("#==============="))
+                    for i in range(0,nAnt):
+                            print("%5d %8s" % (i,antNames[i]))
+                    # Close the ms
+                    tf.close()
+                    print("%15s" % ("#==============="))
+                    print("%6s %7s" % ("#Index","Name"))
+                    print("%15s" % ("#==============="))
+            else:
+                    for i in range(0,nAnt):
+                            print("%5d %8s" % (i,antNames[i]))
     elif query == "listant":
-	    tf = table("%s/ANTENNA" %(ms), readonly=True,ack=False)
-	    # Read the ANTENNA information
-	    antNames = tf.getcol("NAME")   
-	    antPos = tf.getcol("POSITION")   
-	    nAnt = len(antNames)
-	    if detailed == True: 
-		    print("%65s" % ("#================================================================"))
-	            print("%6s %7s %16s %16s %16s" % ("#Index","Name","X","Y","Z"))
-	            print("%65s" % ("#================================================================"))
-	            for i in range(0,nAnt):
-		            print("%5d %8s %16.7f %16.7f %16.7f" % (i,antNames[i],antPos[i,0],antPos[i,1],antPos[i,2]))
-	            # Close the ms
-	            tf.close()
-	            print("%65s" % ("#================================================================"))
-	            print("%6s %7s %16s %16s %16s" % ("#Index","Name","X","Y","Z"))
-	            print("%65s" % ("#================================================================"))
-	    else:
-	            for i in range(0,nAnt):
-		            print("%5d %8s %16.7f %16.7f %16.7f" % (i,antNames[i],antPos[i,0],antPos[i,1],antPos[i,2]))
+            tf = table("%s/ANTENNA" %(ms), readonly=True,ack=False)
+            # Read the ANTENNA information
+            antNames = tf.getcol("NAME")   
+            antPos = tf.getcol("POSITION")   
+            nAnt = len(antNames)
+            if detailed == True: 
+                    print("%65s" % ("#================================================================"))
+                    print("%6s %7s %16s %16s %16s" % ("#Index","Name","X","Y","Z"))
+                    print("%65s" % ("#================================================================"))
+                    for i in range(0,nAnt):
+                            print("%5d %8s %16.7f %16.7f %16.7f" % (i,antNames[i],antPos[i,0],antPos[i,1],antPos[i,2]))
+                    # Close the ms
+                    tf.close()
+                    print("%65s" % ("#================================================================"))
+                    print("%6s %7s %16s %16s %16s" % ("#Index","Name","X","Y","Z"))
+                    print("%65s" % ("#================================================================"))
+            else:
+                    for i in range(0,nAnt):
+                            print("%5d %8s %16.7f %16.7f %16.7f" % (i,antNames[i],antPos[i,0],antPos[i,1],antPos[i,2]))
     elif query == "all": 
-	    tf = table("%s/SPECTRAL_WINDOW" %(ms), readonly=True,ack=False)
-	    nChan = tf.getcol("NUM_CHAN")   
-	    rFreq = tf.getcol("REF_FREQUENCY")   
-	    dChan = tf.getcol("CHAN_WIDTH")   
-	    BW = tf.getcol("EFFECTIVE_BW")   
+            tf = table("%s/SPECTRAL_WINDOW" %(ms), readonly=True,ack=False)
+            nChan = tf.getcol("NUM_CHAN")   
+            rFreq = tf.getcol("REF_FREQUENCY")   
+            dChan = tf.getcol("CHAN_WIDTH")   
+            BW = tf.getcol("EFFECTIVE_BW")   
 
-	    tf.close()
-	    #
-	    tf = table("%s/" %(ms), readonly=True,ack=False)
-	    beamNum = tf.getcol("FEED1")   
-	    tArray = tf.getcol("TIME")   
-	    nTime = len(tArray)
-	    nRows = tArray.shape[0]
-	    tf.close()
+            tf.close()
+            #
+            tf = table("%s/" %(ms), readonly=True,ack=False)
+            beamNum = tf.getcol("FEED1")   
+            tArray = tf.getcol("TIME")   
+            nTime = len(tArray)
+            nRows = tArray.shape[0]
+            tf.close()
 
-	    bTime = tArray[0]
-	    eTime = tArray[nTime-1]
-	    #
-	    tf = table("%s/ANTENNA" %(ms), readonly=True,ack=False)
-	    antNames = tf.getcol("NAME")   
-	    nAnt = len(antNames)
-	    nBase = nAnt * (nAnt + 1) / 2
-	    tf.close() 
-	    #
-	    tf = table("%s/OBSERVATION/" %(ms), readonly=True,ack=False)
-	    telescope = tf.getcol("TELESCOPE_NAME")   
-	    tf.close() 
+            bTime = tArray[0]
+            eTime = tArray[nTime-1]
+            #
+            tf = table("%s/ANTENNA" %(ms), readonly=True,ack=False)
+            antNames = tf.getcol("NAME")   
+            nAnt = len(antNames)
+            nBase = nAnt * (nAnt + 1) // 2
+            tf.close() 
+            #
+            tf = table("%s/OBSERVATION/" %(ms), readonly=True,ack=False)
+            telescope = tf.getcol("TELESCOPE_NAME")   
+            tf.close() 
 
-	    dT = (eTime - bTime )
-	    tInt = dT/nRows*nBase 
-	    nRec = nRows/nBase
-	    #
-	    # 
-	    bTime = Time(bTime/86400.0,format='mjd')
-	    eTime = Time(eTime/86400.0,format='mjd')
+            dT = (eTime - bTime )
+            tInt = dT/nRows*nBase 
+            nRec = nRows//nBase
+            #
+            # 
+            bTime = Time(bTime/86400.0,format='mjd')
+            eTime = Time(eTime/86400.0,format='mjd')
 
-	    print ("%s   Observations between: %s - %s" % (telescope[0],bTime.iso,eTime.iso))
-	    print ("In UTC seconds from MJD=0: %f - %f" % (bTime.mjd*86400.0,eTime.mjd*86400.0))
-	    print "===================================="
-	    print "      Obs duration(s): ",dT
-	    print "  Reference Frequency: ",rFreq[0]
-	    print "   Number of Channels: ",nChan[0]
-	    print "        Channel Width: ",dChan[0,0]
-	    print "      Total Bandwidth: ",BW[0,0]
-	    print "          Beam Number: ",beamNum[0]
-	    print "   Number of Antennas: ",nAnt
-	    print "                nRows: ",nRows
-	    print "    Number of Records: ",nRec
-	    print "Effective integration: ",tInt
-	    print "===================================="
+            print ("%s   Observations between: %s - %s" % (telescope[0],bTime.iso,eTime.iso))
+            print ("In UTC seconds from MJD=0: %f - %f" % (bTime.mjd*86400.0,eTime.mjd*86400.0))
+            print ("====================================")
+            print ("      Obs duration(s): ",dT)
+            print ("  Reference Frequency: ",rFreq[0])
+            print ("   Number of Channels: ",nChan[0])
+            print ("        Channel Width: ",dChan[0,0])
+            print ("      Total Bandwidth: ",BW[0,0])
+            print ("          Beam Number: ",beamNum[0])
+            print ("   Number of Antennas: ",nAnt)
+            print ("                nRows: ",nRows)
+            print ("    Number of Records: ",nRec)
+            print ("Effective integration: ",tInt)
+            print ("====================================")
     elif query == "findGaps": 
-	    tf = table("%s/" %(ms), readonly=True,ack=False)
-	    beamNum = tf.getcol("FEED1")   
-	    tArray = tf.getcol("TIME")   
-	    tf.close()
+            tf = table("%s/" %(ms), readonly=True,ack=False)
+            beamNum = tf.getcol("FEED1")   
+            tArray = tf.getcol("TIME")   
+            tf.close()
 
-	    nTime = len(tArray)
-	    nRows = tArray.shape[0]
+            nTime = len(tArray)
+            nRows = tArray.shape[0]
 
-	    bTime = tArray[0]
-	    eTime = tArray[nTime-1]
-	    #
-	    tf = table("%s/ANTENNA" %(ms), readonly=True,ack=False)
-	    antNames = tf.getcol("NAME")   
-	    nAnt = len(antNames)
-	    nBase = nAnt * (nAnt + 1) / 2
-	    tf.close() 
-	    #
-	    dT = (eTime - bTime)
-	    tInt = dT/nRows*nBase 
-	    nRec = nRows/nBase
+            bTime = tArray[0]
+            eTime = tArray[nTime-1]
+            #
+            tf = table("%s/ANTENNA" %(ms), readonly=True,ack=False)
+            antNames = tf.getcol("NAME")   
+            nAnt = len(antNames)
+            nBase = nAnt * (nAnt + 1) // 2
+            tf.close() 
+            #
+            dT = (eTime - bTime)
+            tInt = dT/nRows*nBase 
+            nRec = nRows//nBase
 
-	    tol = 5.0 
+            tol = 5.0 
 
             iRow = -1 
-	    tRecArr = tArray[0:nRows:nBase]
-	    for iRec in range(1,nRec-1):
-		    tDelta = tRecArr[iRec] - tRecArr[iRec-1] 
-		    if (np.abs(tDelta - tInt) > tol):
-			    t1 = Time(tRecArr[iRec-1]/86400.0,format='mjd')
-			    t2 = Time(tRecArr[iRec]/86400.0,format='mjd')
-			    #print ("Missing sample in ms: %s between timeRange: %s and %s. RecordIds: %d - %d" % (ms,t1.mjd,t2.mjd,iRec-1,iRec))
-			    print ("Missing sample in ms: %s between timeRange: %s and %s. RecordIds: %d - %d" % (ms,t1.iso,t2.iso,iRec-1,iRec))
+            tRecArr = tArray[0:nRows:nBase]
+            for iRec in range(1,nRec-1):
+                    tDelta = tRecArr[iRec] - tRecArr[iRec-1] 
+                    if (np.abs(tDelta - tInt) > tol):
+                            t1 = Time(tRecArr[iRec-1]/86400.0,format='mjd')
+                            t2 = Time(tRecArr[iRec]/86400.0,format='mjd')
+                            #print ("Missing sample in ms: %s between timeRange: %s and %s. RecordIds: %d - %d" % (ms,t1.mjd,t2.mjd,iRec-1,iRec))
+                            print ("Missing sample in ms: %s between timeRange: %s and %s. RecordIds: %d - %d" % (ms,t1.iso,t2.iso,iRec-1,iRec))
     else: 
-	    print "Invalid query parameter. See help."
+            print ("Invalid query parameter. See help.")
