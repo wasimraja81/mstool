@@ -106,7 +106,7 @@ if __name__ == "__main__":
     print ("# Data shape (assumed) : %d x %d x %d" %(nRows,nChan[0],nPol))
     print ("# Data shape (per read): %d x %d" %(nBase,nChan[0]))
 
-    if recNum > nRec or recNum < 0: 
+    if recNum >= nRec or recNum < 0: 
             print ("ERROR - Specified Record Number (0-based) outside Range.")
             sys.exit(1)
     if chanNum >= nChan[0] or chanNum < 0: 
