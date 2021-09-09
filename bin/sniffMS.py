@@ -57,11 +57,12 @@ if __name__ == "__main__":
     tf.close()
     #
     tf = table("%s/" %(ms), readonly=True,ack=False)
-    data = tf.getcol("DATA")
     beamNum = tf.getcol("FEED1")   
     tArray = tf.getcol("TIME")   
     nTime = len(tArray)
-    nRows = tArray.shape[0]
+    nRows = nTime
+    dArray = tf.getcol("DATA",startrow=0,nrow=1,rowincr=1)
+    nPol = dArray.shape[2]
     tf.close()
 
     bTime = tArray[0]
@@ -85,6 +86,7 @@ if __name__ == "__main__":
     bTime = Time(bTime/86400.0,format='mjd')
     eTime = Time(eTime/86400.0,format='mjd')
 
+    print ("# Input msdata: %s \n" % (ms))
     print ("# %s   Observations between: %s - %s" % (telescope[0],bTime.iso,eTime.iso))
     print ("# In UTC seconds from MJD=0: %f - %f" % (bTime.mjd*86400.0,eTime.mjd*86400.0))
     print ("# ====================================")
@@ -96,10 +98,13 @@ if __name__ == "__main__":
     print ("#           Beam Number: ",beamNum[0])
     print ("#    Number of Antennas: ",nAnt)
     print ("#   Number of Baselines: ",nBase)
+    print ("#       Number of Corrs: ",nPol)
     print ("#                 nRows: ",nRows)
     print ("#     Number of Records: ",nRec)
     print ("# Effective integration: ",tInt)
     print ("#====================================")
+    print ("# Data shape (assumed) : %d x %d x %d" %(nRows,nChan[0],nPol))
+    print ("# Data shape (per read): %d x %d" %(nBase,nChan[0]))
 
     if recNum > nRec or recNum < 1: 
             print ("ERROR - Specified Record Number outside Range.")
@@ -107,30 +112,36 @@ if __name__ == "__main__":
     if chanNum > nChan[0] or chanNum < 1: 
             print ("ERROR - Specified Channel Number outside Range.")
             sys.exit(1)
-    #
-    tf = table("%s/" %(ms), readonly=True,ack=False)
-    dArray = tf.getcol("DATA")
-    a1Array = tf.getcol("ANTENNA1")
-    a2Array = tf.getcol("ANTENNA2")
-    nPol = dArray.shape[2]
-    tf.close()
-    print ("#            Data shape: ", dArray.shape)
     if polNum > nPol or polNum < 1: 
             print ("ERROR - Specified Polarisation Number outside Range.")
             sys.exit(1)
-    bRow = (recNum-1)*nBase
-    eRow = recNum*nBase 
-    print ( "# %48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
-    print ( "# RecNum: %9d ChanNum: %6d PolNum: %1d " % (recNum,chanNum,polNum))
-    print ( "# %6s %4s %4s %12s %12s" % ("Row","Ant1","Ant2","Real","Imag"))
-    print ( "# %48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
-    for iRow in range(bRow,eRow):
-            re = np.real(dArray[iRow,chanNum-1,polNum-1])
-            im = np.imag(dArray[iRow,chanNum-1,polNum-1])
-            a1 = a1Array[iRow]
-            a2 = a2Array[iRow]
+    #
+    tf = table("%s/" %(ms), readonly=True,ack=False)
+
+    bRec = recNum-1 # recNum expected from user in 1-based counting
+    eRec = recNum 
+    iRow = bRec * nBase 
+    for iRec in range(bRec,eRec):
+        dArray = tf.getcol('DATA',startrow=iRow,nrow=nBase,rowincr=1)
+        a1Array = tf.getcol('ANTENNA1',startrow=iRow,nrow=nBase,rowincr=1)
+        a2Array = tf.getcol('ANTENNA2',startrow=iRow,nrow=nBase,rowincr=1)
+        print ( "# %48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
+        print ( "# RecNum: %9d ChanNum: %6d PolNum: %1d " % (recNum,chanNum,polNum))
+        print ( "# %6s %4s %4s %12s %12s" % ("Row","Ant1","Ant2","Real","Imag"))
+        print ( "# %48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
+        bBase = 0
+        eBase = nBase
+        ibase = -1 
+        # Write visibilities for all baselines given a channel & pol
+        for iBase in range(0,nBase):
+            re = np.real(dArray[iBase,chanNum-1,polNum-1])
+            im = np.imag(dArray[iBase,chanNum-1,polNum-1])
+            a1 = a1Array[iBase]
+            a2 = a2Array[iBase]
             print ( "%6d %4d %4d %12.7f %12.7f" % (iRow,a1,a2,re,im))
-    print ( "# %6s %4s %4s %12s %12s" % ("Row","Ant1","Ant2","Real","Imag"))
-    print ( "# %48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
-    print ( "# RecNum: %9d ChanNum: %6d PolNum: %1d " % (recNum,chanNum,polNum))
-    print ( "# %48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
+            iRow = iRow + 1 
+        print ( "# %6s %4s %4s %12s %12s" % ("Row","Ant1","Ant2","Real","Imag"))
+        print ( "# %48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
+        print ( "# RecNum: %9d ChanNum: %6d PolNum: %1d " % (recNum,chanNum,polNum))
+        print ( "# %48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
+    tf.close()
