@@ -169,12 +169,6 @@ if __name__ == "__main__":
     fOutSpectra.write ("# Data shape (assumed) : %d x %d x %d \n" %(nRows,nChan[0],nPol))
     fOutSpectra.write ("# Data shape (per read): %d x %d \n" %(nBase,nChan[0]))
 
-    # Find out the reference baseline number (assume auto-corr present, and 0-based indices
-    index = 0
-    for i in range(0,antNum1):
-        index = index + (nAnt-i)
-    refBaseNum = index + antNum2 - antNum1
-    print("Baseline number for ante %d-%d : %d \n" % (antNum1,antNum2,refBaseNum))
 
     if recNum >= nRec or recNum < 0: 
             print ("ERROR - Specified Record Number (0-based) outside Range.")
@@ -185,6 +179,14 @@ if __name__ == "__main__":
     if polNum >= nPol or polNum < 0: 
             print ("ERROR - Specified Polarisation Number (0-based) outside Range.")
             sys.exit(1)
+
+    # Find out the reference baseline number for which to extract the spectrum. 
+    # We assume auto-corrs are present even if flagged, and 0-based indices.
+    index = 0
+    for i in range(0,antNum1):
+        index = index + (nAnt-i)
+    refBaseNum = index + antNum2 - antNum1
+    print("Baseline number for ante %d-%d : %d \n" % (antNum1,antNum2,refBaseNum))
     #
     tf = table("%s/" %(msData), readonly=True,ack=False)
 
@@ -233,11 +235,14 @@ if __name__ == "__main__":
         fOutBaselines.write ( "# %56s" % ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n"))
 
         # Now write the pol-spectrum for the reference baseline for this integration:
+        # Derive the reference RowNum for the spectra  
+        rowNum = iRec * nBase + refBaseNum
         fOutSpectra.write ( "# %56s" % ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n"))
         fOutSpectra.write ( "# NB: All indices are 0-based. \n" )
         fOutSpectra.write ( "#  \n" )
         fOutSpectra.write ( "# Visdata listed for  \n")
         fOutSpectra.write ( "#      Record Number: %d  \n" % (recNum))
+        fOutSpectra.write ( "#         Row Number: %d  \n" % (rowNum))
         fOutSpectra.write ( "#                MJD: %f  \n" % (timeNow.mjd))
         fOutSpectra.write ( "#                UTC: %s  \n" % (timeNow.iso))
         fOutSpectra.write ( "#    Baseline Number: %d  \n" % (refBaseNum))
@@ -256,6 +261,7 @@ if __name__ == "__main__":
         fOutSpectra.write ( "# %56s" % ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n"))
         fOutSpectra.write ( "# Visdata listed for  \n")
         fOutSpectra.write ( "#      Record Number: %d  \n" % (recNum))
+        fOutSpectra.write ( "#         Row Number: %d  \n" % (rowNum))
         fOutSpectra.write ( "#                MJD: %f  \n" % (timeNow.mjd))
         fOutSpectra.write ( "#                UTC: %s  \n" % (timeNow.iso))
         fOutSpectra.write ( "#    Baseline Number: %d  \n" % (refBaseNum))
