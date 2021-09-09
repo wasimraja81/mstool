@@ -25,12 +25,12 @@ def parse_args():
 
     parser.add_argument('-m','--msdata', dest='ms_data',required='true',help='Input msdata (with path)',
                         type=str)
-    parser.add_argument('-r','--recnum', dest='rec_num',help='Record Number',
-                        type=int,default=1)
-    parser.add_argument('-c','--chan', dest='chan_num',help='Channel Number',
-                        type=int,default=1)
-    parser.add_argument('-p','--pol', dest='pol_num',help='Polarisation Number (1-4)',
-                        type=int,default=1)
+    parser.add_argument('-r','--recnum', dest='rec_num',help='Record Number (0-based)',
+                        type=int,default=0)
+    parser.add_argument('-c','--chan', dest='chan_num',help='Channel Number (0-based)',
+                        type=int,default=0)
+    parser.add_argument('-p','--pol', dest='pol_num',help='Polarisation Number (0-3)',
+                        type=int,default=0)
 
     if len(sys.argv) < 2: 
         parser.print_usage()
@@ -106,20 +106,20 @@ if __name__ == "__main__":
     print ("# Data shape (assumed) : %d x %d x %d" %(nRows,nChan[0],nPol))
     print ("# Data shape (per read): %d x %d" %(nBase,nChan[0]))
 
-    if recNum > nRec or recNum < 1: 
-            print ("ERROR - Specified Record Number outside Range.")
+    if recNum > nRec or recNum < 0: 
+            print ("ERROR - Specified Record Number (0-based) outside Range.")
             sys.exit(1)
-    if chanNum > nChan[0] or chanNum < 1: 
-            print ("ERROR - Specified Channel Number outside Range.")
+    if chanNum >= nChan[0] or chanNum < 0: 
+            print ("ERROR - Specified Channel Number (0-based) outside Range.")
             sys.exit(1)
-    if polNum > nPol or polNum < 1: 
-            print ("ERROR - Specified Polarisation Number outside Range.")
+    if polNum >= nPol or polNum < 0: 
+            print ("ERROR - Specified Polarisation Number (0-based) outside Range.")
             sys.exit(1)
     #
     tf = table("%s/" %(ms), readonly=True,ack=False)
 
-    bRec = recNum-1 # recNum expected from user in 1-based counting
-    eRec = recNum 
+    bRec = recNum # recNum expected from user in 0-based counting
+    eRec = recNum+1 
     iRow = bRec * nBase 
     for iRec in range(bRec,eRec):
         dArray = tf.getcol('DATA',startrow=iRow,nrow=nBase,rowincr=1)
@@ -128,7 +128,7 @@ if __name__ == "__main__":
         a2Array = tf.getcol('ANTENNA2',startrow=iRow,nrow=nBase,rowincr=1)
         timeNow = Time(tArray[iRow]/86400.0,format='mjd')
         print ( "# %56s" % ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++"))
-        print ( "# NB: All indices are 1-based." )
+        print ( "# NB: All indices are 0-based." )
         print ( "# " )
         print ( "# Visdata listed for ")
         print ( "#      Record Number: %d " % (recNum))
@@ -143,9 +143,9 @@ if __name__ == "__main__":
         ibase = -1 
         # Write visibilities for all baselines given a channel & pol
         for iBase in range(0,nBase):
-            re = np.real(dArray[iBase,chanNum-1,polNum-1])
-            im = np.imag(dArray[iBase,chanNum-1,polNum-1])
-            flagVal=fArray[iBase,chanNum-1,polNum-1]
+            re = np.real(dArray[iBase,chanNum,polNum])
+            im = np.imag(dArray[iBase,chanNum,polNum])
+            flagVal=fArray[iBase,chanNum,polNum]
             a1 = a1Array[iBase]
             a2 = a2Array[iBase]
             print ( "%6d %4d %4d %12.7f %12.7f %10d" % (iRow,a1,a2,re,im,flagVal))
@@ -159,6 +159,6 @@ if __name__ == "__main__":
         print ( "#     Channel Number: %d " % (chanNum))
         print ( "# Correlation Number: %d " % (polNum))
         print ( "# " )
-        print ( "# NB: All indices are 1-based." )
+        print ( "# NB: All indices are 0-based." )
         print ( "# %56s" % ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++"))
     tf.close()
