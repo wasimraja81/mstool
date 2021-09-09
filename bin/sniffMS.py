@@ -123,12 +123,17 @@ if __name__ == "__main__":
     iRow = bRec * nBase 
     for iRec in range(bRec,eRec):
         dArray = tf.getcol('DATA',startrow=iRow,nrow=nBase,rowincr=1)
+        fArray = tf.getcol('FLAG',startrow=iRow,nrow=nBase,rowincr=1)
         a1Array = tf.getcol('ANTENNA1',startrow=iRow,nrow=nBase,rowincr=1)
         a2Array = tf.getcol('ANTENNA2',startrow=iRow,nrow=nBase,rowincr=1)
-        print ( "# %48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
-        print ( "# RecNum: %9d ChanNum: %6d PolNum: %1d " % (recNum,chanNum,polNum))
-        print ( "# %6s %4s %4s %12s %12s" % ("Row","Ant1","Ant2","Real","Imag"))
-        print ( "# %48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
+        print ( "# %56s" % ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++"))
+        print ( "# Visdata listed for ")
+        print ( "#      Record Number: %d " % (recNum))
+        print ( "#                MJD: %f " % (tArray[iRow]/86400.0))
+        print ( "#     Channel Number: %d " % (chanNum))
+        print ( "# Correlation Number: %d " % (polNum))
+        print ( "# %6s %4s %4s %12s %12s %10s" % ("Row","Ant1","Ant2","Real","Imag","Flag"))
+        print ( "# %56s" % ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++"))
         bBase = 0
         eBase = nBase
         ibase = -1 
@@ -136,12 +141,17 @@ if __name__ == "__main__":
         for iBase in range(0,nBase):
             re = np.real(dArray[iBase,chanNum-1,polNum-1])
             im = np.imag(dArray[iBase,chanNum-1,polNum-1])
+            flagVal=fArray[iBase,chanNum-1,polNum-1]
             a1 = a1Array[iBase]
             a2 = a2Array[iBase]
-            print ( "%6d %4d %4d %12.7f %12.7f" % (iRow,a1,a2,re,im))
+            print ( "%6d %4d %4d %12.7f %12.7f %10d" % (iRow,a1,a2,re,im,flagVal))
             iRow = iRow + 1 
-        print ( "# %6s %4s %4s %12s %12s" % ("Row","Ant1","Ant2","Real","Imag"))
-        print ( "# %48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
-        print ( "# RecNum: %9d ChanNum: %6d PolNum: %1d " % (recNum,chanNum,polNum))
-        print ( "# %48s" % ("++++++++++++++++++++++++++++++++++++++++++++++++"))
+        print ( "# %6s %4s %4s %12s %12s %10s" % ("Row","Ant1","Ant2","Real","Imag","Flag"))
+        print ( "# %56s" % ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++"))
+        print ( "# Visdata listed for  ")
+        print ( "#      Record Number: %d " % (recNum))
+        print ( "#                MJD: %f " % (tArray[iRow]/86400.0))
+        print ( "#     Channel Number: %d " % (chanNum))
+        print ( "# Correlation Number: %d " % (polNum))
+        print ( "# %56s" % ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++"))
     tf.close()
