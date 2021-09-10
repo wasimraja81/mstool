@@ -24,20 +24,22 @@ def parse_args():
     """
     parser = argparse.ArgumentParser(description='Query and print metadata information from a measurement set.')
 
-    parser.add_argument('-m','--msdata', dest='ms_data',required='true',help='Input msdata (with path)',
+    parser.add_argument('-m','--msdata', dest='ms_data',required='true',help='Input msdata (with path) [default: %(default)s]',
                         type=str)
-    parser.add_argument('-r','--recnum', dest='rec_num',help='Record Number (0-based)',
+    parser.add_argument('-r','--recnum', dest='rec_num',help='Record Number (0-based) [default: %(default)s]',
                         type=int,default=0)
-    parser.add_argument('-c','--chan', dest='chan_num',help='Channel Number (0-based)',
+    parser.add_argument('-c','--chan', dest='chan_num',help='Channel Number (0-based) [default: %(default)s]',
                         type=int,default=0)
-    parser.add_argument('-p','--pol', dest='pol_num',help='Polarisation Number (0-3)',
+    parser.add_argument('-p','--pol', dest='pol_num',help='Polarisation Number (0-3) [default: %(default)s]',
                         type=int,default=0)
-    parser.add_argument('-a1','--ant1', dest='ant_num1',help=' Lower antenna number of the baseline (0-based)',
+    parser.add_argument('-a1','--ant1', dest='ant_num1',help=' Lower antenna number of the baseline (0-based) for which to extract spectra [default: %(default)s]',
                         type=int,default=0)
-    parser.add_argument('-a2','--ant2', dest='ant_num2',help='Higher antenna number of the baseline (0-based)',
+    parser.add_argument('-a2','--ant2', dest='ant_num2',help='Higher antenna number of the baseline (0-based) for which to extract spectra [default: %(default)s]',
                         type=int,default=1)
-    parser.add_argument('-o', '--outfile', dest='out_file', help='Base name for Output files',
+    parser.add_argument('-o', '--outfile', dest='out_file', help='Base name for Output files [default: %(default)s]',
                         default='None',type=str)
+    parser.add_argument('-d', '--dryrun', help='Dry-run to query ms properties. No outputs written',
+                        action='store_true')
 
     if len(sys.argv) < 2: 
         parser.print_usage()
@@ -65,9 +67,6 @@ if __name__ == "__main__":
 
     outFileBaselines = outFile + ".sniff-baselines.rec-" + str(recNum) + ".chan-" + str(chanNum) + ".pol-" + str(polNum) + ".txt"
     outFileSpectra = outFile + ".sniff-spectra.rec-" + str(recNum) + ".ante-" + str(antNum1) + "-" + str(antNum2) + ".pol-" + str(polNum) + ".txt"
-
-    fOutBaselines = open(outFileBaselines,'w')
-    fOutSpectra = open(outFileSpectra,'w')
 
 
     # Open up the SPECTRAL_WINDOW table of the current ms
@@ -128,6 +127,19 @@ if __name__ == "__main__":
     print ("#============================================")
     print ("# Data shape (assumed) : %d x %d x %d" %(nRows,nChan[0],nPol))
     print ("# Data shape (per read): %d x %d" %(nBase,nChan[0]))
+    print ("#============================================")
+    print ("# Output Vis record (rec=%d, chan=%d, pol=%d) will be written to: " % (recNum,chanNum,polNum))
+    print ("#      %s" % (outFileBaselines))
+    print ("# ")
+    print ("# Output Vis spectrum (rec=%d, base=%d-%d, pol=%d) will be written to: " % (recNum,antNum1,antNum2,polNum))
+    print ("#      %s" % (outFileSpectra))
+    print ("#============================================")
+    if args.dryrun:
+        print("This was a dry-run. Hope you found the msInfo useful. ")
+        sys.exit(1)
+
+    fOutBaselines = open(outFileBaselines,'w')
+    fOutSpectra = open(outFileSpectra,'w')
 
     fOutBaselines.write ("# Input msdata: %s \n" % (msData))
     fOutBaselines.write ("# %s   Observations between: %s - %s \n" % (telescope[0],bTime.iso,eTime.iso))
