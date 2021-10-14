@@ -14,7 +14,7 @@ from astropy.time import Time
 Code for sniffing small section data from measurement set.
 
 
-                                     --wr, 20 Feb, 2020
+                                     --wr, 14 Oct, 2021
 
 """
 
@@ -22,7 +22,7 @@ def parse_args():
     """
     Parse input arguments
     """
-    parser = argparse.ArgumentParser(description='Query and print metadata information from a measurement set.')
+    parser = argparse.ArgumentParser(description='Query and print UVW values for a selected baseline in a measurement set.')
 
     parser.add_argument('-m','--msdata', dest='ms_data',required='true',help='Input msdata (with path) [default: %(default)s]',
                         type=str)

@@ -22,7 +22,7 @@ def parse_args():
     """
     Parse input arguments
     """
-    parser = argparse.ArgumentParser(description='Query and print metadata information from a measurement set.')
+    parser = argparse.ArgumentParser(description='Query and print visibilities from a measurement set.')
 
     parser.add_argument('-m','--msdata', dest='ms_data',required='true',help='Input msdata (with path) [default: %(default)s]',
                         type=str)
