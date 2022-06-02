@@ -18,15 +18,15 @@ REQUIRED = [
     'python-casacore', 'six', 'matplotlib', 'astropy'
 ]
 
-module1 = Extension(name='finterp',
+module1 = Extension(name='finterp_mstool',
                 sources=['mstool/src/fpython/finterp.f'],
                 extra_f90_compile_args=["-ffixed-form"]
                 )
-module2 = Extension(name='process_bptab',
+module2 = Extension(name='process_bptab_mstool',
                 sources=['mstool/src/fpython/process_bptab.f'],
                 extra_f90_compile_args=["-ffixed-form"]
                 )
-module3 = Extension(name='meanrms',
+module3 = Extension(name='meanrms_mstool',
                 sources=['mstool/src/fpython/robust_meanrms.f'],
                 extra_f90_compile_args=["-ffixed-form"]
                 )
