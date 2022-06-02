@@ -1,0 +1,2 @@
+f2py -c -m finterp finterp.f 
+cp finterp*.so ../../lib/finterp.so

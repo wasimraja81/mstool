@@ -1,0 +1,1 @@
+gfortran -Wall -o how_to_use_finterp how_to_use_finterp.f -lpgplot -lm 
