@@ -6,9 +6,9 @@ import os
 from casacore.tables import * 
 #import matplotlib.pyplot as plt 
 import numpy as np 
-import process_bptab as pbp 
-import meanrms as musigma
-import finterp as fi
+import process_bptab_mstool as pbp 
+import meanrms_mstool as musigma
+import finterp_mstool as fi
 
 def parse_args():
     """
