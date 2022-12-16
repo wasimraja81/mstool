@@ -148,7 +148,7 @@ chelp-
 !       write(*,*)'I am in mov-fit... '
          
         call poly_harm_fit(nsamp_per_fit_now,xarray,yarray,
-     -nleft,nright,lr_exclude,order_h_now,order_p_now,thresh,
+     -nleft,nright,lr_exclude,order_h_now,order_p_now,thresh_now,
      -silent,data_tag,fit_array,best_fit_param)
 
         do jj = 1,nsamp_per_fit_now
