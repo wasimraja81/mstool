@@ -659,11 +659,11 @@ if __name__ == "__main__":
                 pol_L = (np.sqrt(Q**2 + U**2) / I_safe) * 100  # Total linear polarization degree
                 pol_V = (V / I_safe) * 100  # Circular polarization degree
                 
-                # Calculate median values (ignoring NaNs)
-                median_Q = np.nanmedian(pol_Q)
-                median_U = np.nanmedian(pol_U)
-                median_L = np.nanmedian(pol_L)
-                median_V = np.nanmedian(pol_V)
+                # Calculate median values using absolute values (ignoring NaNs)
+                median_Q = np.nanmedian(np.abs(pol_Q))
+                median_U = np.nanmedian(np.abs(pol_U))
+                median_L = np.nanmedian(pol_L)  # Already positive (sqrt)
+                median_V = np.nanmedian(np.abs(pol_V))
                 
                 # Create plot
                 fig, ax = plt.subplots(1, 1, figsize=(12, 6))
@@ -686,10 +686,10 @@ if __name__ == "__main__":
                 # Add text box with median values
                 textstr = '\n'.join([
                     'Median Values:',
-                    f'Q/I = {median_Q:.3f}%',
-                    f'U/I = {median_U:.3f}%',
+                    f'|Q|/I = {median_Q:.3f}%',
+                    f'|U|/I = {median_U:.3f}%',
                     f'√(Q²+U²)/I = {median_L:.3f}%',
-                    f'V/I = {median_V:.3f}%'
+                    f'|V|/I = {median_V:.3f}%'
                 ])
                 props = dict(boxstyle='round', facecolor='lightgreen', alpha=0.9)
                 ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=10,
@@ -699,10 +699,10 @@ if __name__ == "__main__":
                 plt.savefig(plotFile, dpi=150, bbox_inches='tight')
                 print(f"Plot saved to: {plotFile}")
                 print(f"\nMedian Polarization Degrees:")
-                print(f"  Q/I = {median_Q:.3f}%")
-                print(f"  U/I = {median_U:.3f}%")
+                print(f"  |Q|/I = {median_Q:.3f}%")
+                print(f"  |U|/I = {median_U:.3f}%")
                 print(f"  √(Q²+U²)/I = {median_L:.3f}%")
-                print(f"  V/I = {median_V:.3f}%")
+                print(f"  |V|/I = {median_V:.3f}%")
                 
                 if args.show_plot:
                     figures.append(fig)
