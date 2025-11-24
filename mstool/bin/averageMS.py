@@ -444,6 +444,29 @@ if __name__ == "__main__":
         f.write(f"# Reference Frequency: {msInfo['refFreq']} Hz\n")
         f.write(f"# Channel Width: {msInfo['chanWidth'][0]} Hz\n")
         f.write(f"#\n")
+        
+        # Calculate and write leakage statistics for Stokes mode
+        if polMode == 'stokes':
+            I = np.real(avgData[:, 0])
+            Q = np.real(avgData[:, 1])
+            U = np.real(avgData[:, 2])
+            V = np.real(avgData[:, 3])
+            
+            I_safe = np.where(I != 0, I, np.nan)
+            pol_Q = (Q / I_safe) * 100
+            pol_U = (U / I_safe) * 100
+            pol_V = (V / I_safe) * 100
+            
+            median_Q = np.nanmedian(np.abs(pol_Q))
+            median_U = np.nanmedian(np.abs(pol_U))
+            median_V = np.nanmedian(np.abs(pol_V))
+            
+            f.write(f"# Leakage Statistics (median across valid channels):\n")
+            f.write(f"#   |Q|/I = {median_Q:.4f}%\n")
+            f.write(f"#   |U|/I = {median_U:.4f}%\n")
+            f.write(f"#   |V|/I = {median_V:.4f}%\n")
+            f.write(f"#\n")
+        
         f.write(f"# Column format:\n")
         f.write(f"# Chan")
         for pol in polLabels:
