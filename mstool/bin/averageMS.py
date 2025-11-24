@@ -455,15 +455,18 @@ if __name__ == "__main__":
             I_safe = np.where(I != 0, I, np.nan)
             pol_Q = (Q / I_safe) * 100
             pol_U = (U / I_safe) * 100
+            pol_L = (np.sqrt(Q**2 + U**2) / I_safe) * 100
             pol_V = (V / I_safe) * 100
             
             median_Q = np.nanmedian(np.abs(pol_Q))
             median_U = np.nanmedian(np.abs(pol_U))
+            median_L = np.nanmedian(pol_L)
             median_V = np.nanmedian(np.abs(pol_V))
             
             f.write(f"# Leakage Statistics (median across valid channels):\n")
             f.write(f"#   |Q|/I = {median_Q:.4f}%\n")
             f.write(f"#   |U|/I = {median_U:.4f}%\n")
+            f.write(f"#   √(Q²+U²)/I = {median_L:.4f}%\n")
             f.write(f"#   |V|/I = {median_V:.4f}%\n")
             f.write(f"#\n")
         
