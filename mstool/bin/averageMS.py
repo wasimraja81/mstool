@@ -143,6 +143,13 @@ def format_plot_tag_text(tags):
     return f"{tags['sb_ref']}, {tags['sb_1934']}, {tags['sb_holo']}, {tags['sb_target_1934']}"
 
 
+def extract_tag_number(tag_value):
+    match = re.search(r'-(\d+)$', str(tag_value))
+    if match:
+        return match.group(1)
+    return str(tag_value)
+
+
 def linear_to_stokes(vis_data):
     """
     Convert linear polarization correlations to Stokes parameters.
@@ -513,10 +520,10 @@ if __name__ == "__main__":
         f.write(f"# Time averaging: {timeAvg} integrations\n")
         f.write(f"# Frequency averaging: {freqAvg} channels\n")
         f.write(f"# Polarization mode: {polMode}\n")
-        f.write(f"# SB_REF: {plotTags['sb_ref']}\n")
-        f.write(f"# SB_1934: {plotTags['sb_1934']}\n")
-        f.write(f"# SB_HOLO: {plotTags['sb_holo']}\n")
-        f.write(f"# SB_TARGET_1934: {plotTags['sb_target_1934']}\n")
+        f.write(f"# SB_REF: {extract_tag_number(plotTags['sb_ref'])}\n")
+        f.write(f"# SB_1934: {extract_tag_number(plotTags['sb_1934'])}\n")
+        f.write(f"# SB_HOLO: {extract_tag_number(plotTags['sb_holo'])}\n")
+        f.write(f"# SB_TARGET_1934: {extract_tag_number(plotTags['sb_target_1934'])}\n")
         f.write(f"# Telescope: {msInfo['telescope']}\n")
         f.write(f"# Reference Frequency: {msInfo['refFreq']} Hz\n")
         f.write(f"# Channel Width: {msInfo['chanWidth'][0]} Hz\n")
