@@ -143,6 +143,23 @@ def format_plot_tag_text(tags):
     return f"{tags['sb_ref']}, {tags['sb_1934']}, {tags['sb_holo']}, {tags['sb_target_1934']}"
 
 
+def apply_plot_header(fig, main_title, plot_tag_text):
+    fig.suptitle(main_title, fontsize=14, fontweight='bold', y=0.985)
+
+    parts = [part.strip() for part in str(plot_tag_text).split(',') if part.strip()]
+    tag_text = "   |   ".join(parts)
+    fig.text(
+        0.5,
+        0.905,
+        tag_text,
+        ha='center',
+        va='center',
+        fontsize=9.5,
+        color='midnightblue',
+        bbox=dict(boxstyle='round,pad=0.22', facecolor='lavender', edgecolor='slateblue', alpha=0.92)
+    )
+
+
 def extract_tag_number(tag_value):
     match = re.search(r'-(\d+)$', str(tag_value))
     if match:
@@ -665,13 +682,13 @@ if __name__ == "__main__":
             ax4.set_ylim(-180, 180)
             ax4.set_title('Phase', fontsize=12)
             
-            fig.suptitle(
-                f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})\n{plotTagText}',
-                fontsize=14,
-                y=0.995
+            apply_plot_header(
+                fig,
+                f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})',
+                plotTagText
             )
-            
-            plt.tight_layout()
+
+            plt.tight_layout(rect=[0, 0, 1, 0.86])
             plt.savefig(plotFile, dpi=150, bbox_inches='tight')
             print(f"Plot saved to: {plotFile}")
             
@@ -690,9 +707,10 @@ if __name__ == "__main__":
             ax1.set_ylabel('Real', fontsize=12)
             ax1.grid(True, alpha=0.3)
             ax1.legend(loc='best', fontsize=10)
-            ax1.set_title(
-                f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})\n{plotTagText}',
-                fontsize=14
+            apply_plot_header(
+                fig,
+                f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})',
+                plotTagText
             )
             
             ax2.set_ylabel('Imaginary', fontsize=12)
@@ -700,7 +718,7 @@ if __name__ == "__main__":
             ax2.grid(True, alpha=0.3)
             ax2.legend(loc='best', fontsize=10)
             
-            plt.tight_layout()
+            plt.tight_layout(rect=[0, 0, 1, 0.86])
             plt.savefig(plotFile, dpi=150, bbox_inches='tight')
             print(f"Plot saved to: {plotFile}")
             
@@ -724,9 +742,10 @@ if __name__ == "__main__":
             ax1.set_ylabel('Amplitude', fontsize=12)
             ax1.grid(True, alpha=0.3)
             ax1.legend(loc='best', fontsize=10)
-            ax1.set_title(
-                f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})\n{plotTagText}',
-                fontsize=14
+            apply_plot_header(
+                fig,
+                f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})',
+                plotTagText
             )
             
             ax2.set_ylabel('Phase (degrees)', fontsize=12)
@@ -735,7 +754,7 @@ if __name__ == "__main__":
             ax2.legend(loc='best', fontsize=10)
             ax2.set_ylim(-180, 180)
             
-            plt.tight_layout()
+            plt.tight_layout(rect=[0, 0, 1, 0.86])
             plt.savefig(plotFile, dpi=150, bbox_inches='tight')
             print(f"Plot saved to: {plotFile}")
             
@@ -762,12 +781,13 @@ if __name__ == "__main__":
                 ax.set_xlabel('Frequency (MHz)', fontsize=12)
                 ax.grid(True, alpha=0.3)
                 ax.legend(loc='best', fontsize=10)
-                ax.set_title(
-                    f'Averaged Spectrum: Stokes Parameters (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})\n{plotTagText}',
-                    fontsize=14
+                apply_plot_header(
+                    fig,
+                    f'Averaged Spectrum: Stokes Parameters (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})',
+                    plotTagText
                 )
                 
-                plt.tight_layout()
+                plt.tight_layout(rect=[0, 0, 1, 0.86])
                 plt.savefig(plotFile, dpi=150, bbox_inches='tight')
                 print(f"Plot saved to: {plotFile}")
                 
@@ -824,9 +844,10 @@ if __name__ == "__main__":
                 ax.set_xlabel('Frequency (MHz)', fontsize=12)
                 ax.grid(True, alpha=0.3)
                 ax.legend(loc='best', fontsize=10)
-                ax.set_title(
-                    f'Polarization Degree (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})\n{plotTagText}',
-                    fontsize=14
+                apply_plot_header(
+                    fig,
+                    f'Polarization Degree (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})',
+                    plotTagText
                 )
                 
                 # Set y-axis limits if specified, otherwise auto-scale
@@ -849,7 +870,7 @@ if __name__ == "__main__":
                 ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=10,
                        verticalalignment='top', bbox=props)
                 
-                plt.tight_layout()
+                plt.tight_layout(rect=[0, 0, 1, 0.86])
                 plt.savefig(plotFile, dpi=150, bbox_inches='tight')
                 print(f"Plot saved to: {plotFile}")
                 print(f"\nMedian Polarization Degrees:")
