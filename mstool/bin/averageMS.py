@@ -462,12 +462,27 @@ if __name__ == "__main__":
             median_U = np.nanmedian(np.abs(pol_U))
             median_L = np.nanmedian(pol_L)
             median_V = np.nanmedian(np.abs(pol_V))
+
+            median_Q_signed = np.nanmedian(pol_Q)
+            median_U_signed = np.nanmedian(pol_U)
+            median_V_signed = np.nanmedian(pol_V)
+
+            mad_Q = np.nanmedian(np.abs(pol_Q - median_Q_signed))
+            mad_U = np.nanmedian(np.abs(pol_U - median_U_signed))
+            mad_V = np.nanmedian(np.abs(pol_V - median_V_signed))
+            mad_L = np.nanmedian(np.abs(pol_L - median_L))
             
             f.write(f"# Leakage Statistics (median across valid channels):\n")
             f.write(f"#   |Q|/I = {median_Q:.4f}%\n")
             f.write(f"#   |U|/I = {median_U:.4f}%\n")
             f.write(f"#   √(Q²+U²)/I = {median_L:.4f}%\n")
             f.write(f"#   |V|/I = {median_V:.4f}%\n")
+            f.write(f"#\n")
+            f.write(f"# Additional Leakage Statistics (median ± MAD across valid channels):\n")
+            f.write(f"#   Q/I = {median_Q_signed:.4f}% ± {mad_Q:.4f}%\n")
+            f.write(f"#   U/I = {median_U_signed:.4f}% ± {mad_U:.4f}%\n")
+            f.write(f"#   √(Q²+U²)/I = {median_L:.4f}% ± {mad_L:.4f}%\n")
+            f.write(f"#   V/I = {median_V_signed:.4f}% ± {mad_V:.4f}%\n")
             f.write(f"#\n")
         
         f.write(f"# Column format:\n")
@@ -690,6 +705,15 @@ if __name__ == "__main__":
                 median_U = np.nanmedian(np.abs(pol_U))
                 median_L = np.nanmedian(pol_L)  # Already positive (sqrt)
                 median_V = np.nanmedian(np.abs(pol_V))
+
+                median_Q_signed = np.nanmedian(pol_Q)
+                median_U_signed = np.nanmedian(pol_U)
+                median_V_signed = np.nanmedian(pol_V)
+
+                mad_Q = np.nanmedian(np.abs(pol_Q - median_Q_signed))
+                mad_U = np.nanmedian(np.abs(pol_U - median_U_signed))
+                mad_V = np.nanmedian(np.abs(pol_V - median_V_signed))
+                mad_L = np.nanmedian(np.abs(pol_L - median_L))
                 
                 # Create plot
                 fig, ax = plt.subplots(1, 1, figsize=(12, 6))
@@ -715,7 +739,11 @@ if __name__ == "__main__":
                     f'|Q|/I = {median_Q:.3f}%',
                     f'|U|/I = {median_U:.3f}%',
                     f'√(Q²+U²)/I = {median_L:.3f}%',
-                    f'|V|/I = {median_V:.3f}%'
+                    f'|V|/I = {median_V:.3f}%',
+                    '',
+                    'Additional (median ± MAD):',
+                    f'Q/I={median_Q_signed:+.3f}±{mad_Q:.3f}, U/I={median_U_signed:+.3f}±{mad_U:.3f}, V/I={median_V_signed:+.3f}±{mad_V:.3f}%',
+                    f'√(Q²+U²)/I={median_L:.3f}±{mad_L:.3f}%'
                 ])
                 props = dict(boxstyle='round', facecolor='lightgreen', alpha=0.9)
                 ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=10,
@@ -729,6 +757,11 @@ if __name__ == "__main__":
                 print(f"  |U|/I = {median_U:.3f}%")
                 print(f"  √(Q²+U²)/I = {median_L:.3f}%")
                 print(f"  |V|/I = {median_V:.3f}%")
+                print(f"\nAdditional (median ± MAD):")
+                print(f"  Q/I = {median_Q_signed:+.3f}% ± {mad_Q:.3f}%")
+                print(f"  U/I = {median_U_signed:+.3f}% ± {mad_U:.3f}%")
+                print(f"  V/I = {median_V_signed:+.3f}% ± {mad_V:.3f}%")
+                print(f"  √(Q²+U²)/I = {median_L:.3f}% ± {mad_L:.3f}%")
                 
                 if args.show_plot:
                     figures.append(fig)
