@@ -3,6 +3,7 @@
 import sys 
 import os
 import argparse
+import re
 import numpy as np
 from casacore.tables import *
 from datetime import datetime, date, time
@@ -67,6 +68,14 @@ def parse_args():
     parser.add_argument('--ylim-pol', dest='ylim_pol', nargs=2, type=float,
                         help='Y-axis limits for polarization degree plots as [ymin ymax] in percent. Default: auto-scale based on data',
                         default=None)
+    parser.add_argument('--sb-ref', dest='sb_ref_tag', type=str, default=None,
+                        help='Override SB_REF tag for plot titles (accepts 81084 or SB_REF-81084)')
+    parser.add_argument('--sb-1934', dest='sb_1934_tag', type=str, default=None,
+                        help='Override SB_1934 tag for plot titles (accepts 77045 or SB_1934-77045)')
+    parser.add_argument('--sb-holo', dest='sb_holo_tag', type=str, default=None,
+                        help='Override SB_HOLO tag for plot titles (accepts 76554 or SB_HOLO-76554)')
+    parser.add_argument('--sb-target-1934', dest='sb_target_1934_tag', type=str, default=None,
+                        help='Override SB_TARGET_1934 tag for plot titles (accepts 81089 or SB_TARGET_1934-81089)')
 
     if len(sys.argv) < 2: 
         parser.print_usage()
@@ -74,6 +83,64 @@ def parse_args():
 
     args = parser.parse_args()
     return args
+
+
+def normalize_tag_input(value, prefix):
+    if value is None:
+        return None
+    raw = str(value).strip()
+    if raw == '':
+        return None
+    if re.fullmatch(r'\d+', raw):
+        return f"{prefix}{raw}"
+    if raw.startswith(prefix):
+        return raw
+    return raw
+
+
+def extract_plot_tags(input_path, args):
+    source = str(input_path)
+
+    auto_sb_ref = None
+    auto_sb_1934 = None
+    auto_sb_holo = None
+    auto_sb_target = None
+
+    m = re.search(r'(SB_REF-\d+)', source)
+    if m:
+        auto_sb_ref = m.group(1)
+
+    m = re.search(r'(SB_1934-\d+)', source)
+    if m:
+        auto_sb_1934 = m.group(1)
+
+    m = re.search(r'(SB_HOLO-\d+)', source)
+    if m:
+        auto_sb_holo = m.group(1)
+
+    m = re.search(r'1934-processing-SB-(\d+)', source)
+    if m:
+        auto_sb_target = f"SB_TARGET_1934-{m.group(1)}"
+    else:
+        m = re.search(r'(SB_TARGET_1934-\d+)', source)
+        if m:
+            auto_sb_target = m.group(1)
+
+    sb_ref = normalize_tag_input(args.sb_ref_tag, 'SB_REF-') or auto_sb_ref or 'SB_REF-NA'
+    sb_1934 = normalize_tag_input(args.sb_1934_tag, 'SB_1934-') or auto_sb_1934 or 'SB_1934-NA'
+    sb_holo = normalize_tag_input(args.sb_holo_tag, 'SB_HOLO-') or auto_sb_holo or 'SB_HOLO-NA'
+    sb_target = normalize_tag_input(args.sb_target_1934_tag, 'SB_TARGET_1934-') or auto_sb_target or 'SB_TARGET_1934-NA'
+
+    return {
+        'sb_ref': sb_ref,
+        'sb_1934': sb_1934,
+        'sb_holo': sb_holo,
+        'sb_target_1934': sb_target,
+    }
+
+
+def format_plot_tag_text(tags):
+    return f"{tags['sb_ref']}, {tags['sb_1934']}, {tags['sb_holo']}, {tags['sb_target_1934']}"
 
 
 def linear_to_stokes(vis_data):
@@ -214,6 +281,8 @@ if __name__ == "__main__":
     polMode = args.pol_mode
     antNum1 = args.ant_num1
     antNum2 = args.ant_num2
+    plotTags = extract_plot_tags(inputMS, args)
+    plotTagText = format_plot_tag_text(plotTags)
     
     # Check if averaging all baselines
     averageAllBaselines = (antNum1 == -1 or antNum2 == -1)
@@ -314,6 +383,10 @@ if __name__ == "__main__":
     print(f"Time averaging:     {timeAvg} integrations")
     print(f"Freq averaging:     {freqAvg} channels")
     print(f"Polarization mode:  {polMode}")
+    print(f"SB_REF:             {plotTags['sb_ref']}")
+    print(f"SB_1934:            {plotTags['sb_1934']}")
+    print(f"SB_HOLO:            {plotTags['sb_holo']}")
+    print(f"SB_TARGET_1934:     {plotTags['sb_target_1934']}")
     print("-"*60)
     print(f"Output - Channels:  {nChanOut}")
     print(f"Output - Pols:      {nPol}")
@@ -440,6 +513,10 @@ if __name__ == "__main__":
         f.write(f"# Time averaging: {timeAvg} integrations\n")
         f.write(f"# Frequency averaging: {freqAvg} channels\n")
         f.write(f"# Polarization mode: {polMode}\n")
+        f.write(f"# SB_REF: {plotTags['sb_ref']}\n")
+        f.write(f"# SB_1934: {plotTags['sb_1934']}\n")
+        f.write(f"# SB_HOLO: {plotTags['sb_holo']}\n")
+        f.write(f"# SB_TARGET_1934: {plotTags['sb_target_1934']}\n")
         f.write(f"# Telescope: {msInfo['telescope']}\n")
         f.write(f"# Reference Frequency: {msInfo['refFreq']} Hz\n")
         f.write(f"# Channel Width: {msInfo['chanWidth'][0]} Hz\n")
@@ -581,7 +658,11 @@ if __name__ == "__main__":
             ax4.set_ylim(-180, 180)
             ax4.set_title('Phase', fontsize=12)
             
-            fig.suptitle(f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})', fontsize=14, y=0.995)
+            fig.suptitle(
+                f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})\n{plotTagText}',
+                fontsize=14,
+                y=0.995
+            )
             
             plt.tight_layout()
             plt.savefig(plotFile, dpi=150, bbox_inches='tight')
@@ -602,7 +683,10 @@ if __name__ == "__main__":
             ax1.set_ylabel('Real', fontsize=12)
             ax1.grid(True, alpha=0.3)
             ax1.legend(loc='best', fontsize=10)
-            ax1.set_title(f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})', fontsize=14)
+            ax1.set_title(
+                f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})\n{plotTagText}',
+                fontsize=14
+            )
             
             ax2.set_ylabel('Imaginary', fontsize=12)
             ax2.set_xlabel('Frequency (MHz)', fontsize=12)
@@ -633,7 +717,10 @@ if __name__ == "__main__":
             ax1.set_ylabel('Amplitude', fontsize=12)
             ax1.grid(True, alpha=0.3)
             ax1.legend(loc='best', fontsize=10)
-            ax1.set_title(f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})', fontsize=14)
+            ax1.set_title(
+                f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})\n{plotTagText}',
+                fontsize=14
+            )
             
             ax2.set_ylabel('Phase (degrees)', fontsize=12)
             ax2.set_xlabel('Frequency (MHz)', fontsize=12)
@@ -668,7 +755,10 @@ if __name__ == "__main__":
                 ax.set_xlabel('Frequency (MHz)', fontsize=12)
                 ax.grid(True, alpha=0.3)
                 ax.legend(loc='best', fontsize=10)
-                ax.set_title(f'Averaged Spectrum: Stokes Parameters (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})', fontsize=14)
+                ax.set_title(
+                    f'Averaged Spectrum: Stokes Parameters (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})\n{plotTagText}',
+                    fontsize=14
+                )
                 
                 plt.tight_layout()
                 plt.savefig(plotFile, dpi=150, bbox_inches='tight')
@@ -727,7 +817,10 @@ if __name__ == "__main__":
                 ax.set_xlabel('Frequency (MHz)', fontsize=12)
                 ax.grid(True, alpha=0.3)
                 ax.legend(loc='best', fontsize=10)
-                ax.set_title(f'Polarization Degree (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})', fontsize=14)
+                ax.set_title(
+                    f'Polarization Degree (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})\n{plotTagText}',
+                    fontsize=14
+                )
                 
                 # Set y-axis limits if specified, otherwise auto-scale
                 if args.ylim_pol is not None:
