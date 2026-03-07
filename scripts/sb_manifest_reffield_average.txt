@@ -1,0 +1,25 @@
+# Manifest for copy_and_combine_assessment_results.sh
+#
+# This file can fully drive copy+combine without editing the script.
+#
+# -----------------------------
+# Optional config directives
+# -----------------------------
+REMOTE=raj030@setonix-dm03.pawsey.org.au
+REMOTE_BASE=/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026/ODC-5229
+LOCAL_BASE=/Users/raj030/DATA/reffield-average
+AMP_STRATEGY=multiply-insituPreflags
+
+# -----------------------------
+# SB combinations
+# Columns (space or comma-separated):
+# sb_ref sb_1934 sb_holo sb_target_1934 [amp_strategy]
+# If [amp_strategy] is provided on a row, it overrides global AMP_STRATEGY for that row.
+# If omitted on a row, global AMP_STRATEGY (set above) is used.
+# -----------------------------
+# Previously used set
+81082 77045 76554 81089
+81083 77045 76554 81089
+81084 77045 76554 81089
+81085 77045 76554 81089
+81086 77045 76554 81089
