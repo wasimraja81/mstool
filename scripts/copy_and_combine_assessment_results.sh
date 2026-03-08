@@ -5,7 +5,9 @@ set -euo pipefail
 # User-configurable settings
 # -----------------------------
 REMOTE="raj030@setonix-dm03.pawsey.org.au"
-REMOTE_BASE="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026/ODC-5229"
+REMOTE_BASE_ROOT="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026"
+ODC_WEIGHT_ID="5229"
+REMOTE_BASE="${REMOTE_BASE_ROOT}/ODC-${ODC_WEIGHT_ID}"
 LOCAL_PARENT="${HOME}/DATA"
 LOCAL_NAME="reffield-average"
 LOCAL_BASE="${LOCAL_PARENT}/${LOCAL_NAME}"
@@ -33,6 +35,67 @@ normalize_tag() {
   fi
 }
 
+normalize_odc_tag() {
+  local value="$1"
+  if [[ -z "${value}" ]]; then
+    echo ""
+    return
+  fi
+  if [[ "${value}" =~ ^[0-9]+$ ]]; then
+    echo "ODC-${value}"
+  elif [[ "${value}" =~ ^ODC-[0-9]+$ ]]; then
+    echo "${value}"
+  else
+    echo "${value}"
+  fi
+}
+
+resolve_remote_base_from_odc() {
+  if [[ -z "${ODC_WEIGHT_ID}" ]]; then
+    return
+  fi
+
+  local odc_tag
+  odc_tag="$(normalize_odc_tag "${ODC_WEIGHT_ID}")"
+  if [[ ! "${odc_tag}" =~ ^ODC-[0-9]+$ ]]; then
+    echo "ERROR: Invalid ODC weight ID '${ODC_WEIGHT_ID}'. Expected numeric ID (e.g. 5231) or ODC-NNNN."
+    exit 1
+  fi
+
+  if [[ -n "${REMOTE_BASE_ROOT}" ]]; then
+    REMOTE_BASE="${REMOTE_BASE_ROOT%/}/${odc_tag}"
+  elif [[ "${REMOTE_BASE}" =~ ^(.*/)(ODC-[0-9]+)$ ]]; then
+    REMOTE_BASE="${BASH_REMATCH[1]}${odc_tag}"
+  else
+    REMOTE_BASE="${REMOTE_BASE%/}/${odc_tag}"
+  fi
+}
+
+resolve_remote_base_for_odc() {
+  local odc_value="$1"
+  local effective_odc="${odc_value:-${ODC_WEIGHT_ID}}"
+  local odc_tag
+
+  if [[ -z "${effective_odc}" ]]; then
+    echo "${REMOTE_BASE}"
+    return
+  fi
+
+  odc_tag="$(normalize_odc_tag "${effective_odc}")"
+  if [[ ! "${odc_tag}" =~ ^ODC-[0-9]+$ ]]; then
+    echo "ERROR: Invalid ODC weight ID '${effective_odc}'. Expected numeric ID (e.g. 5231) or ODC-NNNN." >&2
+    return 1
+  fi
+
+  if [[ -n "${REMOTE_BASE_ROOT}" ]]; then
+    echo "${REMOTE_BASE_ROOT%/}/${odc_tag}"
+  elif [[ "${REMOTE_BASE}" =~ ^(.*/)(ODC-[0-9]+)$ ]]; then
+    echo "${BASH_REMATCH[1]}${odc_tag}"
+  else
+    echo "${REMOTE_BASE%/}/${odc_tag}"
+  fi
+}
+
 # Auto-detect repo root from script location:
 # script is expected at <repo>/scripts/copy_and_combine_assessment_results.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -48,13 +111,16 @@ SOURCE_SB_TARGET_1934_ID="81089"
 SOURCE_AMP_STRATEGY="multiply-insituPreflags"
 
 SUBPATHS=()
+SUBPATH_REMOTE_BASES=()
 
 build_subpaths() {
   SUBPATHS=()
+  SUBPATH_REMOTE_BASES=()
   for sb_ref_id in "${SOURCE_SB_REF_IDS[@]}"; do
     SUBPATHS+=(
       "SB_REF-${sb_ref_id}_SB_1934-${SOURCE_SB_1934_ID}_SB_HOLO-${SOURCE_SB_HOLO_ID}_AMP_STRATEGY-${SOURCE_AMP_STRATEGY}/1934-processing-SB-${SOURCE_SB_TARGET_1934_ID}/assessment_results/"
     )
+    SUBPATH_REMOTE_BASES+=("${REMOTE_BASE}")
   done
 }
 
@@ -64,6 +130,7 @@ build_subpaths_from_manifest() {
   [[ -f "${manifest_path}" ]] || { echo "ERROR: --manifest file not found: ${manifest_path}"; exit 1; }
 
   SUBPATHS=()
+  SUBPATH_REMOTE_BASES=()
   local line_no=0
   while IFS= read -r raw_line || [[ -n "${raw_line}" ]]; do
     line_no=$((line_no + 1))
@@ -76,6 +143,8 @@ build_subpaths_from_manifest() {
     # Manifest-level config directives (KEY=VALUE), e.g.
     # REMOTE=raj030@setonix-dm03.pawsey.org.au
     # REMOTE_BASE=/scratch/.../ODC-5229
+    # REMOTE_BASE_ROOT=/scratch/.../assess_1934-2026
+    # ODC_WEIGHT_ID=5231
     # LOCAL_BASE=/Users/me/DATA/reffield-average
     # AMP_STRATEGY=multiply-insituPreflags
     if [[ "${line}" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.+)$ ]]; then
@@ -89,6 +158,12 @@ build_subpaths_from_manifest() {
           ;;
         REMOTE_BASE)
           REMOTE_BASE="${cfg_val}"
+          ;;
+        REMOTE_BASE_ROOT)
+          REMOTE_BASE_ROOT="${cfg_val}"
+          ;;
+        ODC_WEIGHT_ID|ODC|WEIGHT_ID)
+          ODC_WEIGHT_ID="${cfg_val}"
           ;;
         LOCAL_BASE)
           LOCAL_BASE="${cfg_val}"
@@ -112,8 +187,8 @@ build_subpaths_from_manifest() {
 
     # Accept comma- or whitespace-separated fields for SBID rows
     line="${line//,/ }"
-    local col1="" col2="" col3="" col4="" col5="" extra=""
-    read -r col1 col2 col3 col4 col5 extra <<< "${line}"
+    local col1="" col2="" col3="" col4="" col5="" col6="" extra=""
+    read -r col1 col2 col3 col4 col5 col6 extra <<< "${line}"
 
     # Skip header line if present
     local col1_lc
@@ -123,16 +198,45 @@ build_subpaths_from_manifest() {
     fi
 
     if [[ -z "${col1}" || -z "${col2}" || -z "${col3}" || -z "${col4}" ]]; then
-      echo "WARNING: Skipping manifest line ${line_no}: expected 4 or 5 columns (sb_ref sb_1934 sb_holo sb_target_1934 [amp_strategy])"
+      echo "WARNING: Skipping manifest line ${line_no}: expected 4 to 6 columns (sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy])"
       continue
     fi
 
-    local sb_ref_tag sb_1934_tag sb_holo_tag sb_target_tag amp_strategy
+    local sb_ref_tag sb_1934_tag sb_holo_tag sb_target_tag amp_strategy row_odc_weight row_remote_base
     sb_ref_tag="$(normalize_tag "${col1}" "SB_REF-")"
     sb_1934_tag="$(normalize_tag "${col2}" "SB_1934-")"
     sb_holo_tag="$(normalize_tag "${col3}" "SB_HOLO-")"
     sb_target_tag="$(normalize_tag "${col4}" "SB_TARGET_1934-")"
-    amp_strategy="${col5:-${SOURCE_AMP_STRATEGY}}"
+    amp_strategy="${SOURCE_AMP_STRATEGY}"
+    row_odc_weight=""
+
+    if [[ -n "${col5}" ]]; then
+      if [[ "${col5}" =~ ^(ODC-)?[0-9]+$ ]]; then
+        row_odc_weight="${col5}"
+      else
+        amp_strategy="${col5}"
+      fi
+    fi
+
+    if [[ -n "${col6}" ]]; then
+      if [[ "${col6}" =~ ^(ODC-)?[0-9]+$ ]]; then
+        if [[ -n "${row_odc_weight}" ]]; then
+          echo "WARNING: Skipping manifest line ${line_no}: multiple ODC values provided ('${col5}', '${col6}')"
+          continue
+        fi
+        row_odc_weight="${col6}"
+      elif [[ "${amp_strategy}" != "${SOURCE_AMP_STRATEGY}" ]]; then
+        echo "WARNING: Skipping manifest line ${line_no}: multiple amp_strategy values provided ('${col5}', '${col6}')"
+        continue
+      else
+        amp_strategy="${col6}"
+      fi
+    fi
+
+    if [[ -n "${extra}" ]]; then
+      echo "WARNING: Skipping manifest line ${line_no}: too many columns"
+      continue
+    fi
 
     if [[ ! "${sb_ref_tag}" =~ ^SB_REF-([0-9]+)$ ]]; then
       echo "WARNING: Skipping manifest line ${line_no}: invalid SB_REF value '${col1}'"
@@ -161,6 +265,8 @@ build_subpaths_from_manifest() {
     SUBPATHS+=(
       "SB_REF-${sb_ref_id}_SB_1934-${sb_1934_id}_SB_HOLO-${sb_holo_id}_AMP_STRATEGY-${amp_strategy}/1934-processing-SB-${sb_target_id}/assessment_results/"
     )
+    row_remote_base="$(resolve_remote_base_for_odc "${row_odc_weight}")" || exit 1
+    SUBPATH_REMOTE_BASES+=("${row_remote_base}")
   done < "${manifest_path}"
 
   if [[ ${#SUBPATHS[@]} -eq 0 ]]; then
@@ -177,7 +283,9 @@ Usage:
 Options:
   --dry-run                 Show what would be copied/processed; do not copy or run combine.
   --remote USER@HOST        Remote SSH target (default: raj030@setonix-dm03.pawsey.org.au).
+  --odc-weight-id ID        ODC weight ID (e.g. 5231 or ODC-5231).
   --remote-base PATH        Remote base directory containing SB_REF-* paths.
+  --remote-base-root PATH   Remote base root; REMOTE_BASE becomes <root>/ODC-<ID> when ODC is set.
   --local-base PATH         Full local destination path (overrides parent/name options).
   --local-parent PATH       Parent directory for local copy destination.
   --local-name NAME         Directory name under --local-parent.
@@ -200,10 +308,13 @@ Manifest format:
   - Optional config directives: KEY=VALUE
       REMOTE=...
       REMOTE_BASE=...
+      REMOTE_BASE_ROOT=...
+      ODC_WEIGHT_ID=...   (aliases: ODC, WEIGHT_ID)
       LOCAL_BASE=...   (or LOCAL_PARENT/LOCAL_NAME)
       AMP_STRATEGY=...
   - SB rows (space or comma separated):
-      sb_ref sb_1934 sb_holo sb_target_1934 [amp_strategy]
+      sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy]
+      (optional odc_weight_id and amp_strategy may be provided in either order)
 EOF
 }
 
@@ -218,9 +329,19 @@ while [[ $# -gt 0 ]]; do
       REMOTE="$2"
       shift 2
       ;;
+    --odc-weight-id|--odc)
+      [[ $# -ge 2 ]] || { echo "ERROR: $1 requires a value"; exit 1; }
+      ODC_WEIGHT_ID="$2"
+      shift 2
+      ;;
     --remote-base)
       [[ $# -ge 2 ]] || { echo "ERROR: --remote-base requires a value"; exit 1; }
       REMOTE_BASE="$2"
+      shift 2
+      ;;
+    --remote-base-root)
+      [[ $# -ge 2 ]] || { echo "ERROR: --remote-base-root requires a value"; exit 1; }
+      REMOTE_BASE_ROOT="$2"
       shift 2
       ;;
     --local-base)
@@ -286,6 +407,8 @@ OVERRIDE_SB_1934="$(normalize_tag "${OVERRIDE_SB_1934}" "SB_1934-")"
 OVERRIDE_SB_HOLO="$(normalize_tag "${OVERRIDE_SB_HOLO}" "SB_HOLO-")"
 OVERRIDE_SB_TARGET_1934="$(normalize_tag "${OVERRIDE_SB_TARGET_1934}" "SB_TARGET_1934-")"
 
+resolve_remote_base_from_odc
+
 if [[ -n "${MANIFEST_FILE}" ]]; then
   build_subpaths_from_manifest "${MANIFEST_FILE}"
 else
@@ -308,12 +431,13 @@ fi
 
 echo "==> Configuration"
 echo "  Remote host/base: ${REMOTE}:${REMOTE_BASE}"
+echo "  ODC weight ID: ${ODC_WEIGHT_ID:-none}"
 echo "  Local destination: ${LOCAL_BASE}"
 echo "  Dry run: ${DRY_RUN}"
 echo "  Manifest: ${MANIFEST_FILE:-none}"
 echo "  Tag overrides: sb_ref=${OVERRIDE_SB_REF:-auto}, sb_1934=${OVERRIDE_SB_1934:-auto}, sb_holo=${OVERRIDE_SB_HOLO:-auto}, sb_target_1934=${OVERRIDE_SB_TARGET_1934:-auto}"
 if [[ -n "${MANIFEST_FILE}" ]]; then
-  echo "  Source IDs: driven by manifest rows"
+  echo "  Source IDs: driven by manifest rows (including per-row ODC if provided)"
 else
   echo "  Source IDs: sb_ref_ids=${SOURCE_SB_REF_IDS[*]}, sb_1934=${SOURCE_SB_1934_ID}, sb_holo=${SOURCE_SB_HOLO_ID}, sb_target_1934=${SOURCE_SB_TARGET_1934_ID}"
 fi
@@ -332,15 +456,17 @@ fi
 echo "==> Copying assessment_results directories from remote"
 copied_count=0
 missing_count=0
-for sub in "${SUBPATHS[@]}"; do
+for i in "${!SUBPATHS[@]}"; do
+  sub="${SUBPATHS[$i]}"
+  remote_base_for_sub="${SUBPATH_REMOTE_BASES[$i]:-${REMOTE_BASE}}"
   sub_rel="${sub%/}"
-  remote_path="${REMOTE_BASE}/${sub_rel}"
+  remote_path="${remote_base_for_sub}/${sub_rel}"
   echo "  - ${remote_path}"
   if ssh "${REMOTE}" "test -d \"${remote_path}\""; then
     if [[ ${DRY_RUN} -eq 1 ]]; then
-      echo "    DRY-RUN: ssh ${REMOTE} \"tar -C '${REMOTE_BASE}' -cf - '${sub_rel}'\" | tar -C '${LOCAL_BASE}' -xf -"
+      echo "    DRY-RUN: ssh ${REMOTE} \"tar -C '${remote_base_for_sub}' -cf - '${sub_rel}'\" | tar -C '${LOCAL_BASE}' -xf -"
     else
-      ssh "${REMOTE}" "tar -C \"${REMOTE_BASE}\" -cf - \"${sub_rel}\"" | tar -C "${LOCAL_BASE}" -xf -
+      ssh "${REMOTE}" "tar -C \"${remote_base_for_sub}\" -cf - \"${sub_rel}\"" | tar -C "${LOCAL_BASE}" -xf -
     fi
     copied_count=$((copied_count + 1))
   else
@@ -433,7 +559,14 @@ fi
 
 echo "==> Running combine_beam_outputs.py on each copied assessment_results directory"
 count=0
-while IFS= read -r -d '' dir; do
+for sub in "${SUBPATHS[@]}"; do
+  sub_rel="${sub%/}"
+  dir="${LOCAL_BASE}/${sub_rel}"
+  if [[ ! -d "${dir}" ]]; then
+    echo "WARNING: Expected local directory not found, skipping combine: ${dir}"
+    continue
+  fi
+
   count=$((count + 1))
   echo "\n[${count}] Processing: ${dir}"
 
@@ -484,10 +617,10 @@ while IFS= read -r -d '' dir; do
 
   echo "    Tags: ${sb_ref_tag:-NA} ${sb_1934_tag:-NA} ${sb_holo_tag:-NA} ${sb_target_1934_tag:-NA}"
   "${combine_cmd[@]}"
-done < <(find "${LOCAL_BASE}" -type d -path "*/assessment_results" -print0 | sort -z)
+done
 
 if [[ ${count} -eq 0 ]]; then
-  echo "WARNING: No local assessment_results directories found under ${LOCAL_BASE}"
+  echo "WARNING: No local assessment_results directories found for configured SUBPATHS under ${LOCAL_BASE}"
   exit 1
 fi
 
