@@ -45,7 +45,24 @@ module load askappipeline/axa-3859-fix-generate-parset-for-offset-fields
 DO_FIND_BANDPASS=true
 DO_FETCH_RAWDATA=true
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR=""
+if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
+    search_dir="${SLURM_SUBMIT_DIR}"
+    while [[ "${search_dir}" != "/" ]]; do
+        candidate="${search_dir}/projects/calibration-updates-2026/slurm"
+        if [[ -f "${candidate}/run_refField.sh" ]]; then
+            SCRIPT_DIR="${candidate}"
+            break
+        fi
+        search_dir="$(cd "${search_dir}/.." && pwd)"
+    done
+fi
+
+if [[ -z "${SCRIPT_DIR}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
+
+echo "INFO - SCRIPT_DIR: ${SCRIPT_DIR}"
 MANIFEST_FILE_DEFAULT="${SCRIPT_DIR}/../manifests/sb_manifest_reffield_average.txt"
 MANIFEST_FILE="${MANIFEST_FILE:-${MANIFEST_FILE_DEFAULT}}"
 BSB_OVERRIDE="${BSB_OVERRIDE:-}"
