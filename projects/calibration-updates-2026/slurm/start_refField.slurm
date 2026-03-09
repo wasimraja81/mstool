@@ -32,6 +32,10 @@ fi
 unset ACES
 unset PYTHONPATH
 unset PYTHONSTARTUP
+# Preserve submission directory before clearing SLURM_* environment.
+# Under sbatch, $0 points to a spool copy (/var/spool/slurmd/...)
+# so we cannot rely on dirname($0) to find repo-local templates.
+SLURM_SUBMIT_DIR_SNAPSHOT="${SLURM_SUBMIT_DIR:-}"
 for slurmEnvVar in $(env | grep SLURM_ | awk -F'=' '{print $1}'); do
     echo "Unsetting ${slurmEnvVar}..."
     unset $slurmEnvVar
@@ -46,8 +50,10 @@ DO_FIND_BANDPASS=true
 DO_FETCH_RAWDATA=true
 
 SCRIPT_DIR=""
-if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
-    search_dir="${SLURM_SUBMIT_DIR}"
+if [[ -n "${SLURM_SUBMIT_DIR_SNAPSHOT}" ]]; then
+    # Walk upward from submit dir to locate the cloned repo root,
+    # then pin SCRIPT_DIR to projects/calibration-updates-2026/slurm.
+    search_dir="${SLURM_SUBMIT_DIR_SNAPSHOT}"
     while [[ "${search_dir}" != "/" ]]; do
         candidate="${search_dir}/projects/calibration-updates-2026/slurm"
         if [[ -f "${candidate}/run_refField.sh" ]]; then
@@ -59,6 +65,8 @@ if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
 fi
 
 if [[ -z "${SCRIPT_DIR}" ]]; then
+    # Fallback (works for direct shell execution, but under sbatch this
+    # often resolves to /var/spool/slurmd/... and should be avoided).
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 fi
 
