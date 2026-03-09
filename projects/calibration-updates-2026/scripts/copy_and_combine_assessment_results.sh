@@ -121,17 +121,55 @@ SOURCE_SB_REF_IDS=(81082 81083)
 SOURCE_SB_1934_ID="77045"
 SOURCE_SB_HOLO_ID="76554"
 SOURCE_SB_TARGET_1934_ID="81089"
-SOURCE_AMP_STRATEGY="multiply-insituPreflags"
+SOURCE_AMP_STRATEGY="multiply"
+SOURCE_DO_PREFLAG_REFTABLE="true"
 
 SUBPATHS=()
 SUBPATH_REMOTE_BASES=()
+
+is_preflag_token() {
+  local token_lc
+  token_lc="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+  [[ "${token_lc}" == *preflag* || "${token_lc}" == "none" || "${token_lc}" == "off" || "${token_lc}" == "on" || "${token_lc}" == "true" || "${token_lc}" == "false" ]]
+}
+
+normalize_do_preflag_value() {
+  local token_lc
+  token_lc="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+  case "${token_lc}" in
+    true|on|yes|1|insitupreflags)
+      echo "true"
+      ;;
+    false|off|no|0|none)
+      echo "false"
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
+
+build_strategy_suffix() {
+  local amp_strategy="$1"
+  local do_preflag="$2"
+  local suffix=""
+  if [[ -n "${amp_strategy}" ]]; then
+    suffix+="_AMP_STRATEGY-${amp_strategy}"
+  fi
+  if [[ "${do_preflag}" == "true" && -n "${amp_strategy}" ]]; then
+    suffix+="-insituPreflags"
+  fi
+  echo "${suffix}"
+}
 
 build_subpaths() {
   SUBPATHS=()
   SUBPATH_REMOTE_BASES=()
   for sb_ref_id in "${SOURCE_SB_REF_IDS[@]}"; do
+    local strategy_suffix
+    strategy_suffix="$(build_strategy_suffix "${SOURCE_AMP_STRATEGY}" "${SOURCE_DO_PREFLAG_REFTABLE}")"
     SUBPATHS+=(
-      "SB_REF-${sb_ref_id}_SB_1934-${SOURCE_SB_1934_ID}_SB_HOLO-${SOURCE_SB_HOLO_ID}_AMP_STRATEGY-${SOURCE_AMP_STRATEGY}/1934-processing-SB-${SOURCE_SB_TARGET_1934_ID}/assessment_results/"
+      "SB_REF-${sb_ref_id}_SB_1934-${SOURCE_SB_1934_ID}_SB_HOLO-${SOURCE_SB_HOLO_ID}${strategy_suffix}/1934-processing-SB-${SOURCE_SB_TARGET_1934_ID}/assessment_results/"
     )
     SUBPATH_REMOTE_BASES+=("${REMOTE_BASE}")
   done
@@ -159,7 +197,8 @@ build_subpaths_from_manifest() {
     # REMOTE_BASE_ROOT=/scratch/.../assess_1934-2026
     # ODC_WEIGHT_ID=5231
     # LOCAL_BASE=/Users/me/DATA/reffield-average
-    # AMP_STRATEGY=multiply-insituPreflags
+    # AMP_STRATEGY=multiply
+    # DO_PREFLAG_REFTABLE=true
     if [[ "${line}" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.+)$ ]]; then
       local cfg_key="${BASH_REMATCH[1]}"
       local cfg_val="${BASH_REMATCH[2]}"
@@ -191,6 +230,15 @@ build_subpaths_from_manifest() {
         AMP_STRATEGY)
           SOURCE_AMP_STRATEGY="${cfg_val}"
           ;;
+        DO_PREFLAG_REFTABLE|PREFLAGGING_STRATEGY|PREFLAG_STRATEGY|FLAG_STRATEGY)
+          local normalized_preflag
+          normalized_preflag="$(normalize_do_preflag_value "${cfg_val}")"
+          if [[ -z "${normalized_preflag}" ]]; then
+            echo "WARNING: Invalid DO_PREFLAG_REFTABLE value '${cfg_val}' on line ${line_no}; expected true/false or insituPreflags/none"
+          else
+            SOURCE_DO_PREFLAG_REFTABLE="${normalized_preflag}"
+          fi
+          ;;
         *)
           echo "WARNING: Unknown manifest config key '${cfg_key}' on line ${line_no}; ignoring"
           ;;
@@ -200,8 +248,21 @@ build_subpaths_from_manifest() {
 
     # Accept comma- or whitespace-separated fields for SBID rows
     line="${line//,/ }"
-    local col1="" col2="" col3="" col4="" col5="" col6="" extra=""
-    read -r col1 col2 col3 col4 col5 col6 extra <<< "${line}"
+    local col1="" col2="" col3="" col4="" col5="" col6="" col7="" extra=""
+    read -r col1 col2 col3 col4 col5 col6 col7 extra <<< "${line}"
+
+    # Optional leading row index:
+    # idx sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy] [do_preflag_reftable]
+    if [[ "${col1}" =~ ^[0-9]+$ ]]; then
+      col1="${col2}"
+      col2="${col3}"
+      col3="${col4}"
+      col4="${col5}"
+      col5="${col6}"
+      col6="${col7}"
+      col7="${extra}"
+      extra=""
+    fi
 
     # Skip header line if present
     local col1_lc
@@ -211,40 +272,48 @@ build_subpaths_from_manifest() {
     fi
 
     if [[ -z "${col1}" || -z "${col2}" || -z "${col3}" || -z "${col4}" ]]; then
-      echo "WARNING: Skipping manifest line ${line_no}: expected 4 to 6 columns (sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy])"
+      echo "WARNING: Skipping manifest line ${line_no}: expected 4 to 8 columns ([idx] sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy] [do_preflag_reftable])"
       continue
     fi
 
-    local sb_ref_tag sb_1934_tag sb_holo_tag sb_target_tag amp_strategy row_odc_weight row_remote_base
+    local sb_ref_tag sb_1934_tag sb_holo_tag sb_target_tag amp_strategy row_do_preflag row_odc_weight row_remote_base
     sb_ref_tag="$(normalize_tag "${col1}" "SB_REF-")"
     sb_1934_tag="$(normalize_tag "${col2}" "SB_1934-")"
     sb_holo_tag="$(normalize_tag "${col3}" "SB_HOLO-")"
     sb_target_tag="$(normalize_tag "${col4}" "SB_TARGET_1934-")"
     amp_strategy="${SOURCE_AMP_STRATEGY}"
+    row_do_preflag="${SOURCE_DO_PREFLAG_REFTABLE}"
     row_odc_weight=""
 
-    if [[ -n "${col5}" ]]; then
-      if [[ "${col5}" =~ ^(ODC-)?[0-9]+$ ]]; then
-        row_odc_weight="${col5}"
-      else
-        amp_strategy="${col5}"
-      fi
-    fi
-
-    if [[ -n "${col6}" ]]; then
-      if [[ "${col6}" =~ ^(ODC-)?[0-9]+$ ]]; then
+    local token
+    for token in "${col5}" "${col6}" "${col7}"; do
+      [[ -z "${token}" ]] && continue
+      if [[ "${token}" =~ ^(ODC-)?[0-9]+$ ]]; then
         if [[ -n "${row_odc_weight}" ]]; then
-          echo "WARNING: Skipping manifest line ${line_no}: multiple ODC values provided ('${col5}', '${col6}')"
-          continue
+          echo "WARNING: Skipping manifest line ${line_no}: multiple ODC values provided"
+          continue 2
         fi
-        row_odc_weight="${col6}"
-      elif [[ "${amp_strategy}" != "${SOURCE_AMP_STRATEGY}" ]]; then
-        echo "WARNING: Skipping manifest line ${line_no}: multiple amp_strategy values provided ('${col5}', '${col6}')"
-        continue
+        row_odc_weight="${token}"
+      elif is_preflag_token "${token}"; then
+        local normalized_row_preflag
+        normalized_row_preflag="$(normalize_do_preflag_value "${token}")"
+        if [[ -z "${normalized_row_preflag}" ]]; then
+          echo "WARNING: Skipping manifest line ${line_no}: invalid preflag token '${token}'"
+          continue 2
+        fi
+        if [[ "${row_do_preflag}" != "${SOURCE_DO_PREFLAG_REFTABLE}" ]]; then
+          echo "WARNING: Skipping manifest line ${line_no}: multiple do_preflag_reftable values provided"
+          continue 2
+        fi
+        row_do_preflag="${normalized_row_preflag}"
       else
-        amp_strategy="${col6}"
+        if [[ "${amp_strategy}" != "${SOURCE_AMP_STRATEGY}" ]]; then
+          echo "WARNING: Skipping manifest line ${line_no}: multiple amp_strategy values provided"
+          continue 2
+        fi
+        amp_strategy="${token}"
       fi
-    fi
+    done
 
     if [[ -n "${extra}" ]]; then
       echo "WARNING: Skipping manifest line ${line_no}: too many columns"
@@ -276,7 +345,7 @@ build_subpaths_from_manifest() {
     local sb_target_id="${BASH_REMATCH[1]}"
 
     SUBPATHS+=(
-      "SB_REF-${sb_ref_id}_SB_1934-${sb_1934_id}_SB_HOLO-${sb_holo_id}_AMP_STRATEGY-${amp_strategy}/1934-processing-SB-${sb_target_id}/assessment_results/"
+      "SB_REF-${sb_ref_id}_SB_1934-${sb_1934_id}_SB_HOLO-${sb_holo_id}$(build_strategy_suffix "${amp_strategy}" "${row_do_preflag}")/1934-processing-SB-${sb_target_id}/assessment_results/"
     )
     row_remote_base="$(resolve_remote_base_for_odc "${row_odc_weight}")" || exit 1
     SUBPATH_REMOTE_BASES+=("${row_remote_base}")
@@ -325,9 +394,10 @@ Manifest format:
       ODC_WEIGHT_ID=...   (aliases: ODC, WEIGHT_ID)
       LOCAL_BASE=...   (or LOCAL_PARENT/LOCAL_NAME)
       AMP_STRATEGY=...
+          DO_PREFLAG_REFTABLE=...   (aliases: PREFLAGGING_STRATEGY, PREFLAG_STRATEGY, FLAG_STRATEGY)
   - SB rows (space or comma separated):
-      sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy]
-      (optional odc_weight_id and amp_strategy may be provided in either order)
+          [idx] sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy] [do_preflag_reftable]
+          (optional odc_weight_id, amp_strategy and do_preflag_reftable may be provided in any order)
 EOF
 }
 
