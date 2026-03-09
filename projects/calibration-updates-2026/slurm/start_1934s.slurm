@@ -9,6 +9,8 @@
 #SBATCH --output=slurm-POLCOMP-TESTS-%j.out
 #SBATCH --export=NONE
 
+set -euo pipefail
+
 # Setting up the environment
 failure=false
 echo "whoami: $(whoami)"
@@ -76,6 +78,12 @@ DIR_SB=/askapbuffer/payne/raj030/askap-scheduling-blocks
 
 WORK_DIR="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026"
 SCIENCE_CONFIG_TEMPLATE="${SCRIPT_DIR}/run_1934Field.sh"
+echo "INFO - SCIENCE_CONFIG_TEMPLATE: ${SCIENCE_CONFIG_TEMPLATE}"
+if [[ ! -f "${SCIENCE_CONFIG_TEMPLATE}" ]]; then
+    echo "ERROR: Missing 1934-field template: ${SCIENCE_CONFIG_TEMPLATE}"
+    echo "ERROR: Ensure run_1934Field.sh exists in the slurm directory on HPC clone."
+    exit 1
+fi
 
 #BP_UPDATE_MODIFY_AMP_STRATEGY="keep"
 BP_UPDATE_MODIFY_AMP_STRATEGY="multiply"

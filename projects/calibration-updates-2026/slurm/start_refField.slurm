@@ -9,6 +9,8 @@
 #SBATCH --output=slurm-POLCOMP-TESTS-%j.out
 #SBATCH --export=NONE
 
+set -euo pipefail
+
 # Setting up the environment
 failure=false
 echo "whoami: $(whoami)"
@@ -83,6 +85,12 @@ WORK_DIR="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-
 FETCHED_DIR="/askapbuffer/payne/dmitchell/askap-scheduling-blocks"
 #FETCHED_DIR="/scratch/askaprt/tgalvin/racs_low3"
 REF_CONFIG_TEMPLATE="${SCRIPT_DIR}/run_refField.sh"
+echo "INFO - REF_CONFIG_TEMPLATE: ${REF_CONFIG_TEMPLATE}"
+if [[ ! -f "${REF_CONFIG_TEMPLATE}" ]]; then
+    echo "ERROR: Missing reference-field template: ${REF_CONFIG_TEMPLATE}"
+    echo "ERROR: Ensure run_refField.sh exists in the slurm directory on HPC clone."
+    exit 1
+fi
 refFieldList=(56572 \
 	56644 \
 	56647 \
@@ -440,7 +448,7 @@ if [ "${DO_FIND_BANDPASS}" == "true" ]; then
             configNow1="run_refField_SB_REF-${sbRefNow}_SB_1934-${sb1934Now}_SB_PB-${holoSBNow}.sh"
 
             # Load base config parameters: 
-            cat ${REF_CONFIG_TEMPLATE} >${configNow1}
+            cat "${REF_CONFIG_TEMPLATE}" >"${configNow1}"
             cat >>${configNow1} << EOF
 DIR_SB=${DIR_SB}
 BP_UPDATE_MODIFY_AMP_STRATEGY=${ampStrategyNow}
