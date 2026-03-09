@@ -1,10 +1,13 @@
-# bptool  
-This directory contains tools for ASKAP table analysis. 
-* `bin` - contains python scripts for ASKAP ms table query/analysis, and continuum removal.
-* `src` - Fortran codes for poly-harm fitting - used for continuum removal per baseline per timeStamp.
-* `doc` - Historical folder containing a ppt describing the various mstool features and tools.
+# mstool
+This repository contains tools for ASKAP table analysis.
 
-The required fortran libraries are built and the scripts installed in the system default directories with the fortran libraries properly linked. 
+## Repository layout
+* `mstool/bin` - reusable python scripts for ASKAP ms table query/analysis and continuum removal.
+* `mstool/src` - Fortran codes for poly-harm fitting used for continuum removal per baseline per timestamp.
+* `mstool/doc` - historical notes/presentations about mstool features.
+* `projects/calibration-updates-2026` - project-specific helpers (manifests, slurm, orchestration scripts) for calibration updates using reference fields.
+
+The required fortran libraries are built and the core scripts are installed in the system default directories with the fortran libraries properly linked.
 ### Python scripts 
 MSTOOL comprises of the following python scripts: 
 * `msInfo.py` - Query and print metadata information and tables from a measurement set.
@@ -24,6 +27,12 @@ This will build the fortran libraries, and install the scripts in `/usr/local/bi
 ### Run a test
 ```
 askapuser>$ msInfo.py -h
+```
+
+### Project-specific workflow (calibration updates)
+```
+askapuser>$ ./projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
+	--manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
 ```
 
 

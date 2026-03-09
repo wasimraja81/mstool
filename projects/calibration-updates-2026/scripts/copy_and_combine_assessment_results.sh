@@ -96,10 +96,23 @@ resolve_remote_base_for_odc() {
   fi
 }
 
-# Auto-detect repo root from script location:
-# script is expected at <repo>/scripts/copy_and_combine_assessment_results.sh
+# Auto-detect repo root from script location.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SEARCH_DIR="${SCRIPT_DIR}"
+REPO_ROOT=""
+while [[ "${SEARCH_DIR}" != "/" ]]; do
+  if [[ -f "${SEARCH_DIR}/setup.py" && -f "${SEARCH_DIR}/mstool/bin/combine_beam_outputs.py" ]]; then
+    REPO_ROOT="${SEARCH_DIR}"
+    break
+  fi
+  SEARCH_DIR="$(cd "${SEARCH_DIR}/.." && pwd)"
+done
+
+if [[ -z "${REPO_ROOT}" ]]; then
+  echo "ERROR: Could not locate repo root containing setup.py and mstool/bin/combine_beam_outputs.py"
+  exit 1
+fi
+
 COMBINE_SCRIPT="${REPO_ROOT}/mstool/bin/combine_beam_outputs.py"
 
 # Remote subpaths to copy are constructed from SB IDs + shared naming pattern.
