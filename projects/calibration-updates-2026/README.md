@@ -13,7 +13,7 @@ Convenience wrappers in `scripts/` (run from `~/mstool/scratch`):
 - `run_stage-1.sh` (submit stage `ref` for idx=2)
 - `run_stage-2.sh` (submit stage `1934` for idx=2)
 - `run_stage-3.sh` (run assessment for idx=2)
-- `run_stage-4.sh` (run copy+combine locally)
+- `run_stage-4.sh` (run copy+combine locally for idx=2)
 
 ## Main workflow helper
 
@@ -209,6 +209,14 @@ TMP_MANIFEST=/tmp/mstool_manifest_idx2.txt
 
 ../projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
   --manifest "$TMP_MANIFEST"
+```
+
+Stage-4 now also supports direct manifest row filtering:
+
+```bash
+../projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
+  --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --start-index 2 --end-index 2
 ```
 
 ## Notes
