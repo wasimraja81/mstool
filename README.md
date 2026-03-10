@@ -18,7 +18,7 @@ MSTOOL comprises of the following python scripts:
 
 ### building and installation
 ```
-askapdev>$ git clone ssh://git@bitbucket.csiro.au:7999/~raj030/mstool.git
+askapdev>$ git clone https://github.com/wasimraja81/mstool.git
 askapdev>$ cd mstool
 askapuser>$ pip3 install -e .
 ```

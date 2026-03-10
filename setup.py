@@ -7,7 +7,7 @@ import io
 # Package meta-data.
 NAME = 'mstool'
 DESCRIPTION = 'Python scripts to analyse ASKAP ms tables.'
-URL = 'https://bitbucket.csiro.au/users/raj030/repos/mstool'
+URL = 'https://github.com/wasimraja81/mstool'
 EMAIL = 'wasim.raja@csiro.au'
 AUTHOR = 'Wasim Raja'
 REQUIRES_PYTHON = '>=3.6.0'
