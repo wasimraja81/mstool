@@ -102,4 +102,21 @@ Before running on your environment, update paths and access settings in your man
 
 Prefer overriding via manifest `KEY=VALUE` entries and CLI arguments rather than hard-coding user-specific paths in scripts.
 
+### Release tag checklist (recommended)
+
+Before creating a release tag (for example `3.4`):
+
+1. Ensure `CHANGELOG.md` has an entry for that exact version.
+2. Merge release changes from `develop` into `main`.
+3. Create and push an annotated tag from the release commit on `main`.
+
+If you discover issues *before public release consumption*, you may move the same tag to a newer commit:
+
+```bash
+git tag -f 3.4 <new-commit>
+git push origin 3.4 --force
+```
+
+If the release is already public/consumed, do **not** move the existing tag; publish a new patch version (for example `3.4.1`).
+
 
