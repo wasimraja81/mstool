@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented in this file.
 
+## 3.4 - 2026-03-11
+
+Patch release focused on strict strategy parsing and safer operator validation for stage-1/stage-2.
+
+### Added
+- `--dry-run-parse` option in:
+  - `projects/calibration-updates-2026/slurm/start_refField.slurm`
+  - `projects/calibration-updates-2026/slurm/start_1934s.slurm`
+- Parse mode prints effective per-index tuple values after global defaults and row-level overrides:
+  - `ODC_WEIGHT`
+  - `AMP_STRATEGY`
+  - `DO_PREFLAG_REFTABLE`
+
+### Changed
+- Manifest optional row tokens in stage-1/stage-2 SLURM scripts are now strict `KEY=VALUE`.
+- Unknown or malformed optional tokens now fail fast with explicit errors.
+- Added early `-h/--help` handling in both SLURM scripts.
+- Added `sh`-safe bootstrap (`exec /bin/bash`) for both SLURM scripts to avoid shell-compatibility issues.
+
+### Fixed
+- Row-level `ODC_WEIGHT=...` now deterministically overrides global default values for the corresponding tuple.
+- Removed ambiguous positional-token behavior that could misinterpret strategy values.
+- `--dry-run-parse` now runs without requiring HPC module environment setup.
+
 ## 3.2 - 2026-03-10
 
 Production release focused on stage-4 usability and clearer operator documentation.
