@@ -76,6 +76,8 @@ def parse_args():
                         help='Override SB_HOLO tag for plot titles (accepts 76554 or SB_HOLO-76554)')
     parser.add_argument('--sb-target-1934', dest='sb_target_1934_tag', type=str, default=None,
                         help='Override SB_TARGET_1934 tag for plot titles (accepts 81089 or SB_TARGET_1934-81089)')
+    parser.add_argument('--field-name', dest='field_name', type=str, default=None,
+                        help='Optional SB_REF field name to show as a third header row on plots')
 
     if len(sys.argv) < 2: 
         parser.print_usage()
@@ -143,7 +145,7 @@ def format_plot_tag_text(tags):
     return f"{tags['sb_ref']}, {tags['sb_1934']}, {tags['sb_holo']}, {tags['sb_target_1934']}"
 
 
-def apply_plot_header(fig, main_title, plot_tag_text):
+def apply_plot_header(fig, main_title, plot_tag_text, field_name=''):
     fig.suptitle(main_title, fontsize=14, fontweight='bold', y=0.985)
 
     parts = [part.strip() for part in str(plot_tag_text).split(',') if part.strip()]
@@ -158,6 +160,21 @@ def apply_plot_header(fig, main_title, plot_tag_text):
         color='midnightblue',
         bbox=dict(boxstyle='round,pad=0.22', facecolor='lavender', edgecolor='slateblue', alpha=0.92)
     )
+
+    field_name_text = str(field_name or '').strip()
+    if field_name_text:
+        fig.text(
+            0.5,
+            0.865,
+            f"SB_REF FIELD_NAME: {field_name_text}",
+            ha='center',
+            va='center',
+            fontsize=9.2,
+            color='darkgreen',
+            bbox=dict(boxstyle='round,pad=0.20', facecolor='honeydew', edgecolor='seagreen', alpha=0.90)
+        )
+    else:
+        fig.text(0.5, 0.865, ' ', ha='center', va='center', fontsize=9.2)
 
 
 def extract_tag_number(tag_value):
@@ -307,6 +324,7 @@ if __name__ == "__main__":
     antNum2 = args.ant_num2
     plotTags = extract_plot_tags(inputMS, args)
     plotTagText = format_plot_tag_text(plotTags)
+    fieldName = str(args.field_name or '').strip()
     
     # Check if averaging all baselines
     averageAllBaselines = (antNum1 == -1 or antNum2 == -1)
@@ -685,10 +703,11 @@ if __name__ == "__main__":
             apply_plot_header(
                 fig,
                 f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})',
-                plotTagText
+                plotTagText,
+                fieldName
             )
 
-            plt.tight_layout(rect=[0, 0, 1, 0.86])
+            plt.tight_layout(rect=[0, 0, 1, 0.83])
             plt.savefig(plotFile, dpi=150, bbox_inches='tight')
             print(f"Plot saved to: {plotFile}")
             
@@ -710,7 +729,8 @@ if __name__ == "__main__":
             apply_plot_header(
                 fig,
                 f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})',
-                plotTagText
+                plotTagText,
+                fieldName
             )
             
             ax2.set_ylabel('Imaginary', fontsize=12)
@@ -718,7 +738,7 @@ if __name__ == "__main__":
             ax2.grid(True, alpha=0.3)
             ax2.legend(loc='best', fontsize=10)
             
-            plt.tight_layout(rect=[0, 0, 1, 0.86])
+            plt.tight_layout(rect=[0, 0, 1, 0.83])
             plt.savefig(plotFile, dpi=150, bbox_inches='tight')
             print(f"Plot saved to: {plotFile}")
             
@@ -745,7 +765,8 @@ if __name__ == "__main__":
             apply_plot_header(
                 fig,
                 f'Averaged Spectrum: {polMode.upper()} (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})',
-                plotTagText
+                plotTagText,
+                fieldName
             )
             
             ax2.set_ylabel('Phase (degrees)', fontsize=12)
@@ -754,7 +775,7 @@ if __name__ == "__main__":
             ax2.legend(loc='best', fontsize=10)
             ax2.set_ylim(-180, 180)
             
-            plt.tight_layout(rect=[0, 0, 1, 0.86])
+            plt.tight_layout(rect=[0, 0, 1, 0.83])
             plt.savefig(plotFile, dpi=150, bbox_inches='tight')
             print(f"Plot saved to: {plotFile}")
             
@@ -784,10 +805,11 @@ if __name__ == "__main__":
                 apply_plot_header(
                     fig,
                     f'Averaged Spectrum: Stokes Parameters (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})',
-                    plotTagText
+                    plotTagText,
+                    fieldName
                 )
                 
-                plt.tight_layout(rect=[0, 0, 1, 0.86])
+                plt.tight_layout(rect=[0, 0, 1, 0.83])
                 plt.savefig(plotFile, dpi=150, bbox_inches='tight')
                 print(f"Plot saved to: {plotFile}")
                 
@@ -847,7 +869,8 @@ if __name__ == "__main__":
                 apply_plot_header(
                     fig,
                     f'Polarization Degree (Beam {msInfo["beamNum"]}, Baseline {baselineLabel})',
-                    plotTagText
+                    plotTagText,
+                    fieldName
                 )
                 
                 # Set y-axis limits if specified, otherwise auto-scale
@@ -870,7 +893,7 @@ if __name__ == "__main__":
                 ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=10,
                        verticalalignment='top', bbox=props)
                 
-                plt.tight_layout(rect=[0, 0, 1, 0.86])
+                plt.tight_layout(rect=[0, 0, 1, 0.83])
                 plt.savefig(plotFile, dpi=150, bbox_inches='tight')
                 print(f"Plot saved to: {plotFile}")
                 print(f"\nMedian Polarization Degrees:")

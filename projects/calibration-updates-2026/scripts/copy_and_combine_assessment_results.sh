@@ -126,6 +126,31 @@ SOURCE_DO_PREFLAG_REFTABLE="true"
 
 SUBPATHS=()
 SUBPATH_REMOTE_BASES=()
+SUBPATH_FIELD_NAMES=()
+
+trim_whitespace() {
+  echo "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+}
+
+normalize_field_name_token() {
+  local token
+  token="$(trim_whitespace "$1")"
+  if [[ -z "${token}" ]]; then
+    echo ""
+    return
+  fi
+  if [[ "${token}" =~ ^REF_FIELDNAME=(.+)$ ]]; then
+    echo "$(trim_whitespace "${BASH_REMATCH[1]}")"
+    return
+  fi
+  echo "${token}"
+}
+
+normalize_manifest_key() {
+  local key
+  key="$(echo "$1" | tr '[:lower:]-' '[:upper:]_')"
+  echo "${key}"
+}
 
 is_preflag_token() {
   local token_lc
@@ -165,6 +190,7 @@ build_strategy_suffix() {
 build_subpaths() {
   SUBPATHS=()
   SUBPATH_REMOTE_BASES=()
+  SUBPATH_FIELD_NAMES=()
   for sb_ref_id in "${SOURCE_SB_REF_IDS[@]}"; do
     local strategy_suffix
     strategy_suffix="$(build_strategy_suffix "${SOURCE_AMP_STRATEGY}" "${SOURCE_DO_PREFLAG_REFTABLE}")"
@@ -172,6 +198,7 @@ build_subpaths() {
       "SB_REF-${sb_ref_id}_SB_1934-${SOURCE_SB_1934_ID}_SB_HOLO-${SOURCE_SB_HOLO_ID}${strategy_suffix}/1934-processing-SB-${SOURCE_SB_TARGET_1934_ID}/assessment_results/"
     )
     SUBPATH_REMOTE_BASES+=("${REMOTE_BASE}")
+    SUBPATH_FIELD_NAMES+=("")
   done
 }
 
@@ -182,6 +209,8 @@ build_subpaths_from_manifest() {
 
   SUBPATHS=()
   SUBPATH_REMOTE_BASES=()
+  SUBPATH_FIELD_NAMES=()
+  local default_field_name=""
   local line_no=0
   while IFS= read -r raw_line || [[ -n "${raw_line}" ]]; do
     line_no=$((line_no + 1))
@@ -202,7 +231,7 @@ build_subpaths_from_manifest() {
     if [[ "${line}" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.+)$ ]]; then
       local cfg_key="${BASH_REMATCH[1]}"
       local cfg_val="${BASH_REMATCH[2]}"
-      cfg_val="$(echo "${cfg_val}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+      cfg_val="$(trim_whitespace "${cfg_val}")"
 
       case "${cfg_key}" in
         REMOTE)
@@ -239,6 +268,9 @@ build_subpaths_from_manifest() {
             SOURCE_DO_PREFLAG_REFTABLE="${normalized_preflag}"
           fi
           ;;
+        REF_FIELDNAME)
+          default_field_name="$(normalize_field_name_token "${cfg_val}")"
+          ;;
         *)
           echo "WARNING: Unknown manifest config key '${cfg_key}' on line ${line_no}; ignoring"
           ;;
@@ -248,11 +280,11 @@ build_subpaths_from_manifest() {
 
     # Accept comma- or whitespace-separated fields for SBID rows
     line="${line//,/ }"
-    local col1="" col2="" col3="" col4="" col5="" col6="" col7="" extra=""
-    read -r col1 col2 col3 col4 col5 col6 col7 extra <<< "${line}"
+    local col1="" col2="" col3="" col4="" col5="" col6="" col7="" col8="" extra=""
+    read -r col1 col2 col3 col4 col5 col6 col7 col8 extra <<< "${line}"
 
     # Optional leading row index:
-    # idx sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy] [do_preflag_reftable]
+    # idx sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy] [do_preflag_reftable] [REF_FIELDNAME=<name>]
     if [[ "${col1}" =~ ^[0-9]+$ ]]; then
       col1="${col2}"
       col2="${col3}"
@@ -260,7 +292,8 @@ build_subpaths_from_manifest() {
       col4="${col5}"
       col5="${col6}"
       col6="${col7}"
-      col7="${extra}"
+      col7="${col8}"
+      col8="${extra}"
       extra=""
     fi
 
@@ -272,11 +305,11 @@ build_subpaths_from_manifest() {
     fi
 
     if [[ -z "${col1}" || -z "${col2}" || -z "${col3}" || -z "${col4}" ]]; then
-      echo "WARNING: Skipping manifest line ${line_no}: expected 4 to 8 columns ([idx] sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy] [do_preflag_reftable])"
+      echo "WARNING: Skipping manifest line ${line_no}: expected 4 to 9 columns ([idx] sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy] [do_preflag_reftable] [REF_FIELDNAME=<name>])"
       continue
     fi
 
-    local sb_ref_tag sb_1934_tag sb_holo_tag sb_target_tag amp_strategy row_do_preflag row_odc_weight row_remote_base
+    local sb_ref_tag sb_1934_tag sb_holo_tag sb_target_tag amp_strategy row_do_preflag row_odc_weight row_remote_base row_field_name row_amp_set row_field_set
     sb_ref_tag="$(normalize_tag "${col1}" "SB_REF-")"
     sb_1934_tag="$(normalize_tag "${col2}" "SB_1934-")"
     sb_holo_tag="$(normalize_tag "${col3}" "SB_HOLO-")"
@@ -284,34 +317,51 @@ build_subpaths_from_manifest() {
     amp_strategy="${SOURCE_AMP_STRATEGY}"
     row_do_preflag="${SOURCE_DO_PREFLAG_REFTABLE}"
     row_odc_weight=""
+    row_field_name="${default_field_name}"
+    row_amp_set=0
+    row_field_set=0
 
     local token
-    for token in "${col5}" "${col6}" "${col7}"; do
+    for token in "${col5}" "${col6}" "${col7}" "${col8}"; do
       [[ -z "${token}" ]] && continue
-      if [[ "${token}" =~ ^(ODC-)?[0-9]+$ ]]; then
-        if [[ -n "${row_odc_weight}" ]]; then
-          echo "WARNING: Skipping manifest line ${line_no}: multiple ODC values provided"
-          continue 2
-        fi
-        row_odc_weight="${token}"
-      elif is_preflag_token "${token}"; then
-        local normalized_row_preflag
-        normalized_row_preflag="$(normalize_do_preflag_value "${token}")"
-        if [[ -z "${normalized_row_preflag}" ]]; then
-          echo "WARNING: Skipping manifest line ${line_no}: invalid preflag token '${token}'"
-          continue 2
-        fi
-        if [[ "${row_do_preflag}" != "${SOURCE_DO_PREFLAG_REFTABLE}" ]]; then
-          echo "WARNING: Skipping manifest line ${line_no}: multiple do_preflag_reftable values provided"
-          continue 2
-        fi
-        row_do_preflag="${normalized_row_preflag}"
+      if [[ "${token}" =~ ^([A-Za-z_][A-Za-z0-9_-]*)=(.+)$ ]]; then
+        local token_key token_val normalized_key normalized_row_preflag
+        token_key="${BASH_REMATCH[1]}"
+        token_val="${BASH_REMATCH[2]}"
+        token_val="$(trim_whitespace "${token_val}")"
+        normalized_key="$(normalize_manifest_key "${token_key}")"
+        case "${normalized_key}" in
+          ODC_WEIGHT|ODC_WEIGHT_ID|ODC|WEIGHT_ID)
+            row_odc_weight="${token_val}"
+            ;;
+          AMP_STRATEGY)
+            amp_strategy="${token_val}"
+            row_amp_set=1
+            ;;
+          DO_PREFLAG_REFTABLE|DO_PREFLAG|PREFLAGGING_STRATEGY|PREFLAG_STRATEGY|FLAG_STRATEGY)
+            normalized_row_preflag="$(normalize_do_preflag_value "${token_val}")"
+            if [[ -z "${normalized_row_preflag}" ]]; then
+              echo "WARNING: Skipping manifest line ${line_no}: invalid do_preflag token '${token_val}'"
+              continue 2
+            fi
+            row_do_preflag="${normalized_row_preflag}"
+            ;;
+          REF_FIELDNAME)
+            if [[ ${row_field_set} -eq 1 ]]; then
+              echo "WARNING: Skipping manifest line ${line_no}: multiple REF_FIELDNAME values provided"
+              continue 2
+            fi
+            row_field_name="$(normalize_field_name_token "REF_FIELDNAME=${token_val}")"
+            row_field_set=1
+            ;;
+          *)
+            echo "WARNING: Skipping manifest line ${line_no}: unknown key '${token_key}'"
+            continue 2
+            ;;
+        esac
       else
-        if [[ "${amp_strategy}" != "${SOURCE_AMP_STRATEGY}" ]]; then
-          echo "WARNING: Skipping manifest line ${line_no}: multiple amp_strategy values provided"
-          continue 2
-        fi
-        amp_strategy="${token}"
+        echo "WARNING: Skipping manifest line ${line_no}: unkeyed optional token '${token}' (use KEY=VALUE format)"
+        continue 2
       fi
     done
 
@@ -349,6 +399,7 @@ build_subpaths_from_manifest() {
     )
     row_remote_base="$(resolve_remote_base_for_odc "${row_odc_weight}")" || exit 1
     SUBPATH_REMOTE_BASES+=("${row_remote_base}")
+    SUBPATH_FIELD_NAMES+=("${row_field_name}")
   done < "${manifest_path}"
 
   if [[ ${#SUBPATHS[@]} -eq 0 ]]; then
@@ -396,8 +447,9 @@ Manifest format:
       AMP_STRATEGY=...
           DO_PREFLAG_REFTABLE=...   (aliases: PREFLAGGING_STRATEGY, PREFLAG_STRATEGY, FLAG_STRATEGY)
   - SB rows (space or comma separated):
-          [idx] sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy] [do_preflag_reftable]
-          (optional odc_weight_id, amp_strategy and do_preflag_reftable may be provided in any order)
+      [idx] sb_ref sb_1934 sb_holo sb_target_1934 [optional tokens]
+      (optional tokens are order-independent but must be key=value;
+       e.g. ODC_WEIGHT=5231 AMP_STRATEGY=multiply DO_PREFLAG_REFTABLE=true REF_FIELDNAME=REF_0324-28)
 EOF
 }
 
@@ -572,7 +624,9 @@ if [[ ${DRY_RUN} -eq 1 ]]; then
 
   echo "==> Dry-run combine preview"
   preview_count=0
-  for sub in "${SUBPATHS[@]}"; do
+  for i in "${!SUBPATHS[@]}"; do
+    sub="${SUBPATHS[$i]}"
+    field_name_now="$(trim_whitespace "${SUBPATH_FIELD_NAMES[$i]:-}")"
     sub_rel="${sub%/}"
     local_dir="${LOCAL_BASE}/${sub_rel}"
 
@@ -620,6 +674,9 @@ if [[ ${DRY_RUN} -eq 1 ]]; then
     if [[ -n "${sb_target_1934_tag}" ]]; then
       combine_cmd+=(--sb-target-1934 "${sb_target_1934_tag}")
     fi
+    if [[ -n "${field_name_now}" ]]; then
+      combine_cmd+=(--field-name "${field_name_now}")
+    fi
 
     echo "  - ${local_dir}"
     if [[ -d "${local_dir}" ]]; then
@@ -642,7 +699,9 @@ fi
 
 echo "==> Running combine_beam_outputs.py on each copied assessment_results directory"
 count=0
-for sub in "${SUBPATHS[@]}"; do
+for i in "${!SUBPATHS[@]}"; do
+  sub="${SUBPATHS[$i]}"
+  field_name_now="$(trim_whitespace "${SUBPATH_FIELD_NAMES[$i]:-}")"
   sub_rel="${sub%/}"
   dir="${LOCAL_BASE}/${sub_rel}"
   if [[ ! -d "${dir}" ]]; then
@@ -696,6 +755,9 @@ for sub in "${SUBPATHS[@]}"; do
   fi
   if [[ -n "${sb_target_1934_tag}" ]]; then
     combine_cmd+=(--sb-target-1934 "${sb_target_1934_tag}")
+  fi
+  if [[ -n "${field_name_now}" ]]; then
+    combine_cmd+=(--field-name "${field_name_now}")
   fi
 
   echo "    Tags: ${sb_ref_tag:-NA} ${sb_1934_tag:-NA} ${sb_holo_tag:-NA} ${sb_target_1934_tag:-NA}"

@@ -8,6 +8,13 @@ This folder contains project-specific helper assets for the calibration update w
 - `manifests/` : SB/ODC manifest files for copy+combine runs
 - `slurm/` : batch job scripts for Setonix
 
+Convenience wrappers in `scripts/` (run from `~/mstool/scratch`):
+
+- `run_stage-1.sh` (submit stage `ref` for idx=2)
+- `run_stage-2.sh` (submit stage `1934` for idx=2)
+- `run_stage-3.sh` (run assessment for idx=2)
+- `run_stage-4.sh` (run copy+combine locally)
+
 ## Main workflow helper
 
 - Project path:
@@ -20,6 +27,33 @@ cd ~/mstool/scratch
 ../projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
   --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
 ```
+
+## Assessment helper
+
+- Script path:
+  - `projects/calibration-updates-2026/scripts/assess_possum_1934s.sh`
+- Uses the same tuple manifest format and index slicing controls as the SLURM scripts.
+- Supports optional per-row `REF_FIELDNAME=<name>` for SB_REF plot headers.
+
+Example (single tuple and limited beams):
+
+```bash
+cd ~/mstool/scratch
+../projects/calibration-updates-2026/scripts/assess_possum_1934s.sh \
+  --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --start-index 2 --end-index 2 \
+  --beam-start 0 --beam-end 3 \
+  --dry-run
+```
+
+`--dry-run` validates manifest parsing and tuple/SB path checks, and prints planned actions without running `averageMS.py`.
+
+`REF_FIELDNAME` resolution order in `assess_possum_1934s.sh`:
+
+1. Use per-row manifest value when provided (recommended).
+2. Otherwise, on HPC, try `schedblock info -p <SB_REF>` and resolve `common.targets` + `common.target.<src>.field_name`.
+3. If multiple targets are present, set field label to `Multi` and print a warning.
+4. If unresolved, keep a blank third header row on plots.
 
 ## Manifest-driven SLURM processing
 
@@ -51,10 +85,20 @@ Example manifest rows:
 AMP_STRATEGY=multiply
 DO_PREFLAG_REFTABLE=true
 
-# idx sb_ref sb_1934 sb_holo sb_target_1934 odc_weight_id [amp_strategy] [do_preflag_reftable]
-19 81099 77045 76554 81107 5231
-20 81100 77045 76554 81107 5231 multiply false
+# idx sb_ref sb_1934 sb_holo sb_target_1934 [optional tokens]
+# Optional tokens are order-independent and must use key=value form
+19 81099 77045 76554 81107 ODC_WEIGHT=5231
+20 81100 77045 76554 81107 ODC_WEIGHT=5231 AMP_STRATEGY=multiply DO_PREFLAG_REFTABLE=false REF_FIELDNAME=REF_0336-32
 ```
+
+Recommended optional row tokens:
+
+- `ODC_WEIGHT=<id>` (or `ODC_WEIGHT_ID=<id>`, `ODC=<id>`)
+- `AMP_STRATEGY=<value>`
+- `DO_PREFLAG_REFTABLE=<true|false>` (or `DO_PREFLAG=<...>`)
+- `REF_FIELDNAME=<name>`
+
+Unkeyed optional tokens are rejected.
 
 Expected tuple directory suffixes from the above:
 
@@ -71,7 +115,8 @@ Recommended run order:
 
 1. Reference-field processing (generate bandpass/leakage tables)
 2. 1934 processing (consumes the generated tables)
-3. Copy + combine assessment outputs
+3. Run assessment script (generate per-beam assessment plots/txt on HPC)
+4. Copy + combine assessment outputs (can be run locally once steps 1-3 are done)
 
 Example sequence:
 
@@ -82,6 +127,9 @@ sbatch ../projects/calibration-updates-2026/slurm/start_refField.slurm \
   --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
 
 sbatch ../projects/calibration-updates-2026/slurm/start_1934s.slurm \
+  --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
+
+../projects/calibration-updates-2026/scripts/assess_possum_1934s.sh \
   --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
 
 ../projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
@@ -116,7 +164,7 @@ cd ~/mstool/scratch
 
 ### End-to-end example for `idx=2`
 
-For a single tuple (legacy case `idx=2`), run stage-1 and stage-2 on HPC, then run stage-3 locally.
+For a single tuple (legacy case `idx=2`), run stages 1-3 on HPC, then run stage-4 locally.
 
 1) On remote HPC (from cloned repo): submit stage-1 for only `idx=2`
 
@@ -138,7 +186,16 @@ cd ~/mstool/scratch
   --start-index 2 --end-index 2
 ```
 
-3) On local machine: run stage-3 (copy + combine) for only `idx=2`
+3) On remote HPC: run stage-3 (assessment) for only `idx=2`
+
+```bash
+cd ~/mstool/scratch
+../projects/calibration-updates-2026/scripts/assess_possum_1934s.sh \
+  --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --start-index 2 --end-index 2
+```
+
+4) On local machine: run stage-4 (copy + combine) for only `idx=2`
 
 ```bash
 cd ~/github-wasimraja81/mstool

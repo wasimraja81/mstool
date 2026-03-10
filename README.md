@@ -30,9 +30,25 @@ askapuser>$ msInfo.py -h
 ```
 
 ### Project-specific workflow (calibration updates)
+
+Recommended linkage:
+1) process refField
+2) process 1934s
+3) run assessment script on HPC
+4) copy+combine from local machine once steps 1, 2 and 3 are complete
+
 ```
+askapuser>$ sbatch ./projects/calibration-updates-2026/slurm/start_refField.slurm \
+	--manifest ./projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
+
+askapuser>$ sbatch ./projects/calibration-updates-2026/slurm/start_1934s.slurm \
+	--manifest ./projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
+
+askapuser>$ ./projects/calibration-updates-2026/scripts/assess_possum_1934s.sh \
+	--manifest ./projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
+
 askapuser>$ ./projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
-	--manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
+	--manifest ./projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
 ```
 
 

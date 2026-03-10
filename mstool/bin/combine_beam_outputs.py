@@ -89,6 +89,12 @@ def parse_args():
         default=None,
         help="Optional tag for SB_TARGET_1934 (e.g. SB_TARGET_1934-81089) to include in output names",
     )
+    parser.add_argument(
+        "--field-name",
+        dest="field_name",
+        default=None,
+        help="Optional SB_REF field name to show as a third header row on plots",
+    )
     return parser.parse_args()
 
 
@@ -410,7 +416,7 @@ def create_combined_pdf(output_dir, variant='', output_prefix=''):
     return pdf_name, stokes_files, poldeg_files
 
 
-def plot_leakage_stats(output_dir, variant='', output_prefix='', plot_tag_text=''):
+def plot_leakage_stats(output_dir, variant='', output_prefix='', plot_tag_text='', field_name=''):
     """
     Extract leakage statistics from text files and create a line plot.
     
@@ -507,11 +513,26 @@ def plot_leakage_stats(output_dir, variant='', output_prefix='', plot_tag_text='
             color='midnightblue',
             bbox=dict(boxstyle='round,pad=0.22', facecolor='lavender', edgecolor='slateblue', alpha=0.92)
         )
+
+    field_name_text = str(field_name or '').strip()
+    if field_name_text:
+        fig.text(
+            0.5,
+            0.865,
+            f"SB_REF FIELD_NAME: {field_name_text}",
+            ha='center',
+            va='center',
+            fontsize=9.2,
+            color='darkgreen',
+            bbox=dict(boxstyle='round,pad=0.20', facecolor='honeydew', edgecolor='seagreen', alpha=0.90)
+        )
+    else:
+        fig.text(0.5, 0.865, ' ', ha='center', va='center', fontsize=9.2)
     ax.grid(True, alpha=0.3)
     ax.legend(loc='best', fontsize=12)
     ax.set_xticks(beam_nums)
     
-    plt.tight_layout(rect=[0, 0, 1, 0.90])
+    plt.tight_layout(rect=[0, 0, 1, 0.83])
     plt.savefig(plot_name, dpi=150, bbox_inches='tight')
     plt.close()
     
@@ -639,6 +660,7 @@ def main():
     name_tokens = derive_name_tokens(output_dir)
     sb_ref, sb_1934, sb_holo, sb_target = resolve_plot_tags(name_tokens, args)
     plot_tag_text = f"{sb_ref}, {sb_1934}, {sb_holo}, {sb_target}"
+    field_name = (args.field_name or '').strip()
 
     output_prefix = build_output_prefix(
         output_dir,
@@ -718,7 +740,7 @@ def main():
         poldeg_movie = make_output_path(output_dir, output_prefix, "beams_pol-degree", ".mp4")
         create_movie(stokes_files, stokes_movie, "Stokes Parameters")
         create_movie(poldeg_files, poldeg_movie, "Polarization Degree")
-    plot_leakage_stats(output_dir, variant='', output_prefix=output_prefix, plot_tag_text=plot_tag_text)
+    plot_leakage_stats(output_dir, variant='', output_prefix=output_prefix, plot_tag_text=plot_tag_text, field_name=field_name)
     
     # Process .lcal variant
     print("\n" + "="*60)
@@ -732,7 +754,7 @@ def main():
         poldeg_movie = make_output_path(output_dir, output_prefix, "beams_pol-degree.lcal", ".mp4")
         create_movie(stokes_files, stokes_movie, "Stokes Parameters (Leakage Calibrated)")
         create_movie(poldeg_files, poldeg_movie, "Polarization Degree (Leakage Calibrated)")
-    plot_leakage_stats(output_dir, variant='.lcal', output_prefix=output_prefix, plot_tag_text=plot_tag_text)
+    plot_leakage_stats(output_dir, variant='.lcal', output_prefix=output_prefix, plot_tag_text=plot_tag_text, field_name=field_name)
     
     print("\n" + "="*60)
     print("COMPLETE")
