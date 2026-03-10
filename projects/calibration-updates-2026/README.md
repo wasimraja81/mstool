@@ -219,6 +219,15 @@ Stage-4 now also supports direct manifest row filtering:
   --start-index 2 --end-index 2
 ```
 
+You can also exclude selected indices in stage-4:
+
+```bash
+../projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
+  --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --start-index 14 --end-index 35 \
+  --exclude-indices 24-29,31,33-35
+```
+
 ## Notes
 
 - Core reusable ASKAP visibility tooling remains in `mstool/bin` and `mstool/src`.
