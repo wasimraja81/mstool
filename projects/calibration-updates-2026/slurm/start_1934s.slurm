@@ -9,6 +9,26 @@
 #SBATCH --output=slurm-POLCOMP-TESTS-%j.out
 #SBATCH --export=NONE
 
+if [ -z "${BASH_VERSION:-}" ]; then
+    exec /bin/bash "$0" "$@"
+fi
+
+for arg in "$@"; do
+    if [[ "$arg" == "-h" || "$arg" == "--help" ]]; then
+        cat <<'EOF'
+Usage: start_1934s.slurm [options]
+
+Options:
+  --manifest <path>      Path to manifest file
+  --start-index <idx>    Start tuple index (inclusive)
+  --end-index <idx>      End tuple index (inclusive)
+  --dry-run-parse        Print resolved tuple values and exit
+  -h, --help             Show this help and exit
+EOF
+        exit 0
+    fi
+done
+
 set -euo pipefail
 
 # Setting up the environment
@@ -32,6 +52,15 @@ fi
 unset ACES
 unset PYTHONPATH
 unset PYTHONSTARTUP
+
+EARLY_DRY_RUN_PARSE=false
+for arg in "$@"; do
+    if [[ "$arg" == "--dry-run-parse" ]]; then
+        EARLY_DRY_RUN_PARSE=true
+        break
+    fi
+done
+
 # Preserve submission directory before clearing SLURM_* environment.
 # Under sbatch, $0 points to a spool copy (/var/spool/slurmd/...)
 # so we cannot rely on dirname($0) to find repo-local templates.
@@ -41,11 +70,13 @@ for slurmEnvVar in $(env | grep SLURM_ | awk -F'=' '{print $1}'); do
     unset $slurmEnvVar
 done
 
-module use /askapbuffer/payne/raj030/askaprtModules
-module load askappipeline/axa-3859-fix-generate-parset-for-offset-fields
-#module load askappipeline/2.23.1
-#module load askappipeline/axa-3741-allow-general-processing-of-1934-fields
-#module load askappipeline/axa-3729-flag-bad-data-in-reference-tables
+if [[ "${EARLY_DRY_RUN_PARSE}" != "true" ]]; then
+    module use /askapbuffer/payne/raj030/askaprtModules
+    module load askappipeline/axa-3859-fix-generate-parset-for-offset-fields
+    #module load askappipeline/2.23.1
+    #module load askappipeline/axa-3741-allow-general-processing-of-1934-fields
+    #module load askappipeline/axa-3729-flag-bad-data-in-reference-tables
+fi
 
 
 DEFAULT_SB1934=77045
@@ -77,6 +108,7 @@ MANIFEST_FILE_DEFAULT="${SCRIPT_DIR}/../manifests/sb_manifest_reffield_average.t
 MANIFEST_FILE="${MANIFEST_FILE:-${MANIFEST_FILE_DEFAULT}}"
 BSB_OVERRIDE="${BSB_OVERRIDE:-}"
 ESB_OVERRIDE="${ESB_OVERRIDE:-}"
+DRY_RUN_PARSE=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -91,6 +123,10 @@ while [[ $# -gt 0 ]]; do
         --end-index)
             ESB_OVERRIDE="$2"
             shift 2
+            ;;
+        --dry-run-parse)
+            DRY_RUN_PARSE=true
+            shift
             ;;
         *)
             echo "ERROR: Unknown argument '$1'"
@@ -217,8 +253,8 @@ normalize_do_preflag_value() {
 
 load_tuples_from_manifest() {
     local manifest_path="$1"
-    local default_amp="${BP_UPDATE_MODIFY_AMP_STRATEGY}"
-    local default_do_preflag="${DO_PREFLAG_REFTABLE}"
+    local default_amp=""
+    local default_do_preflag=""
     local default_odc=""
 
     [[ -f "${manifest_path}" ]] || { echo "ERROR: Manifest not found: ${manifest_path}"; exit 1; }
@@ -243,40 +279,50 @@ load_tuples_from_manifest() {
             local cfg_val="${BASH_REMATCH[2]}"
             cfg_val="$(echo "${cfg_val}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
             case "${cfg_key}" in
-                ODC_WEIGHT_ID|ODC|WEIGHT_ID)
+                ODC_WEIGHT|ODC_WEIGHT_ID)
                     default_odc="$(strip_numeric_tag "${cfg_val}" "ODC-")"
+                    if [[ -z "${default_odc}" ]]; then
+                        echo "ERROR: Invalid global ODC value '${cfg_val}' on line ${line_no}"
+                        exit 1
+                    fi
                     ;;
                 AMP_STRATEGY)
                     default_amp="${cfg_val}"
+                    if [[ -z "${default_amp}" ]]; then
+                        echo "ERROR: Empty AMP_STRATEGY on line ${line_no}"
+                        exit 1
+                    fi
                     ;;
-                DO_PREFLAG_REFTABLE|PREFLAGGING_STRATEGY|PREFLAG_STRATEGY|FLAG_STRATEGY)
+                DO_PREFLAG_REFTABLE)
                     local normalized_do_preflag
                     normalized_do_preflag="$(normalize_do_preflag_value "${cfg_val}")"
                     if [[ -z "${normalized_do_preflag}" ]]; then
-                        echo "WARNING: Invalid DO_PREFLAG_REFTABLE value '${cfg_val}' on line ${line_no}; expected true/false or insituPreflags/none"
-                    else
-                        default_do_preflag="${normalized_do_preflag}"
+                        echo "ERROR: Invalid DO_PREFLAG_REFTABLE value '${cfg_val}' on line ${line_no}; expected true/false"
+                        exit 1
                     fi
+                    default_do_preflag="${normalized_do_preflag}"
                     ;;
             esac
             continue
         fi
 
         line="${line//,/ }"
-        local col1="" col2="" col3="" col4="" col5="" col6="" col7="" extra=""
-        read -r col1 col2 col3 col4 col5 col6 col7 extra <<< "${line}"
+        local -a cols
+        read -r -a cols <<< "${line}"
+        if [[ ${#cols[@]} -eq 0 ]]; then
+            continue
+        fi
 
         # Optional leading row index:
-        # idx sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy] [do_preflag_reftable]
-        if [[ "${col1}" =~ ^[0-9]+$ ]]; then
-            col1="${col2}"
-            col2="${col3}"
-            col3="${col4}"
-            col4="${col5}"
-            col5="${col6}"
-            col6="${col7}"
-            col7="${extra}"
-            extra=""
+        # idx sb_ref sb_1934 sb_holo sb_target_1934 [optional KEY=VALUE tokens]
+        if [[ "${cols[0]}" =~ ^[0-9]+$ ]]; then
+            cols=("${cols[@]:1}")
+        fi
+
+        local col1="${cols[0]:-}" col2="${cols[1]:-}" col3="${cols[2]:-}" col4="${cols[3]:-}"
+        local -a opt_tokens=()
+        if [[ ${#cols[@]} -gt 4 ]]; then
+            opt_tokens=("${cols[@]:4}")
         fi
 
         local col1_lc
@@ -286,11 +332,7 @@ load_tuples_from_manifest() {
         fi
 
         if [[ -z "${col1}" || -z "${col2}" || -z "${col3}" || -z "${col4}" ]]; then
-            echo "WARNING: Skipping manifest line ${line_no} (expected 4-8 columns: [idx] sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy] [do_preflag_reftable])"
-            continue
-        fi
-        if [[ -n "${extra}" ]]; then
-            echo "WARNING: Skipping manifest line ${line_no} (too many columns)"
+            echo "WARNING: Skipping manifest line ${line_no} (expected at least 4 columns: [idx] sb_ref sb_1934 sb_holo sb_target_1934 [optional KEY=VALUE tokens])"
             continue
         fi
 
@@ -308,27 +350,59 @@ load_tuples_from_manifest() {
         local row_odc="${default_odc}"
         local row_amp="${default_amp}"
         local row_do_preflag="${default_do_preflag}"
-        local token
-        for token in "${col5}" "${col6}" "${col7}"; do
+        local token token_key token_val normalized_row_do_preflag
+        for token in "${opt_tokens[@]}"; do
             [[ -z "${token}" ]] && continue
-            if [[ "${token}" =~ ^(ODC-)?[0-9]+$ ]]; then
-                row_odc="$(strip_numeric_tag "${token}" "ODC-")"
-            elif [[ "${token}" =~ [Pp]reflag || "${token}" =~ ^(none|off|on|true|false|yes|no|1|0)$ ]]; then
-                local normalized_row_do_preflag
-                normalized_row_do_preflag="$(normalize_do_preflag_value "${token}")"
-                if [[ -z "${normalized_row_do_preflag}" ]]; then
-                    echo "WARNING: Skipping manifest line ${line_no} (invalid do_preflag token '${token}')"
-                    continue 2
-                fi
-                row_do_preflag="${normalized_row_do_preflag}"
+            if [[ "${token}" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.+)$ ]]; then
+                token_key="${BASH_REMATCH[1]}"
+                token_val="${BASH_REMATCH[2]}"
+                case "${token_key}" in
+                    ODC_WEIGHT|ODC_WEIGHT_ID)
+                        row_odc="$(strip_numeric_tag "${token_val}" "ODC-")"
+                        if [[ -z "${row_odc}" ]]; then
+                            echo "ERROR: Invalid ODC token '${token}' on line ${line_no}"
+                            exit 1
+                        fi
+                        ;;
+                    AMP_STRATEGY)
+                        row_amp="${token_val}"
+                        if [[ -z "${row_amp}" ]]; then
+                            echo "ERROR: Empty AMP_STRATEGY token '${token}' on line ${line_no}"
+                            exit 1
+                        fi
+                        ;;
+                    DO_PREFLAG_REFTABLE)
+                        normalized_row_do_preflag="$(normalize_do_preflag_value "${token_val}")"
+                        if [[ -z "${normalized_row_do_preflag}" ]]; then
+                            echo "ERROR: Invalid DO_PREFLAG_REFTABLE token '${token}' on line ${line_no}"
+                            exit 1
+                        fi
+                        row_do_preflag="${normalized_row_do_preflag}"
+                        ;;
+                    REF_FIELDNAME)
+                        ;;
+                    *)
+                        echo "ERROR: Unknown optional token '${token}' on line ${line_no}"
+                        exit 1
+                        ;;
+                esac
             else
-                row_amp="${token}"
+                echo "ERROR: Non key=value optional token '${token}' on line ${line_no}"
+                exit 1
             fi
         done
 
         if [[ -z "${row_odc}" ]]; then
-            echo "WARNING: Skipping manifest line ${line_no} (missing ODC weight ID)"
-            continue
+            echo "ERROR: Missing ODC weight for tuple on line ${line_no} (set ODC_WEIGHT globally or per-row)"
+            exit 1
+        fi
+        if [[ -z "${row_amp}" ]]; then
+            echo "ERROR: Missing AMP_STRATEGY for tuple on line ${line_no} (set AMP_STRATEGY globally or per-row)"
+            exit 1
+        fi
+        if [[ -z "${row_do_preflag}" ]]; then
+            echo "ERROR: Missing DO_PREFLAG_REFTABLE for tuple on line ${line_no} (set DO_PREFLAG_REFTABLE globally or per-row)"
+            exit 1
         fi
 
         refFieldList+=("${sb_ref_now}")
@@ -350,13 +424,8 @@ if [[ -f "${MANIFEST_FILE}" ]]; then
     echo "INFO - Loading tuples from manifest: ${MANIFEST_FILE}"
     load_tuples_from_manifest "${MANIFEST_FILE}"
 else
-    echo "WARNING - Manifest not found (${MANIFEST_FILE}); falling back to built-in tuple lists"
-    for (( i=0; i<${#refFieldList[@]}; i++ )); do
-        sb1934List+=("${DEFAULT_SB1934}")
-        holoSBList+=("${DEFAULT_HOLOSB}")
-        ampStrategyList+=("${BP_UPDATE_MODIFY_AMP_STRATEGY}")
-        doPreflagList+=("${DO_PREFLAG_REFTABLE}")
-    done
+    echo "ERROR - Manifest not found (${MANIFEST_FILE}); strict strategy mode requires an explicit manifest"
+    exit 1
 fi
 
 nSBref=${#refFieldList[@]}
@@ -382,6 +451,16 @@ eSB=${ESB_OVERRIDE:-$((${nSBref} - 1))}
 if [[ ${bSB} -lt 0 || ${eSB} -ge ${nSBref} || ${bSB} -gt ${eSB} ]]; then
     echo "ERROR - Invalid start/end indices: bSB=${bSB}, eSB=${eSB}, tuple_count=${nSBref}"
     exit 1
+fi
+
+if [[ "${DRY_RUN_PARSE}" == "true" ]]; then
+    echo "INFO - Dry-run parse mode (no processing)"
+    echo "INFO - Manifest: ${MANIFEST_FILE}"
+    echo "INFO - Index range: ${bSB}..${eSB}"
+    for (( iSB=${bSB}; iSB<=${eSB}; iSB++ )); do
+        echo "IDX=${iSB} SB_REF=${refFieldList[${iSB}]} SB_1934=${sb1934List[${iSB}]} SB_HOLO=${holoSBList[${iSB}]} SB_TARGET_1934=${calFieldList[${iSB}]} ODC_WEIGHT=${odcWeightList[${iSB}]} AMP_STRATEGY=${ampStrategyList[${iSB}]} DO_PREFLAG_REFTABLE=${doPreflagList[${iSB}]}"
+    done
+    exit 0
 fi
 
 nSB=$((${eSB} - ${bSB} + 1))
