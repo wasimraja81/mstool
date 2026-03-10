@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented in this file.
 
+## 3.2 - 2026-03-10
+
+Production release focused on stage-4 usability and clearer operator documentation.
+
+### Added
+- Native manifest row filtering for stage-4 copy/combine via:
+  - `--start-index`
+  - `--end-index`
+  in `projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh`
+- Stage-4 helper now includes direct single-index example usage:
+  - `projects/calibration-updates-2026/scripts/run_stage-4.sh`
+
+### Changed
+- Main onboarding documentation in `README.md` is expanded to clearly describe:
+  - strict stage order and dependency chain
+  - which stages run on HPC vs local machine
+  - explicit script references for stages 1-4 (SLURM + shell wrappers)
+  - direct linkage between assessment outputs and `mstool/bin/combine_beam_outputs.py`
+  - guidance for users other than `raj030` to adapt remote/local paths and access
+
+### Fixed
+- Reduced ambiguity in stage-4 usage by documenting exact script entry points and execution context.
+
 ## 3.0 - 2026-03-10
 
 Major refactor of the calibration-updates workflow and manifest model since the 2.x series.
