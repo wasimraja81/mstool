@@ -20,6 +20,9 @@ OVERRIDE_SB_TARGET_1934=""
 MANIFEST_FILE=""
 START_INDEX_OVERRIDE=""
 END_INDEX_OVERRIDE=""
+EXCLUDE_INDICES_RAW=""
+EXCLUDE_RANGE_STARTS=()
+EXCLUDE_RANGE_ENDS=()
 
 normalize_tag() {
   local value="$1"
@@ -152,6 +155,57 @@ normalize_manifest_key() {
   local key
   key="$(echo "$1" | tr '[:lower:]-' '[:upper:]_')"
   echo "${key}"
+}
+
+parse_exclude_indices() {
+  local raw="$1"
+  EXCLUDE_RANGE_STARTS=()
+  EXCLUDE_RANGE_ENDS=()
+
+  [[ -n "${raw}" ]] || return 0
+
+  local cleaned
+  cleaned="$(echo "${raw}" | tr -d '[:space:]')"
+  [[ -n "${cleaned}" ]] || return 0
+
+  local IFS=','
+  local token start end
+  read -r -a tokens <<< "${cleaned}"
+
+  for token in "${tokens[@]}"; do
+    [[ -n "${token}" ]] || continue
+
+    if [[ "${token}" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+      start="${BASH_REMATCH[1]}"
+      end="${BASH_REMATCH[2]}"
+      if [[ ${start} -gt ${end} ]]; then
+        echo "ERROR: Invalid exclude range '${token}' (start > end)"
+        exit 1
+      fi
+      EXCLUDE_RANGE_STARTS+=("${start}")
+      EXCLUDE_RANGE_ENDS+=("${end}")
+    elif [[ "${token}" =~ ^[0-9]+$ ]]; then
+      EXCLUDE_RANGE_STARTS+=("${token}")
+      EXCLUDE_RANGE_ENDS+=("${token}")
+    else
+      echo "ERROR: Invalid --exclude-indices token '${token}'"
+      echo "       Expected comma-separated indices and/or ranges (e.g. 24-29,31,33-35)"
+      exit 1
+    fi
+  done
+}
+
+is_row_excluded() {
+  local idx="$1"
+  local i start end
+  for i in "${!EXCLUDE_RANGE_STARTS[@]}"; do
+    start="${EXCLUDE_RANGE_STARTS[$i]}"
+    end="${EXCLUDE_RANGE_ENDS[$i]}"
+    if [[ ${idx} -ge ${start} && ${idx} -le ${end} ]]; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 is_preflag_token() {
@@ -323,6 +377,9 @@ build_subpaths_from_manifest() {
     if [[ -n "${END_INDEX_OVERRIDE}" && ${row_index} -gt ${END_INDEX_OVERRIDE} ]]; then
       continue
     fi
+    if is_row_excluded "${row_index}"; then
+      continue
+    fi
 
     local sb_ref_tag sb_1934_tag sb_holo_tag sb_target_tag amp_strategy row_do_preflag row_odc_weight row_remote_base row_field_name row_amp_set row_field_set
     sb_ref_tag="$(normalize_tag "${col1}" "SB_REF-")"
@@ -440,6 +497,8 @@ Options:
   --manifest FILE           ASCII file listing SBID combinations and optional config directives.
   --start-index N           Start manifest row index (inclusive, requires --manifest).
   --end-index N             End manifest row index (inclusive, requires --manifest).
+  --exclude-indices SPEC    Comma-separated manifest indices/ranges to skip (requires --manifest),
+                            e.g. 24-29 or 24-29,31,33-35.
   --sb-ref TAG              Override SB_REF tag passed to combine script.
   --sb-1934 TAG             Override SB_1934 tag passed to combine script.
   --sb-holo TAG             Override SB_HOLO tag passed to combine script.
@@ -527,6 +586,11 @@ while [[ $# -gt 0 ]]; do
       END_INDEX_OVERRIDE="$2"
       shift 2
       ;;
+    --exclude-indices)
+      [[ $# -ge 2 ]] || { echo "ERROR: --exclude-indices requires a value"; exit 1; }
+      EXCLUDE_INDICES_RAW="$2"
+      shift 2
+      ;;
     --sb-ref)
       [[ $# -ge 2 ]] || { echo "ERROR: --sb-ref requires a value"; exit 1; }
       OVERRIDE_SB_REF="$2"
@@ -585,6 +649,12 @@ if [[ -z "${MANIFEST_FILE}" && ( -n "${START_INDEX_OVERRIDE}" || -n "${END_INDEX
   echo "ERROR: --start-index/--end-index requires --manifest"
   exit 1
 fi
+if [[ -z "${MANIFEST_FILE}" && -n "${EXCLUDE_INDICES_RAW}" ]]; then
+  echo "ERROR: --exclude-indices requires --manifest"
+  exit 1
+fi
+
+parse_exclude_indices "${EXCLUDE_INDICES_RAW}"
 
 resolve_remote_base_from_odc
 
@@ -615,6 +685,7 @@ echo "  Local destination: ${LOCAL_BASE}"
 echo "  Dry run: ${DRY_RUN}"
 echo "  Manifest: ${MANIFEST_FILE:-none}"
 echo "  Manifest row range: ${START_INDEX_OVERRIDE:-all}..${END_INDEX_OVERRIDE:-all}"
+echo "  Excluded indices: ${EXCLUDE_INDICES_RAW:-none}"
 echo "  Tag overrides: sb_ref=${OVERRIDE_SB_REF:-auto}, sb_1934=${OVERRIDE_SB_1934:-auto}, sb_holo=${OVERRIDE_SB_HOLO:-auto}, sb_target_1934=${OVERRIDE_SB_TARGET_1934:-auto}"
 if [[ -n "${MANIFEST_FILE}" ]]; then
   echo "  Source IDs: driven by manifest rows (including per-row ODC if provided)"

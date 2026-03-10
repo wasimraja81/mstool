@@ -25,6 +25,22 @@ Production release focused on stage-4 usability and clearer operator documentati
 ### Fixed
 - Reduced ambiguity in stage-4 usage by documenting exact script entry points and execution context.
 
+## 3.3 - 2026-03-10
+
+Release focused on flexible stage-4 row selection for copy+combine.
+
+### Added
+- `--exclude-indices` support in
+  - `projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh`
+- Exclusion syntax supports:
+  - single index (e.g. `29`)
+  - contiguous range (e.g. `24-29`)
+  - comma-separated combinations (e.g. `24-29,31,33-35`)
+
+### Changed
+- Stage-4 manifest filtering now supports include range plus explicit exclusions in one run.
+- Project README examples updated to show stage-4 exclusion usage.
+
 ## 3.0 - 2026-03-10
 
 Major refactor of the calibration-updates workflow and manifest model since the 2.x series.
