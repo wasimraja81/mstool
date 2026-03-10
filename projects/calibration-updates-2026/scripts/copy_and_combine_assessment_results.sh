@@ -18,6 +18,8 @@ OVERRIDE_SB_1934=""
 OVERRIDE_SB_HOLO=""
 OVERRIDE_SB_TARGET_1934=""
 MANIFEST_FILE=""
+START_INDEX_OVERRIDE=""
+END_INDEX_OVERRIDE=""
 
 normalize_tag() {
   local value="$1"
@@ -211,6 +213,7 @@ build_subpaths_from_manifest() {
   SUBPATH_REMOTE_BASES=()
   SUBPATH_FIELD_NAMES=()
   local default_field_name=""
+  local auto_row_index=0
   local line_no=0
   while IFS= read -r raw_line || [[ -n "${raw_line}" ]]; do
     line_no=$((line_no + 1))
@@ -281,11 +284,13 @@ build_subpaths_from_manifest() {
     # Accept comma- or whitespace-separated fields for SBID rows
     line="${line//,/ }"
     local col1="" col2="" col3="" col4="" col5="" col6="" col7="" col8="" extra=""
+    local row_index=""
     read -r col1 col2 col3 col4 col5 col6 col7 col8 extra <<< "${line}"
 
     # Optional leading row index:
     # idx sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy] [do_preflag_reftable] [REF_FIELDNAME=<name>]
     if [[ "${col1}" =~ ^[0-9]+$ ]]; then
+      row_index="${col1}"
       col1="${col2}"
       col2="${col3}"
       col3="${col4}"
@@ -295,7 +300,10 @@ build_subpaths_from_manifest() {
       col7="${col8}"
       col8="${extra}"
       extra=""
+    else
+      row_index="${auto_row_index}"
     fi
+    auto_row_index=$((auto_row_index + 1))
 
     # Skip header line if present
     local col1_lc
@@ -306,6 +314,13 @@ build_subpaths_from_manifest() {
 
     if [[ -z "${col1}" || -z "${col2}" || -z "${col3}" || -z "${col4}" ]]; then
       echo "WARNING: Skipping manifest line ${line_no}: expected 4 to 9 columns ([idx] sb_ref sb_1934 sb_holo sb_target_1934 [odc_weight_id] [amp_strategy] [do_preflag_reftable] [REF_FIELDNAME=<name>])"
+      continue
+    fi
+
+    if [[ -n "${START_INDEX_OVERRIDE}" && ${row_index} -lt ${START_INDEX_OVERRIDE} ]]; then
+      continue
+    fi
+    if [[ -n "${END_INDEX_OVERRIDE}" && ${row_index} -gt ${END_INDEX_OVERRIDE} ]]; then
       continue
     fi
 
@@ -423,6 +438,8 @@ Options:
   --local-parent PATH       Parent directory for local copy destination.
   --local-name NAME         Directory name under --local-parent.
   --manifest FILE           ASCII file listing SBID combinations and optional config directives.
+  --start-index N           Start manifest row index (inclusive, requires --manifest).
+  --end-index N             End manifest row index (inclusive, requires --manifest).
   --sb-ref TAG              Override SB_REF tag passed to combine script.
   --sb-1934 TAG             Override SB_1934 tag passed to combine script.
   --sb-holo TAG             Override SB_HOLO tag passed to combine script.
@@ -500,6 +517,16 @@ while [[ $# -gt 0 ]]; do
       MANIFEST_FILE="$2"
       shift 2
       ;;
+    --start-index)
+      [[ $# -ge 2 ]] || { echo "ERROR: --start-index requires a value"; exit 1; }
+      START_INDEX_OVERRIDE="$2"
+      shift 2
+      ;;
+    --end-index)
+      [[ $# -ge 2 ]] || { echo "ERROR: --end-index requires a value"; exit 1; }
+      END_INDEX_OVERRIDE="$2"
+      shift 2
+      ;;
     --sb-ref)
       [[ $# -ge 2 ]] || { echo "ERROR: --sb-ref requires a value"; exit 1; }
       OVERRIDE_SB_REF="$2"
@@ -542,6 +569,23 @@ OVERRIDE_SB_1934="$(normalize_tag "${OVERRIDE_SB_1934}" "SB_1934-")"
 OVERRIDE_SB_HOLO="$(normalize_tag "${OVERRIDE_SB_HOLO}" "SB_HOLO-")"
 OVERRIDE_SB_TARGET_1934="$(normalize_tag "${OVERRIDE_SB_TARGET_1934}" "SB_TARGET_1934-")"
 
+if [[ -n "${START_INDEX_OVERRIDE}" && ! "${START_INDEX_OVERRIDE}" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: --start-index must be a non-negative integer"
+  exit 1
+fi
+if [[ -n "${END_INDEX_OVERRIDE}" && ! "${END_INDEX_OVERRIDE}" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: --end-index must be a non-negative integer"
+  exit 1
+fi
+if [[ -n "${START_INDEX_OVERRIDE}" && -n "${END_INDEX_OVERRIDE}" && ${START_INDEX_OVERRIDE} -gt ${END_INDEX_OVERRIDE} ]]; then
+  echo "ERROR: --start-index cannot be greater than --end-index"
+  exit 1
+fi
+if [[ -z "${MANIFEST_FILE}" && ( -n "${START_INDEX_OVERRIDE}" || -n "${END_INDEX_OVERRIDE}" ) ]]; then
+  echo "ERROR: --start-index/--end-index requires --manifest"
+  exit 1
+fi
+
 resolve_remote_base_from_odc
 
 if [[ -n "${MANIFEST_FILE}" ]]; then
@@ -570,6 +614,7 @@ echo "  ODC weight ID: ${ODC_WEIGHT_ID:-none}"
 echo "  Local destination: ${LOCAL_BASE}"
 echo "  Dry run: ${DRY_RUN}"
 echo "  Manifest: ${MANIFEST_FILE:-none}"
+echo "  Manifest row range: ${START_INDEX_OVERRIDE:-all}..${END_INDEX_OVERRIDE:-all}"
 echo "  Tag overrides: sb_ref=${OVERRIDE_SB_REF:-auto}, sb_1934=${OVERRIDE_SB_1934:-auto}, sb_holo=${OVERRIDE_SB_HOLO:-auto}, sb_target_1934=${OVERRIDE_SB_TARGET_1934:-auto}"
 if [[ -n "${MANIFEST_FILE}" ]]; then
   echo "  Source IDs: driven by manifest rows (including per-row ODC if provided)"
