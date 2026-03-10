@@ -111,6 +111,20 @@ Optional arguments for both SLURM scripts:
 - `--start-index <i>`
 - `--end-index <j>`
 
+Quick checks:
+
+```bash
+cd ~/mstool/projects/calibration-updates-2026/slurm
+
+# show usage (works with sh)
+sh start_refField.slurm -h
+sh start_1934s.slurm -h
+
+# print resolved per-index ODC/AMP/PREFLAG (no fetch/processing)
+bash start_refField.slurm --dry-run-parse --start-index 36 --end-index 49
+bash start_1934s.slurm --dry-run-parse --start-index 36 --end-index 49
+```
+
 Recommended run order:
 
 1. Reference-field processing (generate bandpass/leakage tables)
