@@ -75,7 +75,7 @@ In stage-1 config generation, these map to:
 
 Directory naming keeps legacy behavior:
 
-- `_AMP_STRATEGY-<value>-insituPreflags` only when `DO_PREFLAG_REFTABLE=true`
+- append `-insituPreflags` whenever `DO_PREFLAG_REFTABLE=true` (independent of AMP strategy)
 - no extra preflag suffix when `DO_PREFLAG_REFTABLE=false`
 
 Example manifest rows:

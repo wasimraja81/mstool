@@ -237,7 +237,7 @@ build_strategy_suffix() {
   if [[ -n "${amp_strategy}" ]]; then
     suffix+="_AMP_STRATEGY-${amp_strategy}"
   fi
-  if [[ "${do_preflag}" == "true" && -n "${amp_strategy}" ]]; then
+  if [[ "${do_preflag}" == "true" ]]; then
     suffix+="-insituPreflags"
   fi
   echo "${suffix}"

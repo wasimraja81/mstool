@@ -542,7 +542,7 @@ if [ "${DO_FIND_BANDPASS}" == "true" ]; then
             if [ "${ampStrategyNow}" != "" ]; then
                 strategySuffixNow="${strategySuffixNow}_AMP_STRATEGY-${ampStrategyNow}"
             fi
-            if [ "${doPreflagNow}" == "true" ] && [ "${ampStrategyNow}" != "" ]; then
+            if [ "${doPreflagNow}" == "true" ]; then
                 strategySuffixNow="${strategySuffixNow}-insituPreflags"
             fi
 

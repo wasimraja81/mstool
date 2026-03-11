@@ -391,7 +391,7 @@ for (( iSB=${bSB}; iSB<=${eSB}; iSB++ )); do
     if [[ -n "${ampStrategyNow}" ]]; then
         strategySuffixNow="${strategySuffixNow}_AMP_STRATEGY-${ampStrategyNow}"
     fi
-    if [[ "${doPreflagNow}" == "true" && -n "${ampStrategyNow}" ]]; then
+    if [[ "${doPreflagNow}" == "true" ]]; then
         strategySuffixNow="${strategySuffixNow}-insituPreflags"
     fi
 
