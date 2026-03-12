@@ -1,5 +1,7 @@
 # Calibration updates (reference fields) — 2026
 
+> **Next release: tag `3.5`** — adds leakage-diagnostics pipeline (3-D cube, footprint heatmaps, HTML report).
+
 This folder contains project-specific helper assets for the calibration update workflow using reference (read calibrator) fields.
 
 ## Layout
@@ -14,6 +16,42 @@ Convenience wrappers in `scripts/` (run from `~/mstool/scratch`):
 - `run_stage-2.sh` (submit stage `1934` for idx=2)
 - `run_stage-3.sh` (run assessment for idx=2)
 - `run_stage-4.sh` (run copy+combine locally for idx=2)
+
+### Leakage diagnostics pipeline
+
+Post-processing scripts for analysing residual on-axis polarisation leakage
+across beams, reference fields, and ODC weights:
+
+| Script | Purpose |
+|--------|---------|
+| `build_phase1_master_table.py` | Build the Phase-1 master table from per-SB assessment outputs |
+| `build_phase2_isolation_tables.py` | Produce Phase-2 beam×field and beam×ODC isolation CSVs |
+| `build_leakage_cube.py` | Construct a 3-D NetCDF4 cube (beam × field × odc) from the Phase-2 CSV |
+| `plot_leakage_footprint.py` | Generate beam-layout footprint heatmaps from the cube |
+| `build_phase3_html_report.py` | Generate the HTML index page with summary tables, footprint links, and cube download |
+
+Typical workflow (run from repo root with `.venv` activated):
+
+```bash
+source .venv/bin/activate
+
+# Phase 1 → Phase 2 → Cube → Plots → HTML report
+python scripts/build_phase1_master_table.py
+python scripts/build_phase2_isolation_tables.py
+python scripts/build_leakage_cube.py
+python scripts/plot_leakage_footprint.py
+python scripts/build_phase3_html_report.py
+
+# Serve the report
+python -m http.server 8765 -d ~/DATA/reffield-average/phase3
+```
+
+Output artefacts (under `~/DATA/reffield-average/`):
+
+- `phase2/leakage_cube.nc` — 3-D labelled NetCDF4 cube (xarray-compatible)
+- `phase3/index.html` — self-contained HTML report
+- `phase3/plots/footprint_dL_*.png` — footprint heatmap PNGs
+- `phase3/tables/` — CSV tables and interactive viewers
 
 ## Main workflow helper
 
@@ -246,3 +284,23 @@ You can also exclude selected indices in stage-4:
 
 - Core reusable ASKAP visibility tooling remains in `mstool/bin` and `mstool/src`.
 - These project files are intentionally kept outside the installable package entry points defined in `setup.py`.
+
+## Python dependencies (leakage diagnostics)
+
+The diagnostic scripts require a virtual environment with:
+
+| Package | Version |
+|---------|---------|
+| xarray | ≥ 2024.7 |
+| netCDF4 | ≥ 1.7 |
+| pandas | ≥ 2.0 |
+| numpy | ≥ 1.24 |
+| matplotlib | ≥ 3.8 |
+
+Create with:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install xarray netCDF4 pandas numpy matplotlib
+```
