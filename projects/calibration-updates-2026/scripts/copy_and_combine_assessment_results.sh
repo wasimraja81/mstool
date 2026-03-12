@@ -13,6 +13,8 @@ LOCAL_NAME="reffield-average"
 LOCAL_BASE="${LOCAL_PARENT}/${LOCAL_NAME}"
 LOCAL_BASE_EXPLICIT=0
 DRY_RUN=0
+COPY_METADATA=0
+METADATA_ONLY=0
 OVERRIDE_SB_REF=""
 OVERRIDE_SB_1934=""
 OVERRIDE_SB_HOLO=""
@@ -237,7 +239,7 @@ build_strategy_suffix() {
   if [[ -n "${amp_strategy}" ]]; then
     suffix+="_AMP_STRATEGY-${amp_strategy}"
   fi
-  if [[ "${do_preflag}" == "true" && -n "${amp_strategy}" ]]; then
+  if [[ "${do_preflag}" == "true" ]]; then
     suffix+="-insituPreflags"
   fi
   echo "${suffix}"
@@ -487,6 +489,8 @@ Usage:
 
 Options:
   --dry-run                 Show what would be copied/processed; do not copy or run combine.
+  --copy-metadata           Also copy tuple sibling metadata/ directories (default: off).
+  --metadata-only           Fetch only tuple sibling metadata/ directories; skip assessment copy and combine.
   --remote USER@HOST        Remote SSH target (default: raj030@setonix-dm03.pawsey.org.au).
   --odc-weight-id ID        ODC weight ID (e.g. 5231 or ODC-5231).
   --remote-base PATH        Remote base directory containing SB_REF-* paths.
@@ -533,6 +537,15 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run)
       DRY_RUN=1
+      shift
+      ;;
+    --copy-metadata)
+      COPY_METADATA=1
+      shift
+      ;;
+    --metadata-only)
+      METADATA_ONLY=1
+      COPY_METADATA=1
       shift
       ;;
     --remote)
@@ -683,6 +696,8 @@ echo "  Remote host/base: ${REMOTE}:${REMOTE_BASE}"
 echo "  ODC weight ID: ${ODC_WEIGHT_ID:-none}"
 echo "  Local destination: ${LOCAL_BASE}"
 echo "  Dry run: ${DRY_RUN}"
+echo "  Copy metadata: ${COPY_METADATA}"
+echo "  Metadata only: ${METADATA_ONLY}"
 echo "  Manifest: ${MANIFEST_FILE:-none}"
 echo "  Manifest row range: ${START_INDEX_OVERRIDE:-all}..${END_INDEX_OVERRIDE:-all}"
 echo "  Excluded indices: ${EXCLUDE_INDICES_RAW:-none}"
@@ -707,31 +722,86 @@ fi
 echo "==> Copying assessment_results directories from remote"
 copied_count=0
 missing_count=0
+metadata_copied_count=0
+metadata_skipped_existing_count=0
+metadata_missing_count=0
 for i in "${!SUBPATHS[@]}"; do
   sub="${SUBPATHS[$i]}"
   remote_base_for_sub="${SUBPATH_REMOTE_BASES[$i]:-${REMOTE_BASE}}"
   sub_rel="${sub%/}"
   remote_path="${remote_base_for_sub}/${sub_rel}"
-  echo "  - ${remote_path}"
-  if ssh "${REMOTE}" "test -d \"${remote_path}\""; then
-    if [[ ${DRY_RUN} -eq 1 ]]; then
-      echo "    DRY-RUN: ssh ${REMOTE} \"tar -C '${remote_base_for_sub}' -cf - '${sub_rel}'\" | tar -C '${LOCAL_BASE}' -xf -"
+  if [[ ${METADATA_ONLY} -eq 0 ]]; then
+    echo "  - ${remote_path}"
+    if ssh "${REMOTE}" "test -d \"${remote_path}\""; then
+      if [[ ${DRY_RUN} -eq 1 ]]; then
+        echo "    DRY-RUN: ssh ${REMOTE} \"tar -C '${remote_base_for_sub}' -cf - '${sub_rel}'\" | tar -C '${LOCAL_BASE}' -xf -"
+      else
+        ssh "${REMOTE}" "tar -C \"${remote_base_for_sub}\" -cf - \"${sub_rel}\"" | tar -C "${LOCAL_BASE}" -xf -
+      fi
+      copied_count=$((copied_count + 1))
     else
-      ssh "${REMOTE}" "tar -C \"${remote_base_for_sub}\" -cf - \"${sub_rel}\"" | tar -C "${LOCAL_BASE}" -xf -
+      echo "    WARNING: Missing remote directory, skipping: ${remote_path}"
+      missing_count=$((missing_count + 1))
     fi
-    copied_count=$((copied_count + 1))
-  else
-    echo "    WARNING: Missing remote directory, skipping: ${remote_path}"
-    missing_count=$((missing_count + 1))
+  fi
+
+  if [[ ${COPY_METADATA} -eq 1 ]]; then
+    tuple_rel="$(echo "${sub_rel}" | sed -E 's#/1934-processing-SB-[0-9]+/assessment_results$##')"
+    if [[ -z "${tuple_rel}" || "${tuple_rel}" == "${sub_rel}" ]]; then
+      echo "    WARNING: Could not derive tuple root from subpath, skipping metadata copy for: ${sub_rel}"
+      metadata_missing_count=$((metadata_missing_count + 1))
+      continue
+    fi
+
+    local_metadata_dir="${LOCAL_BASE}/${tuple_rel}/metadata"
+    remote_metadata_path="${remote_base_for_sub}/${tuple_rel}/metadata"
+
+    if [[ -d "${local_metadata_dir}" ]]; then
+      echo "    METADATA: local metadata already exists, skipping fetch: ${local_metadata_dir}"
+      metadata_skipped_existing_count=$((metadata_skipped_existing_count + 1))
+      continue
+    fi
+
+    if ssh "${REMOTE}" "test -d \"${remote_metadata_path}\""; then
+      if [[ ${DRY_RUN} -eq 1 ]]; then
+        echo "    DRY-RUN METADATA: ssh ${REMOTE} \"tar -C '${remote_base_for_sub}' -cf - '${tuple_rel}/metadata'\" | tar -C '${LOCAL_BASE}' -xf -"
+      else
+        ssh "${REMOTE}" "tar -C \"${remote_base_for_sub}\" -cf - \"${tuple_rel}/metadata\"" | tar -C "${LOCAL_BASE}" -xf -
+      fi
+      metadata_copied_count=$((metadata_copied_count + 1))
+    else
+      echo "    WARNING: Missing remote metadata directory, skipping: ${remote_metadata_path}"
+      metadata_missing_count=$((metadata_missing_count + 1))
+    fi
   fi
 done
 
-echo "==> Copy summary: found ${copied_count}, missing ${missing_count}"
+if [[ ${METADATA_ONLY} -eq 1 ]]; then
+  echo "==> Assessment copy summary: skipped (metadata-only mode)"
+else
+  echo "==> Copy summary: found ${copied_count}, missing ${missing_count}"
+fi
+if [[ ${COPY_METADATA} -eq 1 ]]; then
+  echo "==> Metadata copy summary: copied ${metadata_copied_count}, skipped-existing ${metadata_skipped_existing_count}, missing ${metadata_missing_count}"
+fi
 
-if [[ ${copied_count} -eq 0 ]]; then
+if [[ ${METADATA_ONLY} -eq 0 && ${copied_count} -eq 0 ]]; then
   echo "ERROR: None of the configured remote assessment_results directories were found."
   echo "Check --remote-base and subpaths, or update SUBPATHS in this script."
   exit 1
+fi
+
+if [[ ${METADATA_ONLY} -eq 1 ]]; then
+  if [[ $((metadata_copied_count + metadata_skipped_existing_count)) -eq 0 ]]; then
+    echo "WARNING: No metadata directories were copied or already available locally."
+  fi
+  if [[ ${DRY_RUN} -eq 1 ]]; then
+    echo "\n==> Dry-run metadata-only preview complete"
+    echo "No files were copied."
+  else
+    echo "\n==> Metadata-only fetch complete"
+  fi
+  exit 0
 fi
 
 if [[ ${DRY_RUN} -eq 1 ]]; then

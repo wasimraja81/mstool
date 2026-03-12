@@ -482,7 +482,7 @@ do
     if [ "${ampStrategyNow}" != "" ]; then
         strategySuffixNow="${strategySuffixNow}_AMP_STRATEGY-${ampStrategyNow}"
     fi
-    if [ "${doPreflagNow}" == "true" ] && [ "${ampStrategyNow}" != "" ]; then
+    if [ "${doPreflagNow}" == "true" ]; then
         strategySuffixNow="${strategySuffixNow}-insituPreflags"
     fi
     echo "INFO - Processing SB number: ${iSB} of ${nSB}"

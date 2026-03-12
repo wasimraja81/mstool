@@ -1,3 +1,13 @@
 # Python bytecode/cache
 __pycache__/
 *.py[cod]
+
+# Virtual environment
+.venv/
+
+# IDE / editor
+.vscode/
+
+# Generated artefacts (project-specific)
+projects/calibration-updates-2026/reports/
+projects/calibration-updates-2026/metadata/

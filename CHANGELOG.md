@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## 3.5 - 2026-03-11 (pending)
+
+Patch update prepared on `develop` and intended for the next release tag.
+
+### Fixed
+- `-insituPreflags` directory suffix logic now depends only on `DO_PREFLAG_REFTABLE=true` (no dependency on `AMP_STRATEGY` being set).
+- Applied consistently across:
+  - `projects/calibration-updates-2026/slurm/start_refField.slurm`
+  - `projects/calibration-updates-2026/slurm/start_1934s.slurm`
+  - `projects/calibration-updates-2026/scripts/assess_possum_1934s.sh`
+  - `projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh`
+
+### Changed
+- Project docs updated to clarify that `insituPreflags` is controlled by preflag state only.
+
 ## 3.4 - 2026-03-11
 
 Patch release focused on strict strategy parsing and safer operator validation for stage-1/stage-2.
