@@ -1,6 +1,6 @@
 # Calibration updates (reference fields) — 2026
 
-> **Next release: tag `3.5`** — adds leakage-diagnostics pipeline (3-D cube, footprint heatmaps, HTML report).
+> **Next release: tag `3.6`** — full Q/U leakage diagnostics: isolation tables, cube, split-circle footprint plots, and HTML report.
 
 This folder contains project-specific helper assets for the calibration update workflow using reference (read calibrator) fields.
 
@@ -48,9 +48,10 @@ python -m http.server 8765 -d ~/DATA/reffield-average/phase3
 
 Output artefacts (under `~/DATA/reffield-average/`):
 
-- `phase2/leakage_cube.nc` — 3-D labelled NetCDF4 cube (xarray-compatible)
+- `phase2/leakage_cube.nc` — 3-D labelled NetCDF4 cube (xarray-compatible); variables: `dL`, `dQ`, `dU`, `p90`, `nsb` × {regular, lcal}
 - `phase3/index.html` — self-contained HTML report
-- `phase3/plots/footprint_dL_*.png` — footprint heatmap PNGs
+- `phase3/plots/footprint_dL_*.png` — dL = √(Q²+U²)/I footprint heatmap PNGs (multi-panel and single-panel)
+- `phase3/plots/footprint_QU_*.png` — split-circle Q/U footprint PNGs (multi-panel and per-(ODC, variant))
 - `phase3/tables/` — CSV tables and interactive viewers
 
 ## Main workflow helper
@@ -302,5 +303,4 @@ Create with:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install xarray netCDF4 pandas numpy matplotlib
-```
+pip install xarray ne

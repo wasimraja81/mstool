@@ -14,6 +14,10 @@ dL_regular   : median_l_over_i for variant=regular   [beam, field, odc]
 dL_lcal      : median_l_over_i for variant=lcal      [beam, field, odc]
 p90_regular  : p90_l_over_i    for variant=regular    [beam, field, odc]
 p90_lcal     : p90_l_over_i    for variant=lcal       [beam, field, odc]
+dQ_regular   : median_q_over_i for variant=regular   [beam, field, odc]
+dQ_lcal      : median_q_over_i for variant=lcal      [beam, field, odc]
+dU_regular   : median_u_over_i for variant=regular   [beam, field, odc]
+dU_lcal      : median_u_over_i for variant=lcal      [beam, field, odc]
 nsb_regular  : count_sb_ref    for variant=regular    [beam, field, odc]
 nsb_lcal     : count_sb_ref    for variant=lcal       [beam, field, odc]
 
@@ -79,6 +83,8 @@ def main():
         for col, label in [
             ("median_l_over_i", "dL"),
             ("p90_l_over_i", "p90"),
+            ("median_q_over_i", "dQ"),
+            ("median_u_over_i", "dU"),
             ("count_sb_ref", "nsb"),
         ]:
             arrays[f"{label}_{var}"] = np.full((nb, nf, no), np.nan)
@@ -93,6 +99,10 @@ def main():
             continue
         arrays[f"dL_{var}"][bi, fi, oi] = row["median_l_over_i"]
         arrays[f"p90_{var}"][bi, fi, oi] = row["p90_l_over_i"]
+        if "median_q_over_i" in row and pd.notna(row["median_q_over_i"]):
+            arrays[f"dQ_{var}"][bi, fi, oi] = row["median_q_over_i"]
+        if "median_u_over_i" in row and pd.notna(row["median_u_over_i"]):
+            arrays[f"dU_{var}"][bi, fi, oi] = row["median_u_over_i"]
         arrays[f"nsb_{var}"][bi, fi, oi] = row["count_sb_ref"]
 
     # ── Build xarray Dataset ────────────────────────────────────────────
@@ -107,9 +117,11 @@ def main():
     long_names = {
         "dL": "Percentage linear polarisation leakage, dL = 100 × L/I",
         "p90": "90th percentile of dL across SB_REF samples",
+        "dQ": "Percentage Stokes Q leakage, |Q|/I × 100 (median across valid channels)",
+        "dU": "Percentage Stokes U leakage, |U|/I × 100 (median across valid channels)",
         "nsb": "Number of independent SB_REF observations",
     }
-    units = {"dL": "%", "p90": "%", "nsb": "count"}
+    units = {"dL": "%", "p90": "%", "dQ": "%", "dU": "%", "nsb": "count"}
     variant_labels = {
         "regular": "Bandpass calibrated",
         "lcal": "Bandpass + Leakage (on-axis) calibrated",
@@ -144,6 +156,9 @@ def main():
     # Quick sanity: NaN counts
     for name in ds.data_vars:
         total = ds[name].size
+        if total == 0:
+            print(f"  {name}: empty (0 cells)")
+            continue
         nans = int(np.isnan(ds[name].values).sum())
         print(f"  {name}: {total} cells, {nans} NaN ({100*nans/total:.1f}%)")
 
