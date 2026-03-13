@@ -322,15 +322,17 @@ def plot_single_panel_qu(ds, offsets, field_name, odc_val, vtag,
     leg_ax.set_ylim(-1.6, 1.8)
     leg_ax.axis("off")
     # Legend: no invert_xaxis, so Q top-left = Wedge(45,225), U bottom-right = Wedge(225,405)
-    lq = PatchCollection([Wedge((0, 0), 1, 45, 225)], facecolor="0.70", edgecolors="0.4", linewidths=0.6)
-    lu = PatchCollection([Wedge((0, 0), 1, 225, 405)], facecolor="0.88", edgecolors="0.4", linewidths=0.6)
+    _lq_fc = (*cmap(0.25)[:3], 0.45)  # lower-leakage hue, semi-transparent
+    _lu_fc = (*cmap(0.75)[:3], 0.45)  # higher-leakage hue, semi-transparent
+    lq = PatchCollection([Wedge((0, 0), 1, 45, 225)], facecolor=_lq_fc, edgecolors="0.4", linewidths=0.6)
+    lu = PatchCollection([Wedge((0, 0), 1, 225, 405)], facecolor=_lu_fc, edgecolors="0.4", linewidths=0.6)
     leg_ax.add_collection(lq)
     leg_ax.add_collection(lu)
     _ld = np.sqrt(0.5)
     leg_ax.plot([-_ld, _ld], [-_ld, _ld], color="0.4", lw=0.8, zorder=3)
     leg_ax.add_patch(Circle((0, 0), 1, fill=False, edgecolor="0.4", lw=0.8, zorder=4))
-    leg_ax.text(-0.42, 0.42, r"$|Q|/I$", ha="center", va="center", fontsize=5.5, color="black")
-    leg_ax.text( 0.42, -0.42, r"$|U|/I$", ha="center", va="center", fontsize=5.5, color="black")
+    leg_ax.text(-0.42, 0.42, r"$|Q|/I$", ha="center", va="center", fontsize=5.5, color="0.2")
+    leg_ax.text( 0.42, -0.42, r"$|U|/I$", ha="center", va="center", fontsize=5.5, color="0.2")
     leg_ax.set_title("legend", fontsize=5, color="0.4", pad=2)
 
     fig.tight_layout()
@@ -493,15 +495,17 @@ def plot_field_qu(ds, offsets, field_name, output_dir, vmin=0, vmax=1.5):
     leg_ax.set_ylim(-1.6, 1.8)
     leg_ax.axis("off")
     # Legend: no invert_xaxis, so Q top-left = Wedge(45,225), U bottom-right = Wedge(225,405)
-    lq = PatchCollection([Wedge((0, 0), 1, 45, 225)], facecolor="0.70", edgecolors="0.4", linewidths=0.6)
-    lu = PatchCollection([Wedge((0, 0), 1, 225, 405)], facecolor="0.88", edgecolors="0.4", linewidths=0.6)
+    _lq_fc = (*cmap(0.25)[:3], 0.45)  # lower-leakage hue, semi-transparent
+    _lu_fc = (*cmap(0.75)[:3], 0.45)  # higher-leakage hue, semi-transparent
+    lq = PatchCollection([Wedge((0, 0), 1, 45, 225)], facecolor=_lq_fc, edgecolors="0.4", linewidths=0.6)
+    lu = PatchCollection([Wedge((0, 0), 1, 225, 405)], facecolor=_lu_fc, edgecolors="0.4", linewidths=0.6)
     leg_ax.add_collection(lq)
     leg_ax.add_collection(lu)
     _ld = np.sqrt(0.5)
     leg_ax.plot([-_ld, _ld], [-_ld, _ld], color="0.4", lw=0.8, zorder=3)
     leg_ax.add_patch(Circle((0, 0), 1, fill=False, edgecolor="0.4", lw=0.8, zorder=4))
-    leg_ax.text(-0.42, 0.42, r"$|Q|/I$", ha="center", va="center", fontsize=5.5, color="black")
-    leg_ax.text( 0.42, -0.42, r"$|U|/I$", ha="center", va="center", fontsize=5.5, color="black")
+    leg_ax.text(-0.42, 0.42, r"$|Q|/I$", ha="center", va="center", fontsize=5.5, color="0.2")
+    leg_ax.text( 0.42, -0.42, r"$|U|/I$", ha="center", va="center", fontsize=5.5, color="0.2")
     leg_ax.set_title("legend", fontsize=5, color="0.4", pad=2)
 
     fig.suptitle(
