@@ -4,6 +4,8 @@ import argparse
 import csv
 import html
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 from urllib.parse import quote
 
@@ -190,8 +192,78 @@ def convert_pdfs_to_pngs(media_info: dict, media_dir: Path, dpi: int = 150) -> N
 # Leakage spectra section builder
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# PAF beam-overlay generation
+# ---------------------------------------------------------------------------
+
+def generate_paf_overlays(
+    manifest_rows: list,
+    data_root: Path,
+    plots_dir: Path,
+    amp_suffix: str = "AMP_STRATEGY-multiply-insituPreflags",
+) -> dict:
+    """Generate a PAF beam-overlay PNG for each SB_REF that has the required
+    metadata files (footprintOutput + schedblock-info).  Skips silently if
+    either file is missing or if plot_paf_beam_overlay.py is not found.
+
+    Returns dict: sb_ref -> overlay PNG filename (relative, inside plots_dir).
+    """
+    scripts_dir = Path(__file__).resolve().parent
+    overlay_script = scripts_dir / "plot_paf_beam_overlay.py"
+    if not overlay_script.exists():
+        print(f"WARNING: {overlay_script} not found – skipping PAF overlays.")
+        return {}
+
+    plots_dir.mkdir(parents=True, exist_ok=True)
+    result = {}
+    for row in manifest_rows:
+        sb_ref    = row["sb_ref"]
+        sb_1934   = row["sb_1934"]
+        sb_holo   = row["sb_holo"]
+        field     = row.get("ref_fieldname", "")
+        sb_dir    = data_root / f"SB_REF-{sb_ref}_SB_1934-{sb_1934}_SB_HOLO-{sb_holo}_{amp_suffix}"
+        meta_dir  = sb_dir / "metadata"
+        if not meta_dir.is_dir():
+            continue
+        # Find footprint file — may have a '-src1' variant; prefer the plain one
+        fp_plain = meta_dir / f"footprintOutput-sb{sb_ref}-{field}.txt"
+        fp_src1  = meta_dir / f"footprintOutput-sb{sb_ref}-src1-{field}.txt"
+        footprint = fp_plain if fp_plain.exists() else (fp_src1 if fp_src1.exists() else None)
+        if footprint is None:
+            continue
+        sb_file = meta_dir / f"schedblock-info-{sb_ref}.txt"
+        if not sb_file.exists():
+            # fall back to the 1934 schedblock if available
+            sb_file = meta_dir / f"schedblock-info-{sb_1934}.txt"
+        if not sb_file.exists():
+            continue
+        out_fname = f"paf_overlay_{sb_ref}.png"
+        out_path  = plots_dir / out_fname
+        if out_path.exists():
+            result[sb_ref] = out_fname
+            continue
+        print(f"  PAF overlay [{sb_ref}] … ", end="", flush=True)
+        try:
+            subprocess.run(
+                [
+                    sys.executable, str(overlay_script),
+                    "--footprint", str(footprint),
+                    "--schedblock", str(sb_file),
+                    "--output", str(out_path),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            print(f"{out_path.stat().st_size // 1024} KB")
+            result[sb_ref] = out_fname
+        except subprocess.CalledProcessError as exc:
+            print(f"FAILED ({exc.returncode})")
+    return result
+
+
 def build_spectra_cards(manifest_rows: list, media_info: dict,
-                        media_rel_prefix: str = "media") -> str:
+                        media_rel_prefix: str = "media",
+                        paf_overlay_info: dict = None) -> str:
     """Return HTML for the 'Leakage spectra' section.
 
     One <details id='sbref-{r}'> card per SB_REF, sorted by ODC then field.
@@ -278,6 +350,20 @@ def build_spectra_cards(manifest_rows: list, media_info: dict,
             "</table>"
         )
 
+        # ── PAF beam-overlay row ───────────────────────────────────────
+        paf_row_html = ""
+        if paf_overlay_info and sb_ref in paf_overlay_info:
+            overlay_href = f"plots/{quote(paf_overlay_info[sb_ref])}"
+            paf_btn = (
+                f"<button class='media-btn media-btn--paf'"
+                f" onclick=\"openModal('{overlay_href}','img')\">"
+                f"&#9634; PAF overlay</button>"
+            )
+            paf_row_html = (
+                f"<div style='margin-top:6px;padding-top:6px;"
+                f"border-top:1px solid #eee'>{paf_btn}</div>"
+            )
+
         summary_text = (
             f"SB_REF-{html.escape(sb_ref)}"
             f"&nbsp;&nbsp;&middot;&nbsp;&nbsp;ODC-{html.escape(odc)}"
@@ -290,6 +376,7 @@ def build_spectra_cards(manifest_rows: list, media_info: dict,
             f"{summary_text}</summary>"
             f"<div style='padding:10px 14px'>"
             f"{grid_html}"
+            f"{paf_row_html}"
             f"</div>"
             f"</details>"
         )
@@ -777,7 +864,8 @@ def assemble_package(
     # ── Patch index.html ──────────────────────────────────────────────
     src_html = (phase3_dir / "index.html").read_text()
 
-    # 1. Strip GIF modal but    patched = re.sub(
+    # 1. Strip GIF modal buttons
+    patched = re.sub(
         r"<button class='media-btn media-btn--gif'[^>]*>.*?</button>",
         "",
         src_html,
@@ -1104,8 +1192,15 @@ def main():
         cube_link_html = "<p class='meta'>Cube file not found &mdash; run <code>build_leakage_cube.py</code> first.</p>"
 
     # ── Build index page ────────────────────────────────────────────────
+# ── PAF beam-overlay plots (per SB_REF) ─────────────────────────────
+    print("\nGenerating PAF beam-overlay plots …")
+    paf_overlay_info = generate_paf_overlays(manifest_rows, data_root, plots_dir)
+    print(f"  {len(paf_overlay_info)} PAF overlay(s) ready")
+
 # ── Leakage spectra cards (per SB_REF) ──────────────────────────────
-    spectra_cards_html = build_spectra_cards(manifest_rows, media_info)
+    spectra_cards_html = build_spectra_cards(
+        manifest_rows, media_info, paf_overlay_info=paf_overlay_info
+    )
 
     html_content = f"""<!doctype html>
 <html lang='en'>
@@ -1135,6 +1230,8 @@ def main():
     .media-btn--gif:hover {{ background:#1e7e34; }}
     .media-btn--beamwise {{ background:#28a745; }}
     .media-btn--beamwise:hover {{ background:#1e7e34; }}
+    .media-btn--paf {{ background:#7952b3; }}
+    .media-btn--paf:hover {{ background:#5e3d8f; }}
     .media-btn--page {{ background:#6c757d; }}
     .media-btn--page:hover {{ background:#545b62; }}
     #media-modal {{ display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;align-items:center;justify-content:center; }}

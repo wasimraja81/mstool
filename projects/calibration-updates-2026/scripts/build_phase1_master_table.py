@@ -368,7 +368,7 @@ def main():
         help="Local base containing tuple directories",
     )
     parser.add_argument("--start-index", type=int, default=14)
-    parser.add_argument("--end-index", type=int, default=35)
+    parser.add_argument("--end-index",   type=int, default=42)
     parser.add_argument("--exclude-indices", default="24-29")
     parser.add_argument(
         "--output-csv",
