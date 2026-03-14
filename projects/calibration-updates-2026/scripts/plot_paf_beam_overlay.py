@@ -4,41 +4,19 @@ plot_paf_beam_overlay.py
 
 Overlay closepack36 beam positions on the MkII ASKAP PAF element diagram.
 
-Transform chain (sky frame → PAF rear-view frame):
-  1. Read beam sky offsets from footprintOutput (degrees)
-  2. Divide by pitch → normalised units (1 unit = beam spacing = pitch)
-  3. Rotate by -footprint.rotation (undo the sky rotation → PAF canonical frame)
-  4. Scale by (pitch / element_pitch) → units of one PAF element spacing
-  5. Optionally flip X (left-right) for rear-view convention
-  6. Optionally flip Y (up-down) for focal-plane inversion
+The 112-element MkII PAF layout is drawn entirely from code (paf_port_layout.py).
+Beam positions are placed using a compass-based sky→PAF transform that correctly
+accounts for pol_axis, rear-view mirroring, and focal-plane inversion.
+pol_axis and centre frequency are auto-read from the schedblock metadata file.
 
-The sign of the rotation and both flip flags are left as tunable parameters so the
-mapping can be verified empirically once an anchor referencing the physical PAF is
-available (leg orientation, known bright-source position, etc.).
-
-PAF image coordinate calibration:
-  The background image is aligned by specifying the PAF coordinates
-  [xmin, xmax, ymin, ymax] that correspond to the image edges via --image-extent.
-  Start with --image-half-extent to set a symmetric window.
-
-Usage examples:
-  # No background image (synthetic grid only):
+Usage:
   python plot_paf_beam_overlay.py \\
       --footprint footprintOutput-sb81084-REF_0324-28.txt \\
       --schedblock schedblock-info-81084.txt \\
-      --output paf_overlay_v0.png
+      --output paf_overlay.png
 
-  # With PAF diagram as background:
-  python plot_paf_beam_overlay.py \\
-      --footprint footprintOutput-sb81084-REF_0324-28.txt \\
-      --schedblock schedblock-info-81084.txt \\
-      --paf-image /path/to/MkII_PAF.png \\
-      --image-half-extent 8.5 \\
-      --flip-lr \\
-      --output paf_overlay_v1.png
-
-  # Tune rotation offset and scale:
-  python plot_paf_beam_overlay.py ... --pa-offset 90 --elem-pitch 0.75
+  # Show diagnostic sky-direction stars:
+  python plot_paf_beam_overlay.py ... --sky-markers
 """
 
 import argparse
@@ -51,7 +29,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.patheffects as mpe
-from matplotlib.collections import PatchCollection
 from typing import Optional
 
 # Import the correct 112-element 12×12 PAF layout from paf_port_layout
@@ -76,14 +53,6 @@ ASKAP_DISH_DIAM_M = 12.0
 # frequency information is available).  When a centre frequency can be read
 # from the schedblock the radius is computed as (1.02 λ/D / 2) / elem_pitch.
 BEAM_RADIUS_ELEM = 0.8
-
-# Leg colours matching the MkII PAF diagram quadrants
-LEG_COLOUR = {
-    "R": "#dd4444",   # Leg 1 – upper right  (Red region)
-    "G": "#44aa44",   # Leg 2 – upper left   (Green region)
-    "B": "#4466cc",   # Leg 3 – lower left   (Blue region)
-    "Y": "#ccaa00",   # Leg 4 – lower right  (Yellow region)
-}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # I/O helpers
@@ -246,113 +215,14 @@ def sky_to_paf(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PAF element synthetic grid
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _paf_quadrant(u: float, v: float) -> str:
-    """
-    Assign a leg-colour key based on position in PAF rear-view frame.
-    Quadrant boundaries at u=0 and v=0 match the image colour regions:
-      R (red)    : u > 0 , v > 0   (upper-right → Leg 1)
-      G (green)  : u < 0 , v > 0   (upper-left  → Leg 2)
-      B (blue)   : u < 0 , v < 0   (lower-left  → Leg 3)
-      Y (yellow) : u > 0 , v < 0   (lower-right → Leg 4)
-    """
-    if u >= 0 and v >= 0:
-        return "R"
-    if u < 0 and v >= 0:
-        return "G"
-    if u < 0 and v < 0:
-        return "B"
-    return "Y"
-
-
-def build_paf_element_grid(n_max: int = 7) -> list:
-    """
-    Generate (i, j) integer grid positions for the MkII PAF elements in a
-    diamond boundary |i| + |j| ≤ n_max.
-
-    n_max=7 → 113 elements (slightly more than 94; use for a good visual)
-    n_max=6 → 85 elements (slightly fewer than 94)
-    Adjust n_max or switch to circular boundary to match exact count if needed.
-
-    Returns list of ((i, j), colour_key).
-    """
-    elements = []
-    for i in range(-n_max, n_max + 1):
-        for j in range(-n_max, n_max + 1):
-            if abs(i) + abs(j) <= n_max:
-                col = _paf_quadrant(float(i), float(j))
-                elements.append(((i, j), col))
-    return elements
-
-
-def draw_paf_grid(ax: plt.Axes, n_max: int = 7, alpha: float = 0.30) -> None:
-    """
-    Draw the synthetic PAF element grid on *ax*.  Each element is shown as a
-    small rotated square (diamond) centred at its (i, j) grid position.
-
-    The effective element size is 0.85 × spacing so gaps are visible.
-    """
-    half = 0.40   # half-size of each diamond in element units
-    elements = build_paf_element_grid(n_max)
-
-    for (i, j), ckey in elements:
-        colour = LEG_COLOUR[ckey]
-        # Rotated-square vertices (diamond in the plot)
-        verts = np.array([
-            [i + half, j],
-            [i,        j + half],
-            [i - half, j],
-            [i,        j - half],
-        ])
-        poly = mpatches.Polygon(
-            verts,
-            closed=True,
-            linewidth=0.5,
-            edgecolor="0.55",
-            facecolor=(*mpl.colors.to_rgb(colour), alpha),
-            zorder=1,
-        )
-        ax.add_patch(poly)
-
-    # Draw the leg corner markers
-    span = n_max + 1.2
-    for angle_deg, label, ha, va in [
-        (45,  "Leg 1", "left",  "bottom"),
-        (135, "Leg 2", "right", "bottom"),
-        (225, "Leg 3", "right", "top"),
-        (315, "Leg 4", "left",  "top"),
-    ]:
-        ang = np.radians(angle_deg)
-        x0, y0 = 0.72 * span * np.cos(ang), 0.72 * span * np.sin(ang)
-        x1, y1 = 0.95 * span * np.cos(ang), 0.95 * span * np.sin(ang)
-        ax.annotate(
-            "",
-            xy=(x0, y0),
-            xytext=(x1, y1),
-            arrowprops=dict(arrowstyle="->", color="0.4", lw=1.2),
-            zorder=5,
-        )
-        ax.text(
-            1.07 * span * np.cos(ang),
-            1.07 * span * np.sin(ang),
-            label,
-            ha=ha, va=va,
-            fontsize=8, color="0.35", fontweight="bold",
-        )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Main plot
 # ─────────────────────────────────────────────────────────────────────────────
 
+_PAF_LIM = 9.0   # axis half-extent in element spacings
+
+
 def plot_overlay(
     beams_paf: dict,
-    paf_image_path: Optional[str] = None,
-    image_extent: Optional[list] = None,  # [xmin, xmax, ymin, ymax] in elem units
-    image_alpha: float = 0.65,
-    grid_n_max: int = 7,
     beam_radius: float = BEAM_RADIUS_ELEM,
     output_path: str = "paf_beam_overlay.png",
     title: str = "closepack36 beams on MkII PAF (rear view)",
@@ -361,24 +231,9 @@ def plot_overlay(
 ) -> None:
     fig, ax = plt.subplots(figsize=(12, 10), facecolor="white")
 
-    # ── background image ──────────────────────────────────────────────────────
-    use_image = paf_image_path and Path(paf_image_path).exists()
-    if use_image:
-        img = mpl.image.imread(paf_image_path)
-        if image_extent is None:
-            image_extent = [-9, 9, -9, 9]
-        ax.imshow(
-            img,
-            extent=image_extent,   # [left, right, bottom, top] in elem units
-            origin="upper",        # image row 0 at top (standard PNG)
-            aspect="equal",
-            alpha=image_alpha,
-            zorder=0,
-        )
-    else:
-        # Draw the correct 112-element 12×12 symmetric PAF layout
-        _port_table, _unused = build_port_table()
-        draw_paf_elements(ax, _port_table, _unused, show_port_numbers=True)
+    # ── PAF element layout (112-element 12×12 symmetric grid) ─────────────────
+    _port_table, _unused = build_port_table()
+    draw_paf_elements(ax, _port_table, _unused, show_port_numbers=True)
 
     # ── beam circles ─────────────────────────────────────────────────────────
     beam_colour = '#888888'
@@ -409,7 +264,7 @@ def plot_overlay(
 
     # ── compass rose (always shown) ───────────────────────────────────────────
     from matplotlib.patches import Polygon as _MplPolygon
-    _lim_c = grid_n_max + 2.5
+    _lim_c = _PAF_LIM
     _org   = np.array([-0.78 * _lim_c, 0.78 * _lim_c])
     _alen  = 1.10   # needle half-length (element spacings)
     _wid   = 0.16   # diamond half-width
@@ -473,14 +328,8 @@ def plot_overlay(
                 color='teal', fontweight='bold', ha='left', va='center', zorder=6)
 
     # ── frame ─────────────────────────────────────────────────────────────────
-    if use_image and image_extent:
-        pad = (image_extent[1] - image_extent[0]) * 0.05
-        ax.set_xlim(image_extent[0] - pad, image_extent[1] + pad)
-        ax.set_ylim(image_extent[2] - pad, image_extent[3] + pad)
-    else:
-        lim = grid_n_max + 2.5
-        ax.set_xlim(-lim, lim)
-        ax.set_ylim(-lim, lim)
+    ax.set_xlim(-_PAF_LIM, _PAF_LIM)
+    ax.set_ylim(-_PAF_LIM, _PAF_LIM)
 
     ax.set_aspect("equal")
     ax.set_xlabel("PAF u  (element spacings, rear-view)", fontsize=9)
@@ -522,25 +371,6 @@ def parse_args():
                     help="footprintOutput text file (beam sky offsets)")
     ap.add_argument("--schedblock", required=True,
                     help="schedblock-info text file")
-
-    # Background image
-    grp = ap.add_argument_group("Background image")
-    grp.add_argument("--paf-image", default=None,
-                     help="PAF diagram PNG/JPEG to use as background")
-    grp.add_argument("--image-half-extent", type=float, default=9.0,
-                     metavar="H",
-                     help="Symmetric half-extent: image spans [-H,H] × [-H,H] "
-                          "in element units (default 9.0; tune to fit diagram)")
-    grp.add_argument("--image-extent", nargs=4, type=float,
-                     metavar=("XMIN", "XMAX", "YMIN", "YMAX"),
-                     help="Explicit image extent (overrides --image-half-extent)")
-    grp.add_argument("--image-alpha", type=float, default=0.65,
-                     help="Opacity of background image (default 0.65)")
-
-    # Synthetic grid (used when no --paf-image)
-    grp2 = ap.add_argument_group("Synthetic PAF grid (no --paf-image)")
-    grp2.add_argument("--grid-n", type=int, default=7,
-                      help="Diamond half-width for synthetic grid (default 7 → 113 elements)")
 
     # Transform parameters
     grp3 = ap.add_argument_group("Transform parameters  (iterate to calibrate)")
@@ -654,13 +484,6 @@ def main():
     plot_overlay._elem_pitch = args.elem_pitch
     plot_overlay._pitch     = pitch
 
-    # ── image extent ──────────────────────────────────────────────────────────
-    if args.image_extent:
-        image_extent = args.image_extent
-    else:
-        h = args.image_half_extent
-        image_extent = [-h, h, -h, h]
-
     # ── title ─────────────────────────────────────────────────────────────────
     sbid, alias = read_sbid_from_schedblock(args.schedblock)
     pol_axis_src_label = f"pol_axis={pol_axis:+.0f}° ({pol_axis_src})"
@@ -672,14 +495,10 @@ def main():
     # ── plot ──────────────────────────────────────────────────────────────────
     plot_overlay(
         beams_paf,
-        paf_image_path  = args.paf_image,
-        image_extent    = image_extent,
-        image_alpha     = args.image_alpha,
-        grid_n_max      = args.grid_n,
-        beam_radius     = beam_radius,
-        output_path     = args.output,
-        title           = title,
-        annotate_beams  = args.annotate,
+        beam_radius      = beam_radius,
+        output_path      = args.output,
+        title            = title,
+        annotate_beams   = args.annotate,
         show_sky_markers = args.sky_markers,
     )
 
