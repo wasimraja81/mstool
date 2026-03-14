@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented in this file.
 
+## 3.7 — 2026-03-15
+
+Adds two PAF visualisation scripts and a minor fix to the HTML report.
+
+### Added
+- `paf_port_layout.py`: ASKAP MkII PAF layout library — 112-element 12×12
+  symmetric grid (188 ports), compass-based sky→PAF transform
+  (`pol_axis`-aware, rear-view, focal-plane inversion), FWHM beam circles,
+  diagnostic sky-direction markers, and multi-panel `pol_axis` comparison
+  plots.
+- `plot_paf_beam_overlay.py`: CLI tool — overlays closepack-36 beam footprint
+  on the MkII PAF element grid; auto-reads pol_axis, SBID, and centre
+  frequency from the schedblock file; beam radius derived from `1.02 λ/D`;
+  diamond-needle compass rose (N=red); optional sky-source diagnostic stars
+  (`--sky-markers`).
+
+### Fixed
+- `build_phase3_html_report.py`: semi-transparent cmap-sampled colours for
+  Q/U footprint legend wedges.
+
 ## 3.6 — 2026-03-13
 
 Extends the leakage-diagnostics pipeline with full Q/U decomposition across

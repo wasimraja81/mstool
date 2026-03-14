@@ -777,8 +777,7 @@ def assemble_package(
     # ── Patch index.html ──────────────────────────────────────────────
     src_html = (phase3_dir / "index.html").read_text()
 
-    # 1. Strip GIF modal buttons
-    patched = re.sub(
+    # 1. Strip GIF modal but    patched = re.sub(
         r"<button class='media-btn media-btn--gif'[^>]*>.*?</button>",
         "",
         src_html,

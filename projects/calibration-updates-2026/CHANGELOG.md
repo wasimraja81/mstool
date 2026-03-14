@@ -1,5 +1,54 @@
 # Changelog — calibration-updates-2026
 
+## 3.7 — 2026-03-15
+
+### PAF beam-overlay visualisation tools (new scripts)
+
+- **`paf_port_layout.py`** — library + standalone plotter for the ASKAP MkII
+  Phased Array Feed layout:
+  - Canonical 112-element symmetric 12×12 grid; 94 x-ports + 94 y-ports
+    = 188 total ports, numbered following the Reynolds convention.
+  - Per-element leg colouring (Red/Green/Blue/Yellow quadrant split
+    matching MkII wiring diagrams).
+  - `sky_to_paf_grid()` — physically-motivated compass transform:
+    `pol_axis=0` → Leg 4 toward North (Reynolds); East = 90° CW from North
+    in rear-view; telescope focal-plane inversion applied.
+  - `overlay_beam_footprint()` — parses footprintOutput files and overlays
+    FWHM-sized beam circles (radius = `beam_fwhm_deg/2 / elem_pitch_deg`).
+  - `_draw_sky_overlay()` — diagnostic stars (pointing, S-sky, W-sky) +
+    N/E compass rose.
+  - `plot_paf_polaxis_panels()` — 2×2 panel comparison for
+    `pol_axis ∈ {0°, 45°, 60°, −45°}`.
+  - `plot_paf_polaxis_footprint_panels()` — same 2×2 with beam footprints.
+  - `plot_paf_layout()` — single full-panel layout with port-number labels.
+  - Exports `build_port_table` and `draw_paf_elements` for use by other
+    scripts.
+
+- **`plot_paf_beam_overlay.py`** — CLI tool for overlaying a closepack-36
+  beam footprint on the MkII PAF element grid:
+  - Auto-reads `pol_axis`, centre frequency, SBID, and beam pitch from the
+    schedblock metadata file; all can be overridden via CLI flags.
+  - Beam circle radius computed from first-principles:
+    `r = (1.02 λ/D / 2) / elem_pitch_deg` using `weights.centre_frequency`
+    from the schedblock (e.g. 920.5 MHz → FWHM = 1.59°, r = 1.17 elem).
+  - Compass rose with diamond needles always shown: N = red, E = steel-blue,
+    S/W = white outline; `pol_axis` labelled underneath.
+  - `--sky-markers` flag (off by default) enables diagnostic pointing star
+    (red ★), South-sky star (gold ★) and West-sky star (cyan ★).
+  - `--no-labels` suppresses beam-number annotations.
+  - Title line includes SBID, field alias, pol_axis value and its source
+    (schedblock / CLI / default).
+  - Key CLI flags: `--footprint`, `--schedblock`, `--pol-axis`, `--freq-mhz`,
+    `--dish-diam`, `--elem-pitch`, `--beam-radius`, `--sky-markers`,
+    `--output`.
+
+### Fixed
+
+- **`build_phase3_html_report.py`** — semi-transparent cmap-sampled colours
+  for Q/U footprint legend wedges (was fully opaque, obscured background).
+
+---
+
 ## 3.6 — 2026-03-13
 
 ### Pipeline: Q/U leakage diagnostics

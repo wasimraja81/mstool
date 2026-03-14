@@ -1,6 +1,4 @@
-# Calibration updates (reference fields) — 2026
-
-> **Next release: tag `3.6`** — full Q/U leakage diagnostics: isolation tables, cube, split-circle footprint plots, and HTML report.
+# Calibration updates (reference fields) — 2> **Current release: tag `3.7`** — PAF beam-overlay visualisation tools and Q/U leakage legend fix.
 
 This folder contains project-specific helper assets for the calibration update workflow using reference (read calibrator) fields.
 
@@ -29,6 +27,27 @@ across beams, reference fields, and ODC weights:
 | `build_leakage_cube.py` | Construct a 3-D NetCDF4 cube (beam × field × odc) from the Phase-2 CSV |
 | `plot_leakage_footprint.py` | Generate beam-layout footprint heatmaps from the cube |
 | `build_phase3_html_report.py` | Generate the HTML index page with summary tables, footprint links, and cube download |
+
+### PAF beam-overlay visualisation
+
+Scripts for visualising ASKAP MkII PAF element layouts and beam footprints:
+
+| Script | Purpose |
+|--------|---------|
+| `paf_port_layout.py` | 112-element PAF layout library: port numbering, compass-based sky→PAF transform, multi-panel `pol_axis` comparison plots |
+| `plot_paf_beam_overlay.py` | CLI tool: overlay a closepack-36 beam footprint on the 112-element PAF grid; auto-reads `pol_axis` and centre frequency from schedblock |
+
+Example usage:
+
+```bash
+python scripts/plot_paf_beam_overlay.py \
+  --footprint path/to/footprintOutput-sb81084-REF_0324-28.txt \
+  --schedblock path/to/schedblock-info-81084.txt \
+  --output /tmp/paf_overlay.png
+
+# Add diagnostic star markers for validation
+python scripts/plot_paf_beam_overlay.py ... --sky-markers
+```
 
 Typical workflow (run from repo root with `.venv` activated):
 
