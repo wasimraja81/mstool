@@ -1,4 +1,6 @@
-# Calibration updates (reference fields) — 2> **Current release: tag `3.7`** — PAF beam-overlay visualisation tools and Q/U leakage legend fix.
+# Calibration updates (reference fields) — 2026
+
+> **Current release: tag `3.7`** — PAF beam-overlay visualisation tools, per-SB_REF PAF overlay plots in the HTML report, and full-pipeline single-command report generation.
 
 This folder contains project-specific helper assets for the calibration update workflow using reference (read calibrator) fields.
 
@@ -10,10 +12,10 @@ This folder contains project-specific helper assets for the calibration update w
 
 Convenience wrappers in `scripts/` (run from `~/mstool/scratch`):
 
-- `run_stage-1.sh` (submit stage `ref` for idx=2)
-- `run_stage-2.sh` (submit stage `1934` for idx=2)
-- `run_stage-3.sh` (run assessment for idx=2)
-- `run_stage-4.sh` (run copy+combine locally for idx=2)
+- `run_stage-1.sh` (submit stage `ref`)
+- `run_stage-2.sh` (submit stage `1934`)
+- `run_stage-3.sh` (run assessment)
+- `run_stage-4.sh` (copy+combine+metadata locally; indices 14–42, excluding 24–29)
 
 ### Leakage diagnostics pipeline
 
@@ -26,7 +28,7 @@ across beams, reference fields, and ODC weights:
 | `build_phase2_isolation_tables.py` | Produce Phase-2 beam×field and beam×ODC isolation CSVs |
 | `build_leakage_cube.py` | Construct a 3-D NetCDF4 cube (beam × field × odc) from the Phase-2 CSV |
 | `plot_leakage_footprint.py` | Generate beam-layout footprint heatmaps from the cube |
-| `build_phase3_html_report.py` | Generate the HTML index page with summary tables, footprint links, and cube download |
+| `build_phase3_html_report.py` | Run full pipeline end-to-end: summary tables, footprint links, per-SB_REF PAF beam-overlay plots, cube download. Supports `--package <path>` to assemble a self-contained shareable directory. |
 
 ### PAF beam-overlay visualisation
 
@@ -54,14 +56,13 @@ Typical workflow (run from repo root with `.venv` activated):
 ```bash
 source .venv/bin/activate
 
-# Phase 1 → Phase 2 → Cube → Plots → HTML report
-python scripts/build_phase1_master_table.py
-python scripts/build_phase2_isolation_tables.py
-python scripts/build_leakage_cube.py
-python scripts/plot_leakage_footprint.py
-python scripts/build_phase3_html_report.py
+# Single command: runs Phase 1 → 2 → Cube → Footprint plots → PAF overlays → HTML report
+# Add --package to also assemble a self-contained shareable copy
+python projects/calibration-updates-2026/scripts/build_phase3_html_report.py \
+  --data-root ~/DATA/reffield-average \
+  --package ~/DATA/reffield-average/phase4-share
 
-# Serve the report
+# Serve the report locally
 python -m http.server 8765 -d ~/DATA/reffield-average/phase3
 ```
 
@@ -71,7 +72,9 @@ Output artefacts (under `~/DATA/reffield-average/`):
 - `phase3/index.html` — self-contained HTML report
 - `phase3/plots/footprint_dL_*.png` — dL = √(Q²+U²)/I footprint heatmap PNGs (multi-panel and single-panel)
 - `phase3/plots/footprint_QU_*.png` — split-circle Q/U footprint PNGs (multi-panel and per-(ODC, variant))
+- `phase3/plots/paf_overlay_<SB_REF>.png` — per-SB_REF PAF port/beam overlay plots (generated from `metadata/`)
 - `phase3/tables/` — CSV tables and interactive viewers
+- `phase4-share/` — self-contained shareable package (plots + media PNGs/MP4s + cube; no GIFs/PDFs)
 
 ## Main workflow helper
 
