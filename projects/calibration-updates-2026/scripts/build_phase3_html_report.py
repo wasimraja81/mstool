@@ -4,6 +4,8 @@ import argparse
 import csv
 import html
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 from urllib.parse import quote
 
@@ -18,6 +20,370 @@ def write_csv(path: Path, rows, fieldnames):
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+# ---------------------------------------------------------------------------
+# Manifest parsing
+# ---------------------------------------------------------------------------
+
+def parse_manifest(path: Path) -> list:
+    """Parse sb_manifest_reffield_average.txt into a list of row dicts.
+
+    Each dict has keys: idx, sb_ref, sb_1934, sb_holo, sb_target,
+    odc_weight, ref_fieldname.
+    """
+    rows = []
+    with path.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            tokens = line.split()
+            if len(tokens) < 5:
+                continue
+            try:
+                row = {
+                    "idx":       int(tokens[0]),
+                    "sb_ref":    tokens[1],
+                    "sb_1934":   tokens[2],
+                    "sb_holo":   tokens[3],
+                    "sb_target": tokens[4],
+                    "odc_weight":    "",
+                    "ref_fieldname": "",
+                }
+            except (ValueError, IndexError):
+                continue
+            for tok in tokens[5:]:
+                if "=" in tok:
+                    k, v = tok.split("=", 1)
+                    if k == "ODC_WEIGHT":
+                        row["odc_weight"] = v
+                    elif k == "REF_FIELDNAME":
+                        row["ref_fieldname"] = v
+            rows.append(row)
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# Media file helpers
+# ---------------------------------------------------------------------------
+
+#: (filename_template, kind, variant_tag)
+#: variant_tag: "" = regular, ".lcal" = lcal
+_MEDIA_FILE_SPECS = [
+    ("{stem}.combined_beams.pdf",        "pdf",         ""),
+    ("{stem}.combined_beams.lcal.pdf",   "pdf",         ".lcal"),
+    ("{stem}.beams_stokes.mp4",          "mp4_stokes",  ""),
+    ("{stem}.beams_stokes.lcal.mp4",     "mp4_stokes",  ".lcal"),
+    ("{stem}.beams_pol-degree.mp4",      "mp4_poldeg",  ""),
+    ("{stem}.beams_pol-degree.lcal.mp4", "mp4_poldeg",  ".lcal"),
+    ("{stem}.beams_stokes.gif",          "gif_stokes",  ""),
+    ("{stem}.beams_stokes.lcal.gif",     "gif_stokes",  ".lcal"),
+    ("{stem}.beams_pol-degree.gif",      "gif_poldeg",  ""),
+    ("{stem}.beams_pol-degree.lcal.gif", "gif_poldeg",  ".lcal"),
+    ("{stem}.leakage_stats.png",         "png_lstats",  ""),
+    ("{stem}.leakage_stats.lcal.png",    "png_lstats",  ".lcal"),
+]
+
+
+def _media_stem(sb_ref, sb_1934, sb_holo, sb_target):
+    return (
+        f"SB_REF-{sb_ref}_SB_1934-{sb_1934}_SB_HOLO-{sb_holo}_SB_TARGET_1934-{sb_target}_"
+        f"scienceData.Bandpass_closepack36_920MHz_0.9_1MHz.SB{sb_target}"
+    )
+
+
+def copy_media_files(manifest_rows: list, data_root: Path, media_dir: Path) -> dict:
+    """Copy assessment media files into phase3/media/SB_REF-{r}/.
+
+    Returns dict: sb_ref -> {'stem': str, 'present': set_of_filenames}
+    """
+    amp_suffix = "AMP_STRATEGY-multiply-insituPreflags"
+    result = {}
+    for row in manifest_rows:
+        sb_ref    = row["sb_ref"]
+        sb_1934   = row["sb_1934"]
+        sb_holo   = row["sb_holo"]
+        sb_target = row["sb_target"]
+        stem = _media_stem(sb_ref, sb_1934, sb_holo, sb_target)
+        src_dir = (
+            data_root
+            / f"SB_REF-{sb_ref}_SB_1934-{sb_1934}_SB_HOLO-{sb_holo}_{amp_suffix}"
+            / f"1934-processing-SB-{sb_target}"
+            / "assessment_results"
+        )
+        if not src_dir.is_dir():
+            result[sb_ref] = {"stem": stem, "present": set()}
+            continue
+        dst_dir = media_dir / f"SB_REF-{sb_ref}"
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        present = set()
+        for tmpl, _kind, _vtag in _MEDIA_FILE_SPECS:
+            fname = tmpl.replace("{stem}", stem)
+            src = src_dir / fname
+            dst = dst_dir / fname
+            if src.exists():
+                if not dst.exists():
+                    shutil.copy2(src, dst)
+                present.add(fname)
+        # Also pick up pre-generated PNG pages (from convert_pdfs_to_png.py).
+        # These may live in src_dir (if converted there) or already in dst_dir
+        # (if convert_pdfs_to_png.py was run directly on phase3/media/).
+        for png in sorted(src_dir.glob(f"{stem}.combined_beams*_p0*.png")):
+            dst = dst_dir / png.name
+            if not dst.exists():
+                shutil.copy2(png, dst)
+            present.add(png.name)
+        for png in sorted(dst_dir.glob(f"{stem}.combined_beams*_p0*.png")):
+            present.add(png.name)
+        result[sb_ref] = {"stem": stem, "present": present}
+    return result
+
+
+def convert_pdfs_to_pngs(media_info: dict, media_dir: Path, dpi: int = 150) -> None:
+    """Rasterise combined_beams PDFs to 2 PNG files (one per page) via Ghostscript.
+
+    Skips pages that already exist on disk.  Updates media_info in-place with
+    the newly created PNG filenames so downstream builders can use them.
+    """
+    import shutil as _shutil
+    import subprocess
+    gs_bin = _shutil.which("gs")
+    if gs_bin is None:
+        print("WARNING: gs (Ghostscript) not found – skipping PDF→PNG conversion.")
+        return
+    for sb_ref, info in media_info.items():
+        stem    = info["stem"]
+        present = info["present"]
+        dst_dir = media_dir / f"SB_REF-{sb_ref}"
+        if not dst_dir.is_dir():
+            continue
+        for vtag in ("", ".lcal"):
+            pdf_fname = f"{stem}.combined_beams{vtag}.pdf"
+            if pdf_fname not in present:
+                continue
+            pdf_path = dst_dir / pdf_fname
+            if not pdf_path.exists():
+                continue
+            for page_num, page_label in [(1, "p01"), (2, "p02")]:
+                png_fname = f"{stem}.combined_beams{vtag}_{page_label}.png"
+                png_path  = dst_dir / png_fname
+                if png_path.exists():
+                    present.add(png_fname)  # already done
+                    continue
+                print(f"  [{sb_ref}] PDF→PNG page {page_num} [{vtag or 'regular'}] … ", end="", flush=True)
+                subprocess.run(
+                    [
+                        gs_bin, "-q", "-dBATCH", "-dNOPAUSE", "-dSAFER",
+                        "-sDEVICE=png16m",
+                        f"-r{dpi}",
+                        f"-dFirstPage={page_num}",
+                        f"-dLastPage={page_num}",
+                        f"-sOutputFile={png_path}",
+                        str(pdf_path),
+                    ],
+                    check=True,
+                )
+                print(f"{png_path.stat().st_size // 1024} KB")
+                present.add(png_fname)
+
+
+# ---------------------------------------------------------------------------
+# Leakage spectra section builder
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# PAF beam-overlay generation
+# ---------------------------------------------------------------------------
+
+def generate_paf_overlays(
+    manifest_rows: list,
+    data_root: Path,
+    plots_dir: Path,
+    amp_suffix: str = "AMP_STRATEGY-multiply-insituPreflags",
+) -> dict:
+    """Generate a PAF beam-overlay PNG for each SB_REF that has the required
+    metadata files (footprintOutput + schedblock-info).  Skips silently if
+    either file is missing or if plot_paf_beam_overlay.py is not found.
+
+    Returns dict: sb_ref -> overlay PNG filename (relative, inside plots_dir).
+    """
+    scripts_dir = Path(__file__).resolve().parent
+    overlay_script = scripts_dir / "plot_paf_beam_overlay.py"
+    if not overlay_script.exists():
+        print(f"WARNING: {overlay_script} not found – skipping PAF overlays.")
+        return {}
+
+    plots_dir.mkdir(parents=True, exist_ok=True)
+    result = {}
+    for row in manifest_rows:
+        sb_ref    = row["sb_ref"]
+        sb_1934   = row["sb_1934"]
+        sb_holo   = row["sb_holo"]
+        field     = row.get("ref_fieldname", "")
+        sb_dir    = data_root / f"SB_REF-{sb_ref}_SB_1934-{sb_1934}_SB_HOLO-{sb_holo}_{amp_suffix}"
+        meta_dir  = sb_dir / "metadata"
+        if not meta_dir.is_dir():
+            continue
+        # Find footprint file — may have a '-src1' variant; prefer the plain one
+        fp_plain = meta_dir / f"footprintOutput-sb{sb_ref}-{field}.txt"
+        fp_src1  = meta_dir / f"footprintOutput-sb{sb_ref}-src1-{field}.txt"
+        footprint = fp_plain if fp_plain.exists() else (fp_src1 if fp_src1.exists() else None)
+        if footprint is None:
+            continue
+        sb_file = meta_dir / f"schedblock-info-{sb_ref}.txt"
+        if not sb_file.exists():
+            # fall back to the 1934 schedblock if available
+            sb_file = meta_dir / f"schedblock-info-{sb_1934}.txt"
+        if not sb_file.exists():
+            continue
+        out_fname = f"paf_overlay_{sb_ref}.png"
+        out_path  = plots_dir / out_fname
+        if out_path.exists():
+            result[sb_ref] = out_fname
+            continue
+        print(f"  PAF overlay [{sb_ref}] … ", end="", flush=True)
+        try:
+            subprocess.run(
+                [
+                    sys.executable, str(overlay_script),
+                    "--footprint", str(footprint),
+                    "--schedblock", str(sb_file),
+                    "--output", str(out_path),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            print(f"{out_path.stat().st_size // 1024} KB")
+            result[sb_ref] = out_fname
+        except subprocess.CalledProcessError as exc:
+            print(f"FAILED ({exc.returncode})")
+    return result
+
+
+def build_spectra_cards(manifest_rows: list, media_info: dict,
+                        media_rel_prefix: str = "media",
+                        paf_overlay_info: dict = None) -> str:
+    """Return HTML for the 'Leakage spectra' section.
+
+    One <details id='sbref-{r}'> card per SB_REF, sorted by ODC then field.
+    Each card has a 2×2 video grid (stokes/pol-degree × regular/lcal)
+    plus inline PDFs for combined_beams.
+    """
+    # Sort by (odc_weight, ref_fieldname, sb_ref); skip rows with no media on disk
+    ordered = sorted(
+        [
+            r for r in manifest_rows
+            if r["sb_ref"] in media_info and media_info[r["sb_ref"]]["present"]
+        ],
+        key=lambda r: (r["odc_weight"], r["ref_fieldname"], r["sb_ref"]),
+    )
+    cards = []
+    for row in ordered:
+        sb_ref = row["sb_ref"]
+        info   = media_info[sb_ref]
+        stem   = info["stem"]
+        present = info["present"]
+        odc    = row["odc_weight"]
+        field  = row["ref_fieldname"]
+        card_id = f"sbref-{sb_ref}"
+        rel    = f"{media_rel_prefix}/SB_REF-{sb_ref}"
+
+        # ── 2×2 video grid ────────────────────────────────────────────
+        grid_cells = []
+        for variant_label, vtag in [("regular", ""), ("lcal", ".lcal")]:
+            for plot_stem, plot_label in [
+                ("beams_stokes",    "Stokes"),
+                ("beams_pol-degree","Pol. degree"),
+            ]:
+                mp4_fname = f"{stem}.{plot_stem}{vtag}.mp4"
+                gif_fname = f"{stem}.{plot_stem}{vtag}.gif"
+                mp4_href  = f"{rel}/{quote(mp4_fname)}"
+                gif_href  = f"{rel}/{quote(gif_fname)}"
+                inner = (
+                    f"<p style='margin:0 0 6px'><b>{html.escape(plot_label)}"
+                    f" <span style='font-weight:normal;color:#666'>[{html.escape(variant_label)}]</span></b></p>"
+                )
+                btns = []
+                if mp4_fname in present:
+                    btns.append(
+                        f"<button class='media-btn' "
+                        f"onclick=\"openModal('{mp4_href}','video')\">"
+                        f"&#9654; MP4</button>"
+                    )
+                if gif_fname in present:
+                    btns.append(
+                        f"<button class='media-btn media-btn--gif' "
+                        f"onclick=\"openModal('{gif_href}','gif')\">"
+                        f"&#128247; GIF</button>"
+                    )
+                # All-beams combined PNG (p01 = Stokes, p02 = Pol. degree)
+                page_tag = "p01" if plot_stem == "beams_stokes" else "p02"
+                png_all  = f"{stem}.combined_beams{vtag}_{page_tag}.png"
+                if png_all in present:
+                    png_href_all = f"{rel}/{quote(png_all)}"
+                    btns.append(
+                        f"<button class='media-btn'"
+                        f" onclick=\"openModal('{png_href_all}','img')\">"
+                        f"&#8862; all beams</button>"
+                    )
+                # Leakage stats (beamwise, channel-averaged) — only for pol-degree cells
+                if plot_stem == "beams_pol-degree":
+                    lstats_fname = f"{stem}.leakage_stats{vtag}.png"
+                    if lstats_fname in present:
+                        lstats_href = f"{rel}/{quote(lstats_fname)}"
+                        btns.append(
+                            f"<button class='media-btn media-btn--beamwise'"
+                            f" onclick=\"openModal('{lstats_href}','img')\">"
+                            f"&#128200; beamwise</button>"
+                        )
+                if btns:
+                    inner += f"<p style='margin:4px 0 0'>{' '.join(btns)}</p>"
+                else:
+                    inner += "<span style='color:#888;font-size:12px'>(not available)</span>"
+                grid_cells.append(
+                    f"<td style='padding:10px;vertical-align:top;width:25%'>{inner}</td>"
+                )
+        grid_html = (
+            "<table style='width:100%;border-collapse:collapse;border:none'>"
+            f"<tr>{''.join(grid_cells)}</tr>"
+            "</table>"
+        )
+
+        # ── PAF beam-overlay row ───────────────────────────────────────
+        paf_row_html = ""
+        if paf_overlay_info and sb_ref in paf_overlay_info:
+            overlay_href = f"plots/{quote(paf_overlay_info[sb_ref])}"
+            paf_btn = (
+                f"<button class='media-btn media-btn--paf'"
+                f" onclick=\"openModal('{overlay_href}','img')\">"
+                f"&#9634; PAF overlay</button>"
+            )
+            paf_row_html = (
+                f"<div style='margin-top:6px;padding-top:6px;"
+                f"border-top:1px solid #eee'>{paf_btn}</div>"
+            )
+
+        summary_text = (
+            f"SB_REF-{html.escape(sb_ref)}"
+            f"&nbsp;&nbsp;&middot;&nbsp;&nbsp;ODC-{html.escape(odc)}"
+            f"&nbsp;&nbsp;&middot;&nbsp;&nbsp;{html.escape(field)}"
+        )
+        cards.append(
+            f"<details id='{card_id}'"
+            f" style='margin:6px 0;border:1px solid #ddd;border-radius:4px'>"
+            f"<summary style='cursor:pointer;padding:8px 12px;font-weight:bold'>"
+            f"{summary_text}</summary>"
+            f"<div style='padding:10px 14px'>"
+            f"{grid_html}"
+            f"{paf_row_html}"
+            f"</div>"
+            f"</details>"
+        )
+
+    if not cards:
+        return "<p class='meta'>No media files found – run <code>copy_media_files()</code> first.</p>"
+    return "\n".join(cards)
 
 
 def to_float(value, default=-1e18):
@@ -130,11 +496,14 @@ def localize_plot_links(rows, tables_dir: Path, asset_root: Path, asset_http_bas
         row["sb_ref_plot_links"] = ";".join(localized)
 
 
-def build_summary_table(rows, plots_dir=None):
-    """Render an inline HTML table with 9 summary columns and clickable SB_REF links.
+def build_summary_table(rows, plots_dir=None, media_map=None):
+    """Render an inline HTML table with summary columns and clickable SB_REF links.
 
     If plots_dir is given, the reference-field cell links to the individual
     footprint PNG for that (field, ODC, variant) combination.
+
+    If media_map is given ({sb_ref: {'stem': str, 'present': set}}), the
+    sb_ref_values column gains anchor + download links (↓pdf, ↓mp4, ↓gif).
     """
     headers = [
         "odc_weight", "variant", "ref_fieldname", "n_candidates",
@@ -163,19 +532,30 @@ def build_summary_table(rows, plots_dir=None):
         for h in headers:
             v = row.get(h, "")
             if h == "ref_fieldname" and plots_dir is not None:
-                # Link to individual footprint PNG
                 field_safe = str(v).replace("/", "_")
                 odc = row.get("odc_weight", "")
                 vtag = str(row.get("variant", ""))  # "regular" or "lcal"
-                png_name = f"footprint_dL_{field_safe}_odc{odc}_{vtag}.png"
-                if (plots_dir / png_name).exists():
-                    href = f"plots/{quote(png_name)}"
-                    cells.append(
-                        f"<td><a href='{html.escape(href)}' target='_blank'"
-                        f" rel='noopener'>{html.escape(str(v))}</a></td>"
+                # Badge 1: per-(odc, variant) dL footprint
+                dl_png = f"footprint_dL_{field_safe}_odc{odc}_{vtag}.png"
+                if (plots_dir / dl_png).exists():
+                    dl_badge = (
+                        f" <a href='plots/{quote(dl_png)}'"
+                        f" onclick=\"openModal(this.href,'img');return false;\""
+                        f" class='plot-badge'>L</a>"
                     )
                 else:
-                    cells.append(f"<td>{html.escape(str(v))}</td>")
+                    dl_badge = ""
+                # Badge 2: per-(odc, variant) Q/U footprint
+                qu_png = f"footprint_QU_{field_safe}_odc{odc}_{vtag}.png"
+                if (plots_dir / qu_png).exists():
+                    qu_badge = (
+                        f" <a href='plots/{quote(qu_png)}'"
+                        f" onclick=\"openModal(this.href,'img');return false;\""
+                        f" class='plot-badge'>|Q|,|U|</a>"
+                    )
+                else:
+                    qu_badge = ""
+                cells.append(f"<td>{html.escape(str(v))}{dl_badge}{qu_badge}</td>")
             elif h == "sb_ref_values":
                 plot_raw = row.get("sb_ref_plot_links", "")
                 plot_map = {}
@@ -189,17 +569,15 @@ def build_summary_table(rows, plots_dir=None):
                         if sb:
                             plot_map[sb] = link
                 parts = [p.strip() for p in str(v).split(";") if p.strip()]
-                link_parts = []
+                badge_parts = []
                 for sb in parts:
-                    link = plot_map.get(sb, "")
-                    if link:
-                        link_parts.append(
-                            f"<a href='{html.escape(link)}' target='_self'"
-                            f" rel='noopener'>SB_REF-{html.escape(sb)}</a>"
-                        )
-                    else:
-                        link_parts.append(f"SB_REF-{html.escape(sb)}")
-                cells.append(f"<td>{' ; '.join(link_parts)}</td>")
+                    anchor = f"#sbref-{sb}"
+                    badge_parts.append(
+                        f"<a href='{html.escape(anchor)}'"
+                        f" onclick=\"openSpectraCard('sbref-{html.escape(sb)}');return false;\">"
+                        f"SB_REF-{html.escape(sb)}</a>"
+                    )
+                cells.append(f"<td>{'<br>'.join(badge_parts)}</td>")
             elif h in numeric_cols:
                 cells.append(f"<td>{html.escape(fmt_num(v, digits=3))}</td>")
             elif h == "n_candidates":
@@ -430,6 +808,137 @@ def write_csv_viewer(output_dir: Path, csv_filename: str, title: str, column_hel
         return viewer_path
 
 
+def assemble_package(
+    package_dir: Path,
+    phase3_dir: Path,
+    cube_src: Path,
+    media_info: dict,
+) -> None:
+    """Assemble a self-contained shareable package.
+
+    Copies:
+      - plots/ — all PNGs (footprint_dL_*, footprint_QU_*, single-panel variants)
+      - media/ — PNGs (combined_beams pages, leakage_stats) + MP4s only (no GIFs)
+      - leakage_cube.nc
+    Patches index.html: removes GIF buttons + CSS, fixes cube href, drops
+    the Run summary section.
+    """
+    import re
+    package_dir.mkdir(parents=True, exist_ok=True)
+    (package_dir / "plots").mkdir(exist_ok=True)
+    (package_dir / "media").mkdir(exist_ok=True)
+
+    # ── plots/ ────────────────────────────────────────────────────────
+    n_plots = 0
+    for f in sorted((phase3_dir / "plots").glob("*.png")):
+        shutil.copy2(f, package_dir / "plots" / f.name)
+        n_plots += 1
+    print(f"  plots: {n_plots} PNGs")
+
+    # ── cube ──────────────────────────────────────────────────────────
+    if cube_src.exists():
+        shutil.copy2(cube_src, package_dir / "leakage_cube.nc")
+        print(f"  cube:  {cube_src.stat().st_size // 1024} KB")
+    else:
+        print("  cube:  not found, skipping")
+
+    # ── media: PNG + MP4 only ─────────────────────────────────────────
+    n_png = n_mp4 = 0
+    for sb_ref, info in media_info.items():
+        present = info.get("present", set())
+        if not present:
+            continue
+        src_dir = phase3_dir / "media" / f"SB_REF-{sb_ref}"
+        dst_dir = package_dir / "media" / f"SB_REF-{sb_ref}"
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        for fname in sorted(present):
+            if not (fname.endswith(".png") or fname.endswith(".mp4")):
+                continue
+            src = src_dir / fname
+            if src.exists():
+                shutil.copy2(src, dst_dir / fname)
+                if fname.endswith(".png"): n_png += 1
+                else:                      n_mp4 += 1
+    print(f"  media: {n_png} PNGs, {n_mp4} MP4s")
+
+    # ── Patch index.html ──────────────────────────────────────────────
+    src_html = (phase3_dir / "index.html").read_text()
+
+    # 1. Strip GIF modal buttons
+    patched = re.sub(
+        r"<button class='media-btn media-btn--gif'[^>]*>.*?</button>",
+        "",
+        src_html,
+        flags=re.DOTALL,
+    )
+    # 1b. Strip dead GIF CSS rules
+    patched = re.sub(r"\s*\.media-btn--gif\b[^}]*\}", "", patched)
+    # 2. Fix cube href: ../phase2/leakage_cube.nc  ->  leakage_cube.nc
+    patched = patched.replace("'../phase2/leakage_cube.nc'", "'leakage_cube.nc'")
+
+    # 3. Drop Supporting CSV tables + Run summary (everything between
+    #    their first <h3> tag and the closing </ul> before the modal comment)
+    patched = re.sub(
+        r"\s*<h3>Supporting CSV tables</h3>.*?</ul>(?=\s*\n\s*<!--)",
+        "",
+        patched,
+        flags=re.DOTALL,
+    )
+
+    (package_dir / "index.html").write_text(patched)
+
+    total = sum(f.stat().st_size for f in package_dir.rglob("*") if f.is_file())
+    print(f"Package ready at {package_dir}  ({total / 1e6:.1f} MB total)")
+
+
+def run_upstream_pipeline(data_root: Path, phase2_dir: Path) -> None:
+    """Run the three upstream pipeline scripts in order:
+      1. build_phase2_isolation_tables.py  — (re)generate phase-2 CSVs
+      2. build_leakage_cube.py             — rebuild leakage_cube.nc
+      3. plot_leakage_footprint.py         — regenerate footprint PNGs (dL + QU)
+
+    Only runs if the master leakage CSV exists.  Uses the same Python
+    interpreter as the current process.  Failures are reported but do not
+    abort the HTML build (existing outputs will still be used).
+    """
+    import subprocess
+    import sys
+
+    scripts_dir = Path(__file__).resolve().parent
+    python = sys.executable
+
+    master_csv  = data_root / "leakage_master_table.csv"
+
+    if not master_csv.exists():
+        print(f"Upstream pipeline skipped: master CSV not found at {master_csv}")
+        return
+
+    steps = [
+        (
+            "Phase-2 isolation tables",
+            [python, str(scripts_dir / "build_phase2_isolation_tables.py"),
+             "--input-csv", str(master_csv),
+             "--output-dir", str(phase2_dir)],
+        ),
+        (
+            "Leakage cube (NetCDF4)",
+            [python, str(scripts_dir / "build_leakage_cube.py"),
+             "--data-root", str(data_root)],
+        ),
+        (
+            "Footprint plots (dL + QU)",
+            [python, str(scripts_dir / "plot_leakage_footprint.py"),
+             "--data-root", str(data_root)],
+        ),
+    ]
+
+    for label, cmd in steps:
+        print(f"\n── Running: {label} ──")
+        result = subprocess.run(cmd, text=True)
+        if result.returncode != 0:
+            print(f"  WARNING: '{label}' exited with code {result.returncode} — continuing with existing outputs.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Build Phase-3 HTML index report for MVP outputs")
     parser.add_argument(
@@ -457,6 +966,24 @@ def main():
         default="http://127.0.0.1:8767",
         help="HTTP base URL used to convert absolute plot paths into clickable links",
     )
+    parser.add_argument(
+        "--manifest",
+        default=None,
+        help=(
+            "Path to sb_manifest_reffield_average.txt. "
+            "If omitted, the script searches <repo>/projects/calibration-updates-2026/manifests/ "
+            "then <data-root> for a file named sb_manifest_reffield_average.txt."
+        ),
+    )
+    parser.add_argument(
+        "--package",
+        default=None,
+        metavar="PATH",
+        help=(
+            "If given, assemble a self-contained shareable package at this path. "
+            "Includes only PNG + MP4 + plots + cube; strips GIFs, PDFs and CSV tables."
+        ),
+    )
     args = parser.parse_args()
 
     data_root = Path(args.data_root)
@@ -465,9 +992,44 @@ def main():
     asset_root = Path(args.asset_root)
     asset_http_base = args.asset_http_base
     tables_dir = output_dir / "tables"
+    media_dir  = output_dir / "media"
 
     output_dir.mkdir(parents=True, exist_ok=True)
     tables_dir.mkdir(parents=True, exist_ok=True)
+    media_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── Locate manifest ──────────────────────────────────────────────────
+    manifest_path = None
+    if args.manifest:
+        manifest_path = Path(args.manifest)
+    else:
+        # Search heuristic
+        candidates = [
+            Path(__file__).resolve().parent.parent / "manifests" / "sb_manifest_reffield_average.txt",
+            data_root / "sb_manifest_reffield_average.txt",
+        ]
+        for c in candidates:
+            if c.exists():
+                manifest_path = c
+                break
+
+    manifest_rows: list = []
+    media_info: dict    = {}
+    if manifest_path and manifest_path.exists():
+        manifest_rows = parse_manifest(manifest_path)
+        print(f"Parsed {len(manifest_rows)} manifest rows from {manifest_path}")
+        media_info = copy_media_files(manifest_rows, data_root, media_dir)
+        convert_pdfs_to_pngs(media_info, media_dir)
+        n_copied = sum(len(v["present"]) for v in media_info.values())
+        print(f"Media ready for {len(media_info)} SB_REFs ({n_copied} files total under {media_dir})")
+    else:
+        print("Warning: no manifest found – Obs column and spectra cards will be empty.")
+
+    # media_map for the summary table: {sb_ref: {'stem', 'present'}}
+    media_map = media_info if media_info else None
+
+    # ── Run upstream pipeline steps ──────────────────────────────────────
+    run_upstream_pipeline(data_root, phase2_dir)
 
     inputs = {
         "beam_x_field_at_fixed_odc.csv": phase2_dir / "beam_x_field_at_fixed_odc.csv",
@@ -513,15 +1075,36 @@ def main():
     # ── Footprint heatmap links (one PNG per unique field) ──────────────
     plots_dir = output_dir / "plots"
     unique_fields = sorted({r.get("ref_fieldname", "") for r in field_scores} - {""})
-    footprint_links = []
+    combined_footprint_rows = []
     for fname in unique_fields:
         safe = fname.replace("/", "_")
-        png = f"footprint_dL_{safe}.png"
-        if (plots_dir / png).exists():
-            footprint_links.append(
-                f"<li><a href='plots/{quote(png)}' target='_blank' rel='noopener'>{html.escape(fname)}</a></li>"
+        png_l  = f"footprint_dL_{safe}.png"
+        png_qu = f"footprint_QU_{safe}.png"
+        l_badge = (
+            f"<a href='plots/{quote(png_l)}'"
+            f" onclick=\"openModal(this.href,'img');return false;\""
+            f" class='plot-badge'>L</a>"
+            if (plots_dir / png_l).exists() else ""
+        )
+        qu_badge = (
+            f"<a href='plots/{quote(png_qu)}'"
+            f" onclick=\"openModal(this.href,'img');return false;\""
+            f" class='plot-badge'>|Q|,|U|</a>"
+            if (plots_dir / png_qu).exists() else ""
+        )
+        if l_badge or qu_badge:
+            combined_footprint_rows.append(
+                f"<tr><td class='field-name'>{html.escape(fname)}</td>"
+                f"<td>{l_badge}</td><td>{qu_badge}</td></tr>"
             )
-    footprint_links_html = f"<ul>{''.join(footprint_links)}</ul>" if footprint_links else "<p class='meta'>No footprint plots found.</p>"
+    if combined_footprint_rows:
+        combined_footprint_html = (
+            "<table class='footprint-overview'>"
+            "<thead><tr><th>Field</th><th>L</th><th>|Q|,|U|</th></tr></thead>"
+            "<tbody>" + "".join(combined_footprint_rows) + "</tbody></table>"
+        )
+    else:
+        combined_footprint_html = "<p class='meta'>No footprint plots found.</p>"
 
     # ── Build beam-level CSV viewer pages ───────────────────────────────
     beam_viewer_specs = {
@@ -609,6 +1192,16 @@ def main():
         cube_link_html = "<p class='meta'>Cube file not found &mdash; run <code>build_leakage_cube.py</code> first.</p>"
 
     # ── Build index page ────────────────────────────────────────────────
+# ── PAF beam-overlay plots (per SB_REF) ─────────────────────────────
+    print("\nGenerating PAF beam-overlay plots …")
+    paf_overlay_info = generate_paf_overlays(manifest_rows, data_root, plots_dir)
+    print(f"  {len(paf_overlay_info)} PAF overlay(s) ready")
+
+# ── Leakage spectra cards (per SB_REF) ──────────────────────────────
+    spectra_cards_html = build_spectra_cards(
+        manifest_rows, media_info, paf_overlay_info=paf_overlay_info
+    )
+
     html_content = f"""<!doctype html>
 <html lang='en'>
 <head>
@@ -624,6 +1217,31 @@ def main():
     th {{ background: #f3f3f3; position: sticky; top: 0; }}
     .meta {{ color: #444; font-size: 13px; }}
     a {{ color: #0366d6; }}
+    .plot-badge {{ display:inline-block;font-size:10px;font-weight:bold;padding:1px 5px;border-radius:3px;border:1px solid #0366d6;color:#0366d6;text-decoration:none;margin-left:4px;white-space:nowrap; }}
+    .plot-badge:hover {{ background:#0366d6;color:#fff; }}
+    .footprint-overview {{ border-collapse:collapse;margin:8px 0; }}
+    .footprint-overview th {{ font-size:11px;font-weight:600;padding:3px 12px 3px 6px;border-bottom:1px solid #ccc;text-align:left;color:#555; }}
+    .footprint-overview td {{ padding:3px 8px 3px 6px;font-size:12px;vertical-align:middle; }}
+    .footprint-overview td.field-name {{ font-family:monospace;font-size:12px;padding-right:14px; }}
+    .footprint-overview tr:hover td {{ background:#f0f6ff; }}
+    .media-btn {{ display:inline-flex;align-items:center;height:26px;background:#0366d6;color:#fff;border:none;padding:0 11px;border-radius:4px;cursor:pointer;font-size:12px;margin-right:6px;margin-bottom:4px;white-space:nowrap; }}
+    .media-btn:hover {{ background:#0256b4; }}
+    .media-btn--gif {{ background:#28a745; }}
+    .media-btn--gif:hover {{ background:#1e7e34; }}
+    .media-btn--beamwise {{ background:#28a745; }}
+    .media-btn--beamwise:hover {{ background:#1e7e34; }}
+    .media-btn--paf {{ background:#7952b3; }}
+    .media-btn--paf:hover {{ background:#5e3d8f; }}
+    .media-btn--page {{ background:#6c757d; }}
+    .media-btn--page:hover {{ background:#545b62; }}
+    #media-modal {{ display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;align-items:center;justify-content:center; }}
+    #media-modal-box {{ position:relative;max-width:92vw;max-height:92vh;text-align:center; }}
+    #media-modal-close {{ position:absolute;top:-36px;right:0;background:none;border:none;color:#fff;font-size:28px;line-height:1;cursor:pointer; }}
+    #media-modal-content video {{ max-width:88vw;max-height:85vh;display:block;border-radius:4px; }}
+    #media-modal-scroll {{ overflow:auto;max-width:90vw;max-height:86vh;border-radius:4px; }}
+    #media-modal-scroll::-webkit-scrollbar {{ height:10px;width:10px; }}
+    #media-modal-scroll::-webkit-scrollbar-thumb {{ background:#888;border-radius:5px; }}
+    #media-modal-scroll::-webkit-scrollbar-track {{ background:#2a2a2a;border-radius:5px; }}
   </style>
   <script>
       window.MathJax = {{
@@ -632,6 +1250,48 @@ def main():
       }};
   </script>
   <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script>
+    function openSpectraCard(id) {{
+      var el = document.getElementById(id);
+      if (el) {{ el.open = true; el.scrollIntoView({{behavior: 'smooth', block: 'start'}}); }}
+      return false;
+    }}
+    function toggleImgZoom(img) {{
+      var hint = document.getElementById('media-modal-hint');
+      if (img.dataset.zoomed === '1') {{
+        img.style.maxWidth = '88vw'; img.style.maxHeight = '85vh'; img.style.width = '';
+        img.style.cursor = 'zoom-in'; img.dataset.zoomed = '0';
+        if (hint) hint.textContent = 'Click to zoom \u00b7 Esc / click outside to close';
+      }} else {{
+        img.style.maxWidth = 'none'; img.style.maxHeight = 'none'; img.style.width = 'auto';
+        img.style.cursor = 'zoom-out'; img.dataset.zoomed = '1';
+        if (hint) hint.textContent = 'Scroll \u2195\u2194 to pan \u00b7 Click to zoom out \u00b7 Esc / click outside to close';
+      }}
+    }}
+    function openModal(url, type) {{
+      var box = document.getElementById('media-modal-content');
+      if (type === 'video') {{
+        box.innerHTML = '<video src="' + url + '" autoplay loop muted playsinline controls></video>';
+      }} else if (type === 'img') {{
+        box.innerHTML = '<div id="media-modal-scroll">'
+          + '<img src="' + url + '" alt="preview" data-zoomed="0"'
+          + ' style="display:block;max-width:88vw;max-height:85vh;cursor:zoom-in"'
+          + ' onclick="toggleImgZoom(this)"></div>'
+          + '<p id="media-modal-hint" style="color:#ccc;font-size:12px;margin:6px 0 0">Click to zoom \u00b7 Esc / click outside to close</p>';
+      }} else {{
+        box.innerHTML = '<img src="' + url + '" alt="preview">';
+      }}
+      var modal = document.getElementById('media-modal');
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }}
+    function closeModal() {{
+      document.getElementById('media-modal').style.display = 'none';
+      document.getElementById('media-modal-content').innerHTML = '';
+      document.body.style.overflow = '';
+    }}
+    document.addEventListener('keydown', function(e) {{ if (e.key === 'Escape') closeModal(); }});
+  </script>
 </head>
 <body>
   <h1>Summary of Residual On-axis Leakage</h1>
@@ -648,7 +1308,7 @@ def main():
       <tr><td>Variant</td><td>Bandpass calibrated (regular) or Bandpass + Leakage on-axis calibrated (lcal)</td></tr>
       <tr><td>Reference field</td><td>Name (with skyPos) of the field used for calibration</td></tr>
       <tr><td>n_obs(f)</td><td>Number of independent observations for this field (per ODC weight)</td></tr>
-      <tr><td>Observed SB_REF IDs</td><td>Clickable links to diagnostic plots for these SB_REFs</td></tr>
+      <tr><td>Observed SB_REF IDs</td><td>Links to the leakage statistics card for each individual SB_REF observation</td></tr>
       <tr><td>&mu;&#8317;&#7495;&#8318;</td><td>Median across beams of \\(\\mu_{{b,f}}^{{(s)}}\\)</td></tr>
       <tr><td>MAD&#8317;&#7495;&#8318;</td><td>MAD across beams of \\(\\mu_{{b,f}}^{{(s)}}\\) &mdash; beam-to-beam spread</td></tr>
       <tr><td>min&#8317;&#7495;&#8318;</td><td>Minimum across beams of \\(\\mu_{{b,f}}^{{(s)}}\\)</td></tr>
@@ -659,14 +1319,20 @@ def main():
      \\(dL = 100 \\times L/I\\), where \\(L\\) is the linear polarisation intensity and \\(I\\) is the Stokes&nbsp;I total intensity.</p>
 
   <h2>Bandpass calibrated</h2>
-  {build_summary_table(field_regular, plots_dir=output_dir / 'plots')}
+  {build_summary_table(field_regular, plots_dir=output_dir / 'plots', media_map=media_map)}
 
   <h2>Bandpass + Leakage (on-axis) calibrated</h2>
-  {build_summary_table(field_lcal, plots_dir=output_dir / 'plots')}
+  {build_summary_table(field_lcal, plots_dir=output_dir / 'plots', media_map=media_map)}
 
   <h2>Footprint heatmaps</h2>
-  <p class='meta'>Beam-layout footprint plots of residual leakage (dL&nbsp;%) for each reference field, faceted by ODC weight and calibration variant.</p>
-  {footprint_links_html}
+  <p class='meta'>Beam-layout footprint plots for each reference field. <b>L</b>: residual leakage dL&nbsp;=&nbsp;&radic;(Q&sup2;+U&sup2;)/I (%), faceted by ODC weight and calibration variant. <b>|Q|,|U|</b>: split-circle plots of |Q|/I (top-left) and |U|/I (bottom-right).</p>
+  {combined_footprint_html}
+
+  <h2>Leakage statistics for beams (per SB_REF)</h2>
+  <p class='meta'>Per-observation plots, one card per SB_REF. Each card is collapsed by default — click a row to expand.
+    Within each card: <b>Stokes</b> and <b>pol. degree</b> animations (MP4/GIF) plus <b>&#8862;&nbsp;all beams</b> grid images for both calibration variants (regular / lcal).
+    The pol. degree cells also include a <b>&#128200;&nbsp;beamwise</b> button opening the channel-averaged leakage statistics plot (x-axis = BeamNum).</p>
+  {spectra_cards_html}
 
   <h2>3D Leakage cube (NetCDF4)</h2>
   <p class='meta'>The leakage data is stored as a labelled 3-D <a href='https://www.unidata.ucar.edu/software/netcdf/' target='_blank'>NetCDF4</a> cube
@@ -675,13 +1341,17 @@ def main():
      Open with <code>xarray.open_dataset('leakage_cube.nc')</code> for programmatic slicing, outlier detection, or further analysis.</p>
   {cube_link_html}
 
-  <h3>Supporting CSV tables</h3>
-  <p class='meta'>Pre-averaged (beam &times; candidate) tables used to build the cube.</p>
-  {beam_links_html}
-
   <h3>Run summary</h3>
   <ul><li>phase2_mvp_summary.md:
     <a href='tables/phase2_mvp_summary.md' target='_blank' rel='noopener'>open</a></li></ul>
+
+  <!-- ── Media modal ─────────────────────────────────────────── -->
+  <div id='media-modal' onclick="if(event.target===this)closeModal()">
+    <div id='media-modal-box'>
+      <button id='media-modal-close' onclick='closeModal()' title='Close (Esc)'>&#10005;</button>
+      <div id='media-modal-content'></div>
+    </div>
+  </div>
 </body>
 </html>
 """
@@ -691,6 +1361,15 @@ def main():
 
     print(f"Wrote {index_path}")
     print(f"Wrote copied artifacts under {tables_dir}")
+
+    if args.package:
+        print("\nAssembling shareable package …")
+        assemble_package(
+            package_dir=Path(args.package),
+            phase3_dir=output_dir,
+            cube_src=data_root / "phase2" / "leakage_cube.nc",
+            media_info=media_info,
+        )
 
 
 if __name__ == "__main__":

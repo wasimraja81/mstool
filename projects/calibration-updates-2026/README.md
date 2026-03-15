@@ -1,6 +1,6 @@
 # Calibration updates (reference fields) — 2026
 
-> **Next release: tag `3.5`** — adds leakage-diagnostics pipeline (3-D cube, footprint heatmaps, HTML report).
+> **Current release: tag `3.8`** — PAF beam-scan animation (MP4): Airy-disk beam movie driven by the manifest, with per-row `AMP_STRATEGY` / `DO_PREFLAG_REFTABLE` path construction.
 
 This folder contains project-specific helper assets for the calibration update workflow using reference (read calibrator) fields.
 
@@ -12,10 +12,10 @@ This folder contains project-specific helper assets for the calibration update w
 
 Convenience wrappers in `scripts/` (run from `~/mstool/scratch`):
 
-- `run_stage-1.sh` (submit stage `ref` for idx=2)
-- `run_stage-2.sh` (submit stage `1934` for idx=2)
-- `run_stage-3.sh` (run assessment for idx=2)
-- `run_stage-4.sh` (run copy+combine locally for idx=2)
+- `run_stage-1.sh` (submit stage `ref`)
+- `run_stage-2.sh` (submit stage `1934`)
+- `run_stage-3.sh` (run assessment)
+- `run_stage-4.sh` (copy+combine+metadata locally; indices 14–42, excluding 24–29)
 
 ### Leakage diagnostics pipeline
 
@@ -28,30 +28,69 @@ across beams, reference fields, and ODC weights:
 | `build_phase2_isolation_tables.py` | Produce Phase-2 beam×field and beam×ODC isolation CSVs |
 | `build_leakage_cube.py` | Construct a 3-D NetCDF4 cube (beam × field × odc) from the Phase-2 CSV |
 | `plot_leakage_footprint.py` | Generate beam-layout footprint heatmaps from the cube |
-| `build_phase3_html_report.py` | Generate the HTML index page with summary tables, footprint links, and cube download |
+| `build_phase3_html_report.py` | Run full pipeline end-to-end: summary tables, footprint links, per-SB_REF PAF beam-overlay plots, cube download. Supports `--package <path>` to assemble a self-contained shareable directory. |
+
+### PAF beam-overlay visualisation
+
+Scripts for visualising ASKAP MkII PAF element layouts and beam footprints:
+
+| Script | Purpose |
+|--------|---------|
+| `paf_port_layout.py` | 112-element PAF layout library: port numbering, compass-based sky→PAF transform, multi-panel `pol_axis` comparison plots |
+| `plot_paf_beam_overlay.py` | CLI tool: overlay a closepack-36 beam footprint on the 112-element PAF grid; auto-reads `pol_axis` and centre frequency from schedblock |
+| `plot_paf_beam_movie.py` | Generate an Airy-disk beam-scan animation (MP4): one frame per beam, optional trail accumulation, display gamma, configurable nulls/cmap/fps |
+| `create_paf_beam_movie.sh` | Manifest-driven wrapper: loops over selected rows, resolves `metadata/` paths using per-row `AMP_STRATEGY` + `DO_PREFLAG_REFTABLE`, calls `plot_paf_beam_movie.py` |
+| `run_paf_beam_movie.sh` | Convenience caller: hardcoded manifest path + canonical index range; edit and run directly |
+
+Example usage:
+
+```bash
+python scripts/plot_paf_beam_overlay.py \
+  --footprint path/to/footprintOutput-sb81084-REF_0324-28.txt \
+  --schedblock path/to/schedblock-info-81084.txt \
+  --output /tmp/paf_overlay.png
+
+# Add diagnostic star markers for validation
+python scripts/plot_paf_beam_overlay.py ... --sky-markers
+```
+
+Beam-scan movie (run from repo root):
+
+```bash
+# Single SB_REF (quick test, no trail)
+bash projects/calibration-updates-2026/scripts/create_paf_beam_movie.sh \
+  --manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --start-index 16 --end-index 16 --trail 0
+
+# All active SB_REFs (indices 14-42, skipping ODC-5233 24-29)
+bash projects/calibration-updates-2026/scripts/run_paf_beam_movie.sh
+```
 
 Typical workflow (run from repo root with `.venv` activated):
 
 ```bash
 source .venv/bin/activate
 
-# Phase 1 → Phase 2 → Cube → Plots → HTML report
-python scripts/build_phase1_master_table.py
-python scripts/build_phase2_isolation_tables.py
-python scripts/build_leakage_cube.py
-python scripts/plot_leakage_footprint.py
-python scripts/build_phase3_html_report.py
+# Single command: runs Phase 1 → 2 → Cube → Footprint plots → PAF overlays → HTML report
+# Add --package to also assemble a self-contained shareable copy
+python projects/calibration-updates-2026/scripts/build_phase3_html_report.py \
+  --data-root ~/DATA/reffield-average \
+  --package ~/DATA/reffield-average/phase4-share
 
-# Serve the report
+# Serve the report locally
 python -m http.server 8765 -d ~/DATA/reffield-average/phase3
 ```
 
 Output artefacts (under `~/DATA/reffield-average/`):
 
-- `phase2/leakage_cube.nc` — 3-D labelled NetCDF4 cube (xarray-compatible)
+- `phase2/leakage_cube.nc` — 3-D labelled NetCDF4 cube (xarray-compatible); variables: `dL`, `dQ`, `dU`, `p90`, `nsb` × {regular, lcal}
 - `phase3/index.html` — self-contained HTML report
-- `phase3/plots/footprint_dL_*.png` — footprint heatmap PNGs
+- `phase3/plots/footprint_dL_*.png` — dL = √(Q²+U²)/I footprint heatmap PNGs (multi-panel and single-panel)
+- `phase3/plots/footprint_QU_*.png` — split-circle Q/U footprint PNGs (multi-panel and per-(ODC, variant))
+- `phase3/plots/paf_overlay_<SB_REF>.png` — per-SB_REF PAF port/beam overlay plots (generated from `metadata/`)
+- `phase3/plots/paf_beam_movie_<SB_REF>.mp4` — per-SB_REF Airy-disk beam-scan animation (generated by `create_paf_beam_movie.sh`)
 - `phase3/tables/` — CSV tables and interactive viewers
+- `phase4-share/` — self-contained shareable package (plots + media PNGs/MP4s + cube; no GIFs/PDFs)
 
 ## Main workflow helper
 
@@ -296,11 +335,11 @@ The diagnostic scripts require a virtual environment with:
 | pandas | ≥ 2.0 |
 | numpy | ≥ 1.24 |
 | matplotlib | ≥ 3.8 |
+| scipy | ≥ 1.10 |
 
 Create with:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install xarray netCDF4 pandas numpy matplotlib
-```
+pip install xarray ne

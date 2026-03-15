@@ -2,7 +2,54 @@
 
 All notable changes to this project are documented in this file.
 
-## 3.5 - 2026-03-11 (pending)
+## 3.7 — 2026-03-15
+
+Adds two PAF visualisation scripts and a minor fix to the HTML report.
+
+### Added
+- `paf_port_layout.py`: ASKAP MkII PAF layout library — 112-element 12×12
+  symmetric grid (188 ports), compass-based sky→PAF transform
+  (`pol_axis`-aware, rear-view, focal-plane inversion), FWHM beam circles,
+  diagnostic sky-direction markers, and multi-panel `pol_axis` comparison
+  plots.
+- `plot_paf_beam_overlay.py`: CLI tool — overlays closepack-36 beam footprint
+  on the MkII PAF element grid; auto-reads pol_axis, SBID, and centre
+  frequency from the schedblock file; beam radius derived from `1.02 λ/D`;
+  diamond-needle compass rose (N=red); optional sky-source diagnostic stars
+  (`--sky-markers`).
+
+### Fixed
+- `build_phase3_html_report.py`: semi-transparent cmap-sampled colours for
+  Q/U footprint legend wedges.
+
+## 3.6 — 2026-03-13
+
+Extends the leakage-diagnostics pipeline with full Q/U decomposition across
+every layer: isolation tables → cube → footprint plots → HTML report.
+
+### Added
+- `build_phase2_isolation_tables.py`: propagate `leak_q_over_i_pct` /
+  `leak_u_over_i_pct` into beam×field and field-scores tables
+  (`median_q_over_i`, `p90_q_over_i`, beam-level aggregates).
+- `build_leakage_cube.py`: four new cube variables `dQ_regular`, `dQ_lcal`,
+  `dU_regular`, `dU_lcal` (|Q|/I × 100 % and |U|/I × 100 %).
+- `plot_leakage_footprint.py`: split-circle Q/U footprint plots with 45°
+  diagonal split and real `Wedge`-patch legend; single-panel and
+  combined-heatmap variants.
+- `build_phase3_html_report.py`:
+  - Merged L + Q/U footprint overview into a single field-row table.
+  - Per-(ODC, variant) Q/U badge in each summary-table row.
+  - `leakage_stats` PNG as **📈 beamwise** button in Pol. degree card cells.
+  - Uniform 26 px button height; blue/green/blue/green colour scheme.
+  - Labels: "Stokes spectra"→"Stokes"; "6×6 grid"→"⊞ all beams";
+    section renamed "Leakage statistics for beams (per SB_REF)".
+  - `assemble_package()` + `--package <path>` CLI flag: builds a
+    self-contained shareable directory (plots, media PNGs + MP4s, cube,
+    patched `index.html` with GIFs and CSV sections stripped).
+- `convert_pdfs_to_png.py` (new untracked utility): pre-renders
+  `combined_beams` PDF pages to PNG for embeds in the HTML report.
+
+## 3.5 — 2026-03-11
 
 Patch update prepared on `develop` and intended for the next release tag.
 

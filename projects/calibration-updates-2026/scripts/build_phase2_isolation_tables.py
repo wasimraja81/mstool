@@ -90,12 +90,16 @@ def read_master_rows(csv_path: Path):
             if leak_l is None:
                 continue
             row["leak_l_over_i_pct"] = leak_l
+            row["leak_q_over_i_pct"] = to_float(row.get("leak_q_over_i_pct"))
+            row["leak_u_over_i_pct"] = to_float(row.get("leak_u_over_i_pct"))
             rows.append(row)
     return rows
 
 
 def aggregate_beam_x_field_at_fixed_odc(rows):
     grouped = defaultdict(list)
+    grouped_q = defaultdict(list)
+    grouped_u = defaultdict(list)
     sb_refs = defaultdict(set)
 
     for row in rows:
@@ -106,11 +110,17 @@ def aggregate_beam_x_field_at_fixed_odc(rows):
             row["ref_fieldname"],
         )
         grouped[key].append(row["leak_l_over_i_pct"])
+        if row["leak_q_over_i_pct"] is not None:
+            grouped_q[key].append(row["leak_q_over_i_pct"])
+        if row["leak_u_over_i_pct"] is not None:
+            grouped_u[key].append(row["leak_u_over_i_pct"])
         sb_refs[key].add(row["sb_ref"])
 
     out = []
     for key, vals in grouped.items():
         odc_weight, variant, beam, ref_fieldname = key
+        qvals = grouped_q.get(key, [])
+        uvals = grouped_u.get(key, [])
         out.append(
             {
                 "odc_weight": odc_weight,
@@ -119,6 +129,10 @@ def aggregate_beam_x_field_at_fixed_odc(rows):
                 "ref_fieldname": ref_fieldname,
                 "median_l_over_i": median(vals),
                 "p90_l_over_i": percentile(vals, 0.90),
+                "median_q_over_i": median(qvals) if qvals else None,
+                "p90_q_over_i": percentile(qvals, 0.90) if qvals else None,
+                "median_u_over_i": median(uvals) if uvals else None,
+                "p90_u_over_i": percentile(uvals, 0.90) if uvals else None,
                 "count_sb_ref": len(sb_refs[key]),
                 "count_samples": len(vals),
             }
@@ -130,6 +144,8 @@ def aggregate_beam_x_field_at_fixed_odc(rows):
 
 def aggregate_beam_x_odc_at_fixed_field(rows):
     grouped = defaultdict(list)
+    grouped_q = defaultdict(list)
+    grouped_u = defaultdict(list)
     sb_refs = defaultdict(set)
 
     for row in rows:
@@ -140,11 +156,17 @@ def aggregate_beam_x_odc_at_fixed_field(rows):
             row["odc_weight"],
         )
         grouped[key].append(row["leak_l_over_i_pct"])
+        if row["leak_q_over_i_pct"] is not None:
+            grouped_q[key].append(row["leak_q_over_i_pct"])
+        if row["leak_u_over_i_pct"] is not None:
+            grouped_u[key].append(row["leak_u_over_i_pct"])
         sb_refs[key].add(row["sb_ref"])
 
     out = []
     for key, vals in grouped.items():
         ref_fieldname, variant, beam, odc_weight = key
+        qvals = grouped_q.get(key, [])
+        uvals = grouped_u.get(key, [])
         out.append(
             {
                 "ref_fieldname": ref_fieldname,
@@ -153,6 +175,10 @@ def aggregate_beam_x_odc_at_fixed_field(rows):
                 "odc_weight": odc_weight,
                 "median_l_over_i": median(vals),
                 "p90_l_over_i": percentile(vals, 0.90),
+                "median_q_over_i": median(qvals) if qvals else None,
+                "p90_q_over_i": percentile(qvals, 0.90) if qvals else None,
+                "median_u_over_i": median(uvals) if uvals else None,
+                "p90_u_over_i": percentile(uvals, 0.90) if uvals else None,
                 "count_sb_ref": len(sb_refs[key]),
                 "count_samples": len(vals),
             }
@@ -174,12 +200,18 @@ def build_field_effect_scores(beam_x_field_rows, sb_refs_by_candidate=None, plot
 
     per_field_beam_deltas = defaultdict(list)
     per_field_all_vals = defaultdict(list)
+    per_field_all_vals_q = defaultdict(list)
+    per_field_all_vals_u = defaultdict(list)
     for row in beam_x_field_rows:
         key = (row["odc_weight"], row["variant"], row["ref_fieldname"])
         baseline = beam_baseline[(row["odc_weight"], row["variant"], row["beam"])]
         delta = row["median_l_over_i"] - baseline
         per_field_beam_deltas[key].append(delta)
         per_field_all_vals[key].append(row["median_l_over_i"])
+        if row.get("median_q_over_i") is not None:
+            per_field_all_vals_q[key].append(row["median_q_over_i"])
+        if row.get("median_u_over_i") is not None:
+            per_field_all_vals_u[key].append(row["median_u_over_i"])
 
     groups = defaultdict(list)
     for (odc_weight, variant, _field), vals in per_field_beam_deltas.items():
@@ -190,6 +222,8 @@ def build_field_effect_scores(beam_x_field_rows, sb_refs_by_candidate=None, plot
         odc_weight, variant, ref_fieldname = key
         delta_score = median(deltas)
         vals = per_field_all_vals[key]
+        qvals = per_field_all_vals_q.get(key, [])
+        uvals = per_field_all_vals_u.get(key, [])
         med_beam = median(vals) if vals else None
         affected = sum(1 for d in deltas if d > 0)
         z = robust_z(delta_score, groups[(odc_weight, variant)])
@@ -211,9 +245,21 @@ def build_field_effect_scores(beam_x_field_rows, sb_refs_by_candidate=None, plot
                 "beam_mad_l_over_i": mad(vals),
                 "beam_min_l_over_i": min(vals) if vals else None,
                 "beam_max_l_over_i": max(vals) if vals else None,
+                "beam_median_q_over_i": median(qvals) if qvals else None,
+                "beam_mean_q_over_i": (sum(qvals) / len(qvals)) if qvals else None,
+                "beam_mad_q_over_i": mad(qvals),
+                "beam_min_q_over_i": min(qvals) if qvals else None,
+                "beam_max_q_over_i": max(qvals) if qvals else None,
+                "beam_median_u_over_i": median(uvals) if uvals else None,
+                "beam_mean_u_over_i": (sum(uvals) / len(uvals)) if uvals else None,
+                "beam_mad_u_over_i": mad(uvals),
+                "beam_min_u_over_i": min(uvals) if uvals else None,
+                "beam_max_u_over_i": max(uvals) if uvals else None,
                 "delta_to_beam_baseline_f": delta_score,
                 "affected_beam_count_f": affected,
                 "p95_l_over_i": percentile(vals, 0.95),
+                "p95_q_over_i": percentile(qvals, 0.95) if qvals else None,
+                "p95_u_over_i": percentile(uvals, 0.95) if uvals else None,
                 "robust_z": z,
             }
         )
@@ -234,12 +280,18 @@ def build_odc_effect_scores(beam_x_odc_rows, sb_refs_by_candidate=None, plot_lin
 
     per_odc_beam_deltas = defaultdict(list)
     per_odc_all_vals = defaultdict(list)
+    per_odc_all_vals_q = defaultdict(list)
+    per_odc_all_vals_u = defaultdict(list)
     for row in beam_x_odc_rows:
         key = (row["ref_fieldname"], row["variant"], row["odc_weight"])
         baseline = beam_baseline[(row["ref_fieldname"], row["variant"], row["beam"])]
         delta = row["median_l_over_i"] - baseline
         per_odc_beam_deltas[key].append(delta)
         per_odc_all_vals[key].append(row["median_l_over_i"])
+        if row.get("median_q_over_i") is not None:
+            per_odc_all_vals_q[key].append(row["median_q_over_i"])
+        if row.get("median_u_over_i") is not None:
+            per_odc_all_vals_u[key].append(row["median_u_over_i"])
 
     groups = defaultdict(list)
     for (ref_fieldname, variant, _odc), vals in per_odc_beam_deltas.items():
@@ -250,6 +302,8 @@ def build_odc_effect_scores(beam_x_odc_rows, sb_refs_by_candidate=None, plot_lin
         ref_fieldname, variant, odc_weight = key
         delta_score = median(deltas)
         vals = per_odc_all_vals[key]
+        qvals = per_odc_all_vals_q.get(key, [])
+        uvals = per_odc_all_vals_u.get(key, [])
         med_beam = median(vals) if vals else None
         affected = sum(1 for d in deltas if d > 0)
         z = robust_z(delta_score, groups[(ref_fieldname, variant)])
@@ -271,9 +325,21 @@ def build_odc_effect_scores(beam_x_odc_rows, sb_refs_by_candidate=None, plot_lin
                 "beam_mad_l_over_i": mad(vals),
                 "beam_min_l_over_i": min(vals) if vals else None,
                 "beam_max_l_over_i": max(vals) if vals else None,
+                "beam_median_q_over_i": median(qvals) if qvals else None,
+                "beam_mean_q_over_i": (sum(qvals) / len(qvals)) if qvals else None,
+                "beam_mad_q_over_i": mad(qvals),
+                "beam_min_q_over_i": min(qvals) if qvals else None,
+                "beam_max_q_over_i": max(qvals) if qvals else None,
+                "beam_median_u_over_i": median(uvals) if uvals else None,
+                "beam_mean_u_over_i": (sum(uvals) / len(uvals)) if uvals else None,
+                "beam_mad_u_over_i": mad(uvals),
+                "beam_min_u_over_i": min(uvals) if uvals else None,
+                "beam_max_u_over_i": max(uvals) if uvals else None,
                 "delta_to_beam_baseline_o": delta_score,
                 "affected_beam_count_o": affected,
                 "p95_l_over_i": percentile(vals, 0.95),
+                "p95_q_over_i": percentile(qvals, 0.95) if qvals else None,
+                "p95_u_over_i": percentile(uvals, 0.95) if uvals else None,
                 "robust_z": z,
             }
         )
@@ -285,7 +351,7 @@ def build_odc_effect_scores(beam_x_odc_rows, sb_refs_by_candidate=None, plot_lin
 def write_csv(path: Path, rows, fieldnames):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -348,7 +414,12 @@ def main():
     write_csv(
         p1,
         beam_x_field,
-        ["odc_weight", "variant", "beam", "ref_fieldname", "median_l_over_i", "p90_l_over_i", "count_sb_ref", "count_samples"],
+        [
+            "odc_weight", "variant", "beam", "ref_fieldname",
+            "median_l_over_i", "p90_l_over_i",
+            "median_q_over_i", "median_u_over_i",
+            "count_sb_ref", "count_samples",
+        ],
     )
     write_csv(
         p2,
@@ -365,6 +436,8 @@ def main():
             "beam_mad_l_over_i",
             "beam_min_l_over_i",
             "beam_max_l_over_i",
+            "beam_median_q_over_i",
+            "beam_median_u_over_i",
             "delta_to_beam_baseline_f",
             "affected_beam_count_f",
             "p95_l_over_i",
@@ -374,7 +447,12 @@ def main():
     write_csv(
         p3,
         beam_x_odc,
-        ["ref_fieldname", "variant", "beam", "odc_weight", "median_l_over_i", "p90_l_over_i", "count_sb_ref", "count_samples"],
+        [
+            "ref_fieldname", "variant", "beam", "odc_weight",
+            "median_l_over_i", "p90_l_over_i",
+            "median_q_over_i", "median_u_over_i",
+            "count_sb_ref", "count_samples",
+        ],
     )
     write_csv(
         p4,
@@ -391,6 +469,8 @@ def main():
             "beam_mad_l_over_i",
             "beam_min_l_over_i",
             "beam_max_l_over_i",
+            "beam_median_q_over_i",
+            "beam_median_u_over_i",
             "delta_to_beam_baseline_o",
             "affected_beam_count_o",
             "p95_l_over_i",
