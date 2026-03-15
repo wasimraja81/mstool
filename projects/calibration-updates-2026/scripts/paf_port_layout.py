@@ -304,8 +304,8 @@ def draw_paf_elements(ax: plt.Axes,
                       port_table: dict,
                       unused_sockets: set,
                       show_port_numbers: bool = True,
-                      alpha_elem: float = 0.28,
-                      alpha_unused: float = 0.07) -> None:
+                      alpha_elem: float = 0.08,
+                      alpha_unused: float = 0.03) -> None:
     """
     Draw all 112 PAF elements on *ax* in rear-view frame.
 
