@@ -289,22 +289,6 @@ cd ~/mstool/scratch
 4) On local machine: run stage-4 (copy + combine) for only `idx=2`
 
 ```bash
-cd ~/github-wasimraja81/mstool
-cd scratch
-
-TMP_MANIFEST=/tmp/mstool_manifest_idx2.txt
-
-../projects/calibration-updates-2026/scripts/make_single_index_manifest.sh \
-  --index 2 \
-  --output "$TMP_MANIFEST"
-
-../projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
-  --manifest "$TMP_MANIFEST"
-```
-
-Stage-4 now also supports direct manifest row filtering:
-
-```bash
 ../projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
   --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
   --start-index 2 --end-index 2
