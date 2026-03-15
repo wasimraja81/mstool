@@ -1,5 +1,50 @@
 # Changelog — calibration-updates-2026
 
+## 3.8 — 2026-03-15
+
+### PAF beam-scan animation (new scripts)
+
+- **`plot_paf_beam_movie.py`** — Generates an Airy-disk beam-scan animation (MP4)
+  for a single SB_REF:
+  - One frame per beam in footprint order; Airy pattern rendered on a fine grid
+    using `scipy.special.j1` to the configurable N-th null (default: 3rd).
+  - Optional trail accumulation: previous beams persist at a scaled alpha,
+    giving a ghost-trail effect controlled by `--trail` (0 = no trail).
+  - Display gamma power-law (`--gamma`) for ring contrast enhancement.
+  - Configurable colourmap (`--cmap`, default `gray`), fps, DPI, hold frames,
+    and grid resolution.
+  - Port numbers shown on PAF elements; beam-number annotation suppressed.
+  - Frame title shows SB_REF, field alias, frequency, and pol_axis.
+  - Encoded to MP4 via `ffmpeg` (H.264, yuv420p, default output to
+    `phase3/plots/paf_beam_movie_<SB_REF>.mp4`).
+  - Key CLI flags: `--footprint`, `--schedblock`, `--output`, `--fps`,
+    `--n-nulls`, `--trail`, `--gamma`, `--cmap`, `--dpi`, `--hold`,
+    `--grid-res`.
+
+- **`create_paf_beam_movie.sh`** — Manifest-driven shell wrapper:
+  - Accepts `--manifest`, `--start-index`, `--end-index`, `--exclude-indices`
+    (same conventions as `copy_and_combine_assessment_results.sh`).
+  - Per-row path construction: reads `AMP_STRATEGY` and `DO_PREFLAG_REFTABLE`
+    from each manifest row (with global manifest defaults), builds the
+    `_AMP_STRATEGY-<amp>[-insituPreflags]` suffix via `build_strategy_suffix()`
+    — handles any independent combination of amp strategy and preflag flag.
+  - Resolves `footprintOutput-sb<REF>-<FIELD>.txt` (with `src1` fallback) and
+    `schedblock-info-<REF>.txt` (with 1934 fallback) from `metadata/`.
+  - Skips rows with excluded indices, missing `REF_FIELDNAME`, or absent
+    metadata; summarises ok / skipped / missing_meta / failed counts.
+  - `--force` flag to regenerate existing MP4s.
+
+- **`run_paf_beam_movie.sh`** — Simple convenience caller:
+  - Hardcodes the canonical manifest path and index range (14–42, excluding
+    24–29); edit and run directly from the repo root.
+  - Two commented-out variants: single-SB quick test, Blues+slow playback.
+
+### Dependencies
+
+- `scipy` added to `.venv` (required by `plot_paf_beam_movie.py` for `j1`).
+
+---
+
 ## 3.7 — 2026-03-15
 
 ### PAF beam-overlay visualisation tools (new scripts)
