@@ -215,10 +215,10 @@ def build_movie(
     beam_ids  = sorted(beams_paf.keys())
     n_beams   = len(beam_ids)
 
-    # ── North/East unit vectors on PAF rear-view ──────────────────────────────
-    na = np.radians(-45.0 - pol_axis)
-    nd = np.array([np.cos(na),  np.sin(na)])
-    ed = np.array([ nd[1],     -nd[0]])
+    # ── North/East unit vectors in sky-view (N up, E right) ─────────────────
+    na = np.radians(+45.0 - pol_axis)
+    nd = np.array([np.cos(na),  np.sin(na)])   # sky-North direction
+    ed = np.array([ nd[1],     -nd[0]])         # sky-East  direction
 
     # ── Airy grid ─────────────────────────────────────────────────────────────
     lim  = _PAF_LIM
@@ -246,8 +246,8 @@ def build_movie(
     ax.set_aspect("equal")
     ax.set_xlim(-lim, lim)
     ax.set_ylim(-lim, lim)
-    ax.set_xlabel("PAF u (element spacings ← E / W →)", fontsize=9)
-    ax.set_ylabel("PAF v (element spacings ↓ N / S ↑)", fontsize=9)
+    ax.set_xlabel("PAF u (element spacings  ← W / E →)", fontsize=9)
+    ax.set_ylabel("PAF v (element spacings  ↓ S / N ↑)", fontsize=9)
 
     # ── Static layers ─────────────────────────────────────────────────────────
     port_table, unused_set = build_port_table()

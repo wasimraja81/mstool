@@ -77,19 +77,21 @@ LEG_COLOUR = {
 
 def _leg_colour(row: int, col: int) -> str:
     """
-    Assign leg colour by diagonal quadrant in the rear-view 12×11 grid.
+    Assign leg colour by diagonal quadrant using physical (device) coordinates.
+    Always uses rear-view formula so leg colours are independent of the
+    display convention chosen in grid_to_xy.
 
-    The colour boundaries run along the two main diagonals of the PAF
-    (Leg1–Leg3 axis and Leg2–Leg4 axis), not along the horizontal/vertical
-    grid axes. In centred (x,y) coordinates:
-      x+y > 0  AND  x-y > 0  →  right of both diagonals → Leg1 (upper-right, red)
-      x+y > 0  AND  x-y < 0  →  upper of both           → Leg2 (upper-left,  green)
-      x+y < 0  AND  x-y < 0  →  left of both            → Leg3 (lower-left,  blue)
-      x+y < 0  AND  x-y > 0  →  lower of both           → Leg4 (lower-right, yellow/red-leg)
+    Device-frame diagonal boundaries (rear-view, x=col-6.5, y=6.5-row):
+      x+y > 0  AND  y-x > 0  →  top    wedge → "R" (between Leg1 & Leg2)
+      x+y < 0  AND  y-x > 0  →  left   wedge → "G" (between Leg2 & Leg3)
+      x+y < 0  AND  y-x < 0  →  bottom wedge → "B" (between Leg3 & Leg4)
+      x+y > 0  AND  y-x < 0  →  right  wedge → "Y" (between Leg4 & Leg1)
     """
-    x, y = grid_to_xy(row, col)
-    sp = x + y   # positive = upper-right diagonal half
-    sm = y - x   # positive = upper-left diagonal half
+    # Physical rear-view coordinates (decoupled from display grid_to_xy)
+    x = col - 6.5
+    y = 6.5 - row
+    sp = x + y
+    sm = y - x
     if sp >= 0 and sm >= 0: return "R"   # top    wedge (between Leg1 & Leg2)
     if sp <  0 and sm >= 0: return "G"   # left   wedge (between Leg2 & Leg3)
     if sp <  0 and sm <  0: return "B"   # bottom wedge (between Leg3 & Leg4)
@@ -114,12 +116,14 @@ def build_port_table() -> dict:
 
 def grid_to_xy(row: int, col: int):
     """
-    Convert (row, col) in 1-based 12×12 rear-view grid to plot (x,y).
-    x increases right (col direction), y increases upward (inverted row).
+    Convert (row, col) in 1-based 12×12 grid to sky-view plot (x,y).
+    Sky-view convention: sky-North = up, sky-East = right.
+    x increases rightward (col decreases: col 1 → right, col 12 → left).
+    y increases upward   (row increases: row 12 → top,  row 1  → bottom).
     Returns centred coordinates so (0,0) = centre of 12×12 grid.
     """
-    x = col - 6.5    # cols 1–12, centred at 6.5
-    y = 6.5 - row    # rows 1–12, top=row1, bottom=row12; centred at 6.5
+    x = 6.5 - col    # cols 1–12; col 1 at right (+5.5), col 12 at left (−5.5)
+    y = row - 6.5    # rows 1–12; row 12 at top (+5.5), row 1 at bottom (−5.5)
     return x, y
 
 
@@ -238,24 +242,27 @@ def sky_to_paf_grid(beams: dict,
     the PAF rear-view grid using the physically-motivated compass transform.
 
     Physics:
-      - Telescope focal-plane inverts the sky image: a source at (x,y) sky
-        appears at (-x,-y) on the focal plane in the sky frame.
-      - pol_axis=0  →  Leg4 points North (Reynolds convention).
-      - Rear view  →  East and West are mirrored vs the sky; East on the sky
-        appears to the left (toward Leg3) in the rear-view diagram.
-      - North on PAF rear-view: angle = -45° - pol_axis_deg from the +u axis
-        (because Leg4 is at lower-right = -45° from horizontal at pol_axis=0).
+      - pol_axis_deg is a sky position angle (North-through-East), maintained
+        fixed on the sky by ASKAP's third (roll) axis in pa_fixed mode.
+      - Telescope prime focus inverts the sky image: (x_sky, y_sky) →
+        (-x_sky, -y_sky) on the focal plane.
+      - Rear-view orientation adds a left-right mirror: East on sky appears
+        to the LEFT in the rear-view diagram (toward Leg 3).
+      - Combined effect: angle of North in rear-view = +45° - pol_axis_deg
+        from the +u axis (Leg 4 at lower-right = +45° from horizontal at
+        pol_axis=0 in rear view after applying both inversions).
       - East on PAF rear-view: 90° clockwise from North.
     """
     scale = pitch_deg / elem_pitch_deg
-    na    = np.radians(-45.0 - pol_axis_deg)
+    na    = np.radians(+45.0 - pol_axis_deg)
     nd    = np.array([np.cos(na),  np.sin(na)])   # North unit vector
     ed    = np.array([nd[1],      -nd[0]])          # East  unit vector (90° CW in rear view)
     result = {}
     for bid, (x_sky, y_sky) in beams.items():
         u = scale / pitch_deg * (-y_sky * nd[0] - x_sky * ed[0])
         v = scale / pitch_deg * (-y_sky * nd[1] - x_sky * ed[1])
-        result[bid] = (float(u), float(v))
+        # Negate both to convert rear-view focal-plane to sky-view (N up, E right)
+        result[bid] = (float(-u), float(-v))
     return result
 
 
@@ -296,7 +303,7 @@ def overlay_beam_footprint(ax: plt.Axes,
                 fontsize=6.5, fontweight='bold', color='black', zorder=10,
                 path_effects=[mpe.withStroke(linewidth=2.0, foreground='white')])
 
-    print(f"Overlaid {n} beams  (pol_axis={pol_axis_deg:+.1f}°, compass transform)")
+    print(f"Overlaid {n} beams  (pol_axis={pol_axis_deg:+.1f}°, sky-view: N up, E right)")
     return beams_paf
 
 
@@ -481,16 +488,16 @@ def draw_paf_elements(ax: plt.Axes,
 
     # ── Step 5: leg arrows and wedge labels ───────────────────────────────────
     wedge_labels = {
-        'R': ( 0.0,  5.5, 'center', 'bottom'),
-        'G': (-5.5,  0.0, 'right',  'center'),
-        'B': ( 0.0, -5.5, 'center', 'top'),
-        'Y': ( 5.5,  0.0, 'left',   'center'),
+        'R': ( 0.0, -5.5, 'center', 'top'),      # Leg1/Leg2 side: bottom in sky-view
+        'G': ( 5.5,  0.0, 'left',   'center'),   # Leg2/Leg3 side: right  in sky-view
+        'B': ( 0.0,  5.5, 'center', 'bottom'),   # Leg3/Leg4 side: top    in sky-view
+        'Y': (-5.5,  0.0, 'right',  'center'),   # Leg4/Leg1 side: left   in sky-view
     }
     leg_positions = {
-        'Leg 1\n(+90°)':  ( 6.2,  5.8, 'left',  'bottom', '0.35', '0.30'),
-        'Leg 2\n(180°)':  (-6.2,  5.8, 'right', 'bottom', '0.35', '0.30'),
-        'Leg 3\n(−90°)':  (-6.2, -5.8, 'right', 'top',    '0.35', '0.30'),
-        'Leg 4\n(0°)':    ( 6.2, -5.8, 'left',  'top',    'red',  'red'),
+        'Leg 1\n(+90°)':  (-6.2, -5.8, 'right', 'top',    '0.35', '0.30'),
+        'Leg 2\n(180°)':  ( 6.2, -5.8, 'left',  'top',    '0.35', '0.30'),
+        'Leg 3\n(−90°)':  ( 6.2,  5.8, 'left',  'bottom', '0.35', '0.30'),
+        'Leg 4\n(0°)':    (-6.2,  5.8, 'right', 'bottom', 'red',  'red'),
     }
     for lbl, (tx, ty, ha, va) in wedge_labels.items():
         ax.text(tx, ty, lbl, ha=ha, va=va, fontsize=13,
@@ -510,9 +517,9 @@ def frame_axis(ax: plt.Axes, title: str = "") -> None:
     ax.plot(0, 0, 'k+', ms=8, mew=1.5, zorder=7)
     ax.set_title(title, fontsize=9, pad=3)
     ax.tick_params(labelsize=6)
-    ax.set_xlabel("← Leg2 side      col      Leg1 side →", fontsize=7)
-    ax.set_ylabel("← Leg4 side      row      Leg2 side →", fontsize=7)
-    ax.text(0.01, 0.01, "Rear view (looking down onto back of PAF)\nLeg2=upper-left  Leg1=upper-right",
+    ax.set_xlabel("← Leg1/Leg2      col      Leg3/Leg4 side →  [sky-East right]", fontsize=7)
+    ax.set_ylabel("← Leg1/Leg2      row      Leg3/Leg4 side ↑  [sky-North up]",   fontsize=7)
+    ax.text(0.01, 0.01, "Sky view (N up, E right)\nLeg4=upper-left  Leg3=upper-right",
             transform=ax.transAxes, fontsize=5.5, color='0.45', va='bottom')
 
 
@@ -524,9 +531,9 @@ def _draw_sky_overlay(ax: plt.Axes, pol_axis_deg: float,
                       arrow_len: float = 1.2) -> None:
     """Draw pointing star, south-sky star and N/E compass for a given pol_axis."""
     # North direction on PAF rear-view:
-    #   pol_axis=0 → Leg4 is North → lower-right (angle -45° from +u in rear view)
-    #   pol_axis rotates CCW on sky → CW on rear-view (mirror)
-    north_angle_rad = np.radians(-45.0 - pol_axis_deg)
+    #   Combined prime-focus inversion + rear-view mirror: angle = +45° - pol_axis_deg
+    #   (canonical formula — matches sky_to_paf_grid() in this file)
+    north_angle_rad = np.radians(+45.0 - pol_axis_deg)
     nd = np.array([np.cos(north_angle_rad), np.sin(north_angle_rad)])
     ed = np.array([nd[1], -nd[0]])   # East = 90° CW from North in rear-view
 
@@ -539,18 +546,18 @@ def _draw_sky_overlay(ax: plt.Axes, pol_axis_deg: float,
     ax.text(0.22, 0.15, 'pointing', fontsize=5.5, color='darkred',
             fontweight='bold', ha='left', va='bottom', zorder=21)
 
-    # Gold star: sky source 3 pitches South → appears in North direction on focal plane
+    # Gold star: sky-North source → appears in North (up) direction in sky-view
     u_s, v_s = _dist * nd
     ax.plot(u_s, v_s, marker='*', markersize=18, color='gold',
             markeredgecolor='darkorange', markeredgewidth=1.0, zorder=20)
-    ax.text(u_s + 0.22, v_s, 'S sky\nsource', fontsize=5.5,
+    ax.text(u_s + 0.22, v_s, 'N sky\nsource', fontsize=5.5,
             color='darkorange', fontweight='bold', ha='left', va='center', zorder=21)
 
-    # Cyan star: sky source 3 pitches West → appears in East direction on focal plane
+    # Cyan star: sky-East source → appears in East (right) direction in sky-view
     u_w, v_w = _dist * ed
     ax.plot(u_w, v_w, marker='*', markersize=18, color='cyan',
             markeredgecolor='teal', markeredgewidth=1.0, zorder=20)
-    ax.text(u_w + 0.22, v_w, 'W sky\nsource', fontsize=5.5,
+    ax.text(u_w + 0.22, v_w, 'E sky\nsource', fontsize=5.5,
             color='teal', fontweight='bold', ha='left', va='center', zorder=21)
 
     # Compass rose

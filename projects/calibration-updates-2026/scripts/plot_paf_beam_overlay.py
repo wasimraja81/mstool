@@ -33,7 +33,7 @@ from typing import Optional
 
 # Import the correct 112-element 12×12 PAF layout from paf_port_layout
 sys.path.insert(0, str(Path(__file__).parent))
-from paf_port_layout import build_port_table, draw_paf_elements
+from paf_port_layout import build_port_table, draw_paf_elements, sky_to_paf_grid
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
@@ -179,39 +179,10 @@ def sky_to_paf(
     pol_axis_deg: float = 0.0,
 ) -> dict:
     """
-    Project sky-frame beam offsets (x_sky=East, y_sky=North, degrees) onto
-    the PAF rear-view grid using the physically-motivated compass transform.
-
-    Physics:
-      - Telescope focal-plane inverts the sky image: source at (x,y) sky
-        appears at (-x,-y) on the focal plane in the sky frame.
-      - pol_axis=0  →  Leg4 points North (Reynolds convention).
-      - Rear view  →  East/West are mirrored vs sky; East on sky appears to
-        the left (toward Leg3) in the rear-view diagram.
-      - North on PAF rear-view: angle = -45° - pol_axis_deg from the +u axis.
-      - East on PAF rear-view: 90° clockwise from North.
-
-    Parameters
-    ----------
-    beams         : {beam_id: (x_sky, y_sky)} in degrees
-    pitch_deg     : beam pitch (degrees)
-    elem_pitch_deg: PAF physical element pitch in degrees
-    pol_axis_deg  : feed rotator angle (degrees); 0 = Leg4 toward North
-
-    Returns
-    -------
-    dict {beam_id: (u_elem, v_elem)} in units of one PAF element spacing
+    Thin wrapper — delegates to the canonical sky_to_paf_grid() in
+    paf_port_layout.py.  Do NOT copy the transform logic here.
     """
-    scale = pitch_deg / elem_pitch_deg
-    na    = np.radians(-45.0 - pol_axis_deg)
-    nd    = np.array([np.cos(na),  np.sin(na)])   # North unit vector
-    ed    = np.array([nd[1],      -nd[0]])          # East  unit vector (90° CW in rear view)
-    result = {}
-    for bid, (x_sky, y_sky) in beams.items():
-        u = scale / pitch_deg * (-y_sky * nd[0] - x_sky * ed[0])
-        v = scale / pitch_deg * (-y_sky * nd[1] - x_sky * ed[1])
-        result[bid] = (float(u), float(v))
-    return result
+    return sky_to_paf_grid(beams, pitch_deg, elem_pitch_deg, pol_axis_deg)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -258,9 +229,9 @@ def plot_overlay(
     _pol_axis_c  = getattr(plot_overlay, '_pol_axis',   0.0)
     _elem_pitch_c = getattr(plot_overlay, '_elem_pitch', DEFAULT_ELEM_PITCH_DEG)
     _pitch_c     = getattr(plot_overlay, '_pitch',      0.9)
-    _na  = np.radians(-45.0 - _pol_axis_c)
-    _nd  = np.array([np.cos(_na),  np.sin(_na)])   # North unit vector on PAF rear-view
-    _ed  = np.array([_nd[1], -_nd[0]])             # East  = 90° CW from North
+    _na  = np.radians(+45.0 - _pol_axis_c)
+    _nd  = np.array([np.cos(_na),  np.sin(_na)])   # sky-North direction in sky-view (N up)
+    _ed  = np.array([_nd[1], -_nd[0]])             # sky-East  = 90° CW from North
 
     # ── compass rose (always shown) ───────────────────────────────────────────
     from matplotlib.patches import Polygon as _MplPolygon
@@ -314,17 +285,17 @@ def plot_overlay(
         ax.text(0.25, 0.15, 'pointing', fontsize=5.5, color='darkred',
                 fontweight='bold', ha='left', va='bottom', zorder=6)
         _dist = 3.0 * (_pitch_c / _elem_pitch_c)
-        # Gold star: South sky source → focal plane inverts → toward North on PAF
+        # Gold star: sky-North source → appears toward North (up) in sky-view
         u_s, v_s = _dist * _nd
         ax.plot(u_s, v_s, marker='*', markersize=18, color='gold',
                 markeredgecolor='darkorange', markeredgewidth=1.0, zorder=6)
-        ax.text(u_s + 0.25, v_s, 'S sky\nsource', fontsize=5.5,
+        ax.text(u_s + 0.25, v_s, 'N sky\nsource', fontsize=5.5,
                 color='darkorange', fontweight='bold', ha='left', va='center', zorder=6)
-        # Cyan star: West sky source → appears toward East on PAF
+        # Cyan star: sky-East source → appears toward East (right) in sky-view
         u_w, v_w = _dist * _ed
         ax.plot(u_w, v_w, marker='*', markersize=18, color='cyan',
                 markeredgecolor='teal', markeredgewidth=1.0, zorder=6)
-        ax.text(u_w + 0.25, v_w, 'W sky\nsource', fontsize=5.5,
+        ax.text(u_w + 0.25, v_w, 'E sky\nsource', fontsize=5.5,
                 color='teal', fontweight='bold', ha='left', va='center', zorder=6)
 
     # ── frame ─────────────────────────────────────────────────────────────────
@@ -332,8 +303,8 @@ def plot_overlay(
     ax.set_ylim(-_PAF_LIM, _PAF_LIM)
 
     ax.set_aspect("equal")
-    ax.set_xlabel("PAF u  (element spacings, rear-view)", fontsize=9)
-    ax.set_ylabel("PAF v  (element spacings, rear-view)", fontsize=9)
+    ax.set_xlabel("PAF u  (element spacings, sky-view  ← W / E →)", fontsize=9)
+    ax.set_ylabel("PAF v  (element spacings, sky-view  ↓ S / N ↑)", fontsize=9)
     ax.set_title(title, fontsize=10)
     ax.grid(True, lw=0.25, alpha=0.35, color="0.5")
     ax.tick_params(labelsize=8)
@@ -464,7 +435,7 @@ def main():
         f"pitch={pitch}°  rotation={rotation}°  "
         f"elem_pitch={args.elem_pitch}°  scale={pitch/args.elem_pitch:.3f} elem/beam"
     )
-    print(f"Transform: pol_axis={pol_axis:+.1f}°  (source: {pol_axis_src}, compass-based, rear view)")
+    print(f"Transform: pol_axis={pol_axis:+.1f}°  (source: {pol_axis_src}, sky-view: N up, E right)")
     print(f"Beam radius: {beam_radius_src}")
 
     # ── transform ─────────────────────────────────────────────────────────────

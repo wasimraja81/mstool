@@ -1,4 +1,33 @@
-# Changelog — calibration-updates-2026
+# Changelog — calibration-u
+## 3.9 — 2026-03-16
+
+### PAF coordinate-transform fix + sky-view display
+
+- **Bug fix — `sky_to_paf_grid()` in `paf_port_layout.py`**: corrected sign
+  constant from `−45°` to `+45°` in `na = radians(+45 − pol_axis_deg)`.
+  The previous sign omitted the rear-view left-right mirror reflection;
+  beam positions were systematically ~90° off. Verified against system
+  scientist's beam→max-port table (0-based indexing confirmed; inner-beam
+  agreement ≥ 17/36 exact after offset correction, consistent with
+  Airy-theory vs max-SNR centroid difference for outer beams).
+
+- **Duplicate-transform elimination**: `sky_to_paf()` in
+  `plot_paf_beam_overlay.py` is now a thin wrapper delegating to the
+  canonical `sky_to_paf_grid()` in `paf_port_layout.py`. Independent
+  copies of the transform formula removed from both overlay and movie
+  scripts; a single definition is the source of truth.
+
+- **Sky-view display**: all plots now show the sky-view convention
+  (sky-North up, sky-East right) rather than rear-view:
+  - `grid_to_xy()` coordinate negation: `x = 6.5−col`, `y = row−6.5`.
+  - `_leg_colour()` decoupled from `grid_to_xy()` — uses fixed rear-view
+    formula so leg colours remain physically correct.
+  - `sky_to_paf_grid()` negates the final `(u, v)` result.
+  - Leg/wedge labels, axis text, and `frame_axis()` annotations updated.
+  - Sky-marker stars relabelled from "S/W sky source" → "N/E sky source".
+  - Compass still shows sky-North (red) and sky-East (blue).
+
+---
 
 ## 3.8 — 2026-03-15
 
