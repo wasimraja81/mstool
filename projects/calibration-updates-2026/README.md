@@ -1,6 +1,6 @@
 # Calibration updates (reference fields) — 2026
 
-> **Current release: tag `3.8`** — PAF beam-scan animation (MP4): Airy-disk beam movie driven by the manifest, with per-row `AMP_STRATEGY` / `DO_PREFLAG_REFTABLE` path construction.
+> **Current release: tag `3.9`** — PAF plots: transform fix, E-left astronomical sky-view, shared `draw_info_box()` helper, footprint name and all parameters read from schedblock metadata (no hardcoded values except MkII PAF physical layout).
 
 This project measures and analyses on-axis polarisation leakage across ASKAP
 beams, reference fields, and ODC calibration-weight configurations.  It drives
