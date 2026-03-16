@@ -2,20 +2,90 @@
 
 > **Current release: tag `3.8`** — PAF beam-scan animation (MP4): Airy-disk beam movie driven by the manifest, with per-row `AMP_STRATEGY` / `DO_PREFLAG_REFTABLE` path construction.
 
-This folder contains project-specific helper assets for the calibration update workflow using reference (read calibrator) fields.
+This project measures and analyses on-axis polarisation leakage across ASKAP
+beams, reference fields, and ODC calibration-weight configurations.  It drives
+a four-stage pipeline (stages 1–3 on HPC, stage 4 locally) using a shared
+manifest file that maps each scheduling block tuple to its processing
+parameters.  Post-pipeline diagnostics produce a self-contained HTML leakage
+report, NetCDF4 leakage cube, footprint heatmaps, per-SB_REF PAF overlay
+images, and Airy-disk beam-scan animation MP4s.
 
 ## Layout
 
-- `scripts/` : project helper scripts
-- `manifests/` : SB/ODC manifest files for copy+combine runs
-- `slurm/` : batch job scripts for Setonix
+```
+projects/calibration-updates-2026/
+  manifests/   SB/ODC manifest files (sb_manifest_reffield_average.txt)
+  scripts/     pipeline orchestration, diagnostics, and visualisation scripts
+  slurm/       SLURM batch scripts for Setonix (start_refField.slurm, start_1934s.slurm)
+  metadata/    README describing the metadata/ directory convention
+```
 
-Convenience wrappers in `scripts/` (run from `~/mstool/scratch`):
+## Pipeline stages
 
-- `run_stage-1.sh` (submit stage `ref`)
-- `run_stage-2.sh` (submit stage `1934`)
-- `run_stage-3.sh` (run assessment)
-- `run_stage-4.sh` (copy+combine+metadata locally; indices 14–42, excluding 24–29)
+Run order is strict.  All stages accept `--manifest FILE --start-index N --end-index N [--exclude-indices SPEC]`.
+
+| Stage | Where | Script | Purpose |
+|-------|-------|--------|---------|
+| 1 — refField | HPC | `slurm/start_refField.slurm` / `run_stage-1.sh` | Generate bandpass + leakage tables from reference-field observations |
+| 2 — 1934 | HPC | `slurm/start_1934s.slurm` / `run_stage-2.sh` | Apply tables to 1934 data; quality-check on-axis calibration |
+| 3 — assessment | HPC | `assess_possum_1934s.sh` / `run_stage-3.sh` | Run `averageMS.py` assessment; produce per-beam products for stage 4 |
+| 4 — copy + combine | Local | `copy_and_combine_assessment_results.sh` / `run_stage-4.sh` | Copy HPC outputs locally; invoke `combine_beam_outputs.py`; copy metadata |
+
+### Quick start
+
+From `~/mstool/scratch` (all stages accept `--manifest`, `--start-index`, `--end-index`, `--exclude-indices`):
+
+```bash
+# Stage 1 (HPC)
+../projects/calibration-updates-2026/scripts/run_stage-1.sh
+
+# Stage 2 (HPC)
+../projects/calibration-updates-2026/scripts/run_stage-2.sh
+
+# Stage 3 (HPC)
+../projects/calibration-updates-2026/scripts/run_stage-3.sh
+
+# Stage 4 (local) — copy results + metadata, combine per-beam outputs
+../projects/calibration-updates-2026/scripts/run_stage-4.sh
+```
+
+### Manual commands
+
+```bash
+# Stage 1 (HPC) — adjust --start-index/--end-index for subset runs
+sbatch projects/calibration-updates-2026/slurm/start_refField.slurm \
+  --manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --start-index 14 --end-index 42 --exclude-indices 24-29
+
+# Stage 2 (HPC)
+sbatch projects/calibration-updates-2026/slurm/start_1934s.slurm \
+  --manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --start-index 14 --end-index 42 --exclude-indices 24-29
+
+# Stage 3 (HPC)
+projects/calibration-updates-2026/scripts/assess_possum_1934s.sh \
+  --manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --start-index 14 --end-index 42 --exclude-indices 24-29
+
+# Stage 4 (local) — also copies metadata/ directories
+projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
+  --manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --start-index 14 --end-index 42 --exclude-indices 24-29 --copy-metadata
+
+# Single SB_REF test (e.g. idx=16 = SB_REF 81084)
+projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
+  --manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --start-index 16 --end-index 16
+```
+
+### Porting to a new user environment
+
+Override via manifest `KEY=VALUE` entries and CLI arguments rather than hard-coding paths:
+
+- `REMOTE` — your HPC login/host
+- `REMOTE_BASE_ROOT` and ODC paths matching your project storage
+- `LOCAL_BASE` — your local destination directory
+- Any module/environment requirements for `schedblock`/ASKAP tooling
 
 ### Leakage diagnostics pipeline
 
