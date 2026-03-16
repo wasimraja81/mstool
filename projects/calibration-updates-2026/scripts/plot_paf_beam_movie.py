@@ -30,13 +30,13 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.patches as mpatches
 import matplotlib.patheffects as mpe
-from matplotlib.patches import Polygon as _MplPoly
 
 # ── Import shared helpers from plot_paf_beam_overlay ─────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
-from paf_port_layout import build_port_table, draw_paf_elements
+from paf_port_layout import build_port_table, draw_paf_elements, draw_compass_rose, draw_info_box
 from plot_paf_beam_overlay import (
     read_footprint_output,
+    read_schedblock_param,
     read_pol_axis_from_schedblock,
     read_centre_freq_from_schedblock,
     read_sbid_from_schedblock,
@@ -138,36 +138,7 @@ def airy_rgba_disk(
     return rgba.astype(np.float32)
 
 
-# ── Compass rose helper (copied from plot_paf_beam_overlay) ───────────────────
-def _draw_compass(ax, nd, ed, lim=_PAF_LIM):
-    """Draw a diamond-needle compass rose in the top-left corner."""
-    org   = np.array([-0.78 * lim, 0.78 * lim])
-    alen  = 1.10
-    wid   = 0.16
-
-    def _needle(centre, tip_vec, hw):
-        perp = np.array([-tip_vec[1], tip_vec[0]])
-        n = np.linalg.norm(perp)
-        if n > 1e-9:
-            perp /= n
-        tail = centre - tip_vec * 0.18
-        return np.array([centre + tip_vec, centre + perp * hw,
-                         tail, centre - perp * hw])
-
-    for tip, fc, ec, lbl, lc in [
-        ( alen * nd, "red",       "darkred", "N", "darkred"),
-        (-alen * nd, "white",     "0.45",    "S", "0.45"),
-        ( alen * ed, "steelblue", "navy",    "E", "navy"),
-        (-alen * ed, "white",     "0.45",    "W", "0.45"),
-    ]:
-        ax.add_patch(_MplPoly(_needle(org, tip, wid), closed=True,
-                              facecolor=fc, edgecolor=ec, lw=0.8, zorder=12))
-        lpos = org + (alen + 0.38) * (tip / alen)
-        ax.text(*lpos, lbl, color=lc, fontsize=8.5, fontweight="bold",
-                ha="center", va="center", zorder=13)
-
-
-# ── Main animation builder ────────────────────────────────────────────────────
+# ── Main animation builder ────────────────────────────────────────────────────────
 
 def build_movie(
     footprint_path: str,
@@ -215,10 +186,10 @@ def build_movie(
     beam_ids  = sorted(beams_paf.keys())
     n_beams   = len(beam_ids)
 
-    # ── North/East unit vectors in sky-view (N up, E right) ─────────────────
+    # ── North/East unit vectors in sky-view (N up, E left — astro convention) ──
     na = np.radians(+45.0 - pol_axis)
     nd = np.array([np.cos(na),  np.sin(na)])   # sky-North direction
-    ed = np.array([ nd[1],     -nd[0]])         # sky-East  direction
+    ed = np.array([-nd[1],      nd[0]])         # sky-East  direction (E-left: 90° CCW)
 
     # ── Airy grid ─────────────────────────────────────────────────────────────
     lim  = _PAF_LIM
@@ -246,13 +217,13 @@ def build_movie(
     ax.set_aspect("equal")
     ax.set_xlim(-lim, lim)
     ax.set_ylim(-lim, lim)
-    ax.set_xlabel("PAF u (element spacings  ← W / E →)", fontsize=9)
+    ax.set_xlabel("PAF u (element spacings  ← E / W →)", fontsize=9)
     ax.set_ylabel("PAF v (element spacings  ↓ S / N ↑)", fontsize=9)
 
     # ── Static layers ─────────────────────────────────────────────────────────
     port_table, unused_set = build_port_table()
     draw_paf_elements(ax, port_table, unused_set, show_port_numbers=True)
-    _draw_compass(ax, nd, ed, lim)
+    draw_compass_rose(ax, nd, ed, lim=lim)
 
     # small cross-hair at PAF centre
     ax.axhline(0, color="0.85", lw=0.5, zorder=0)
@@ -267,11 +238,27 @@ def build_movie(
                            extent=extent, origin="lower",
                            interpolation="bilinear", zorder=5, animated=True)
 
-    # Beam-number text (top-right corner)
-    beam_lbl = ax.text(0.97, 0.97, "", transform=ax.transAxes,
-                       ha="right", va="top", fontsize=14, fontweight="bold",
-                       color="#1a4e8a", zorder=11,
-                       path_effects=[mpe.withStroke(linewidth=2.5, foreground="white")])
+    # Beam-number text in title (animated per frame)
+    footprint_name = (
+        read_schedblock_param(schedblock_path, "weights.footprint_name")
+        or read_schedblock_param(schedblock_path, "common.target.src%d.footprint.name")
+        or "unknown footprint"
+    )
+    title_base = f"{footprint_name} footprint for ASKAP MkII PAF (sky view)"
+    title_artist = ax.set_title(f"{title_base}  —  beam —", fontsize=10, pad=6)
+    title_artist.set_animated(True)
+
+    # Static annotation box (upper-right)
+    draw_info_box(
+        ax,
+        sbid                = sbid,
+        alias               = alias,
+        freq_mhz            = freq_mhz,
+        pol_axis_deg        = pol_axis,
+        footprint_pitch_deg = pitch_deg,
+        elem_pitch_deg      = elem_pitch,
+        n_beams             = n_beams,
+    )
 
     # Small dot at each beam centre (always visible)
     dot_artists = {}
@@ -280,12 +267,6 @@ def build_movie(
         dot, = ax.plot(cx, cy, "o", ms=2.0, color="0.5",
                        alpha=0.4, zorder=6, animated=True)
         dot_artists[bid] = dot
-
-    title_str = (
-        f"PAF beam-overlay  SB{sbid} · {alias}\n"
-        f"{freq_mhz:.1f} MHz   pol_axis={pol_axis:+.1f}°"
-    )
-    ax.set_title(title_str, fontsize=10, pad=6)
 
     # ── Animation frames ──────────────────────────────────────────────────────
     # Frame layout: n_beams active frames + hold_frames at end
@@ -296,7 +277,7 @@ def build_movie(
 
         if frame_idx >= n_beams:
             # Hold: just keep the final state, no change needed
-            return [trail_im, current_im, beam_lbl] + list(dot_artists.values())
+            return [trail_im, current_im, title_artist] + list(dot_artists.values())
 
         bid = beam_ids[frame_idx]
         cx, cy = beams_paf[bid]
@@ -314,8 +295,8 @@ def build_movie(
             trail_rgba = np.clip(trail_rgba + prev * trail_alpha_scale, 0, 1)
         trail_im.set_data(trail_rgba)
 
-        # Update beam label
-        beam_lbl.set_text(f"beam {bid}")
+        # Update beam number in title
+        title_artist.set_text(f"{title_base}  —  beam {bid}")
 
         # Highlight current beam dot in blue, others grey
         for b, dot in dot_artists.items():
@@ -332,7 +313,7 @@ def build_movie(
                 dot.set_alpha(0.3)
                 dot.set_markersize(2.0)
 
-        return [trail_im, current_im, beam_lbl] + list(dot_artists.values())
+        return [trail_im, current_im, title_artist] + list(dot_artists.values())
 
     ani = animation.FuncAnimation(
         fig, update, frames=total_frames,

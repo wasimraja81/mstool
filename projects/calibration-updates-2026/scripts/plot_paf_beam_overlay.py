@@ -33,7 +33,7 @@ from typing import Optional
 
 # Import the correct 112-element 12×12 PAF layout from paf_port_layout
 sys.path.insert(0, str(Path(__file__).parent))
-from paf_port_layout import build_port_table, draw_paf_elements, sky_to_paf_grid
+from paf_port_layout import build_port_table, draw_paf_elements, sky_to_paf_grid, draw_compass_rose, draw_info_box
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
@@ -196,7 +196,7 @@ def plot_overlay(
     beams_paf: dict,
     beam_radius: float = BEAM_RADIUS_ELEM,
     output_path: str = "paf_beam_overlay.png",
-    title: str = "closepack36 beams on MkII PAF (rear view)",
+    title: str = "closepack36 footprint for ASKAP MkII PAF (sky view)",
     annotate_beams: bool = True,
     show_sky_markers: bool = False,
 ) -> None:
@@ -231,51 +231,10 @@ def plot_overlay(
     _pitch_c     = getattr(plot_overlay, '_pitch',      0.9)
     _na  = np.radians(+45.0 - _pol_axis_c)
     _nd  = np.array([np.cos(_na),  np.sin(_na)])   # sky-North direction in sky-view (N up)
-    _ed  = np.array([_nd[1], -_nd[0]])             # sky-East  = 90° CW from North
+    _ed  = np.array([-_nd[1], _nd[0]])             # sky-East  = 90° CCW from North (E-left)
 
-    # ── compass rose (always shown) ───────────────────────────────────────────
-    from matplotlib.patches import Polygon as _MplPolygon
-    _lim_c = _PAF_LIM
-    _org   = np.array([-0.78 * _lim_c, 0.78 * _lim_c])
-    _alen  = 1.10   # needle half-length (element spacings)
-    _wid   = 0.16   # diamond half-width
-
-    def _compass_needle(centre, tip_vec, half_width):
-        """Diamond needle: fills from slightly behind centre to tip."""
-        perp = np.array([-tip_vec[1], tip_vec[0]])
-        norm = np.linalg.norm(perp)
-        if norm > 1e-9:
-            perp /= norm
-        tail = centre - tip_vec * 0.18
-        return np.array([
-            centre + tip_vec,
-            centre + perp * half_width,
-            tail,
-            centre - perp * half_width,
-        ])
-
-    # N needle – red; S needle – white; E needle – steel blue; W needle – white
-    _needles = [
-        ( _alen * _nd,  'red',       'darkred',  'N', 'darkred'),
-        (-_alen * _nd,  'white',     '0.45',     'S', '0.45'  ),
-        ( _alen * _ed,  'steelblue', 'navy',     'E', 'navy'  ),
-        (-_alen * _ed,  'white',     '0.45',     'W', '0.45'  ),
-    ]
-    for _tip, _fc, _ec, _lbl, _lc in _needles:
-        ax.add_patch(_MplPolygon(
-            _compass_needle(_org, _tip, _wid),
-            closed=True, facecolor=_fc, edgecolor=_ec, linewidth=0.8, zorder=8,
-        ))
-        _lpos = _org + (_alen + 0.38) * (_tip / _alen)
-        ax.text(*_lpos, _lbl, color=_lc, fontsize=8.5, fontweight='bold',
-                ha='center', va='center', zorder=9)
-
-    # Centre pivot dot
-    ax.plot(*_org, 'o', ms=4.5, color='0.2', markeredgewidth=0, zorder=9)
-    ax.text(_org[0], _org[1] - _alen - 0.75,
-            f'pol_axis={_pol_axis_c:+.0f}°',
-            color='0.35', fontsize=6, ha='center', va='top',
-            style='italic', zorder=8)
+    # ── compass rose (canonical implementation in paf_port_layout.draw_compass_rose) ──
+    draw_compass_rose(ax, _nd, _ed, lim=_PAF_LIM)
 
     # ── sky-direction diagnostic markers (--sky-markers only) ────────────────
     if show_sky_markers:
@@ -303,24 +262,23 @@ def plot_overlay(
     ax.set_ylim(-_PAF_LIM, _PAF_LIM)
 
     ax.set_aspect("equal")
-    ax.set_xlabel("PAF u  (element spacings, sky-view  ← W / E →)", fontsize=9)
+    ax.set_xlabel("PAF u  (element spacings, sky-view  ← E / W →)", fontsize=9)
     ax.set_ylabel("PAF v  (element spacings, sky-view  ↓ S / N ↑)", fontsize=9)
     ax.set_title(title, fontsize=10)
     ax.grid(True, lw=0.25, alpha=0.35, color="0.5")
     ax.tick_params(labelsize=8)
 
     # ── parameter annotation ──────────────────────────────────────────────────
-    n_beams = len(beams_paf)
-    param_txt = (
-        f"beams: {n_beams}  |  "
-        f"pol_axis={getattr(plot_overlay, '_pol_axis', '?')}°  "
-        f"elem_pitch={getattr(plot_overlay, '_elem_pitch', '?')}°"
-    )
-    ax.annotate(
-        param_txt,
-        xy=(0.01, 0.01), xycoords="axes fraction",
-        fontsize=6, color="0.4",
-        bbox=dict(boxstyle="square,pad=0.2", fc="white", ec="none", alpha=0.7),
+    draw_info_box(
+        ax,
+        sbid                = getattr(plot_overlay, '_sbid',       ''),
+        alias               = getattr(plot_overlay, '_alias',      ''),
+        freq_mhz            = getattr(plot_overlay, '_freq_mhz',   None),
+        pol_axis_deg        = getattr(plot_overlay, '_pol_axis',   None),
+        pol_axis_src        = getattr(plot_overlay, '_pol_src',    ''),
+        footprint_pitch_deg = getattr(plot_overlay, '_pitch',      None),
+        elem_pitch_deg      = getattr(plot_overlay, '_elem_pitch', None),
+        n_beams             = len(beams_paf),
     )
 
     fig.tight_layout()
@@ -435,7 +393,7 @@ def main():
         f"pitch={pitch}°  rotation={rotation}°  "
         f"elem_pitch={args.elem_pitch}°  scale={pitch/args.elem_pitch:.3f} elem/beam"
     )
-    print(f"Transform: pol_axis={pol_axis:+.1f}°  (source: {pol_axis_src}, sky-view: N up, E right)")
+    print(f"Transform: pol_axis={pol_axis:+.1f}°  (source: {pol_axis_src}, sky-view: N up, E left)")
     print(f"Beam radius: {beam_radius_src}")
 
     # ── transform ─────────────────────────────────────────────────────────────
@@ -451,17 +409,23 @@ def main():
         print(f"  beam {bid:2d}: ({beams_paf[bid][0]:+.3f}, {beams_paf[bid][1]:+.3f})")
 
     # ── stash params for annotation ───────────────────────────────────────────
-    plot_overlay._pol_axis  = pol_axis
+    plot_overlay._pol_axis   = pol_axis
+    plot_overlay._pol_src    = pol_axis_src
     plot_overlay._elem_pitch = args.elem_pitch
-    plot_overlay._pitch     = pitch
-
-    # ── title ─────────────────────────────────────────────────────────────────
+    plot_overlay._pitch      = pitch
+    plot_overlay._freq_mhz   = freq_mhz
     sbid, alias = read_sbid_from_schedblock(args.schedblock)
-    pol_axis_src_label = f"pol_axis={pol_axis:+.0f}° ({pol_axis_src})"
-    title = (
-        f"closepack36 beams on MkII PAF (rear view) — "
-        f"SB{sbid} ({alias})   {pol_axis_src_label}"
+    plot_overlay._sbid       = sbid
+    plot_overlay._alias      = alias
+
+    # ── footprint name and title ───────────────────────────────────────────────
+    footprint_name = (
+        read_schedblock_param(args.schedblock, "weights.footprint_name")
+        or read_schedblock_param(args.schedblock, "common.target.src%d.footprint.name")
+        or "unknown footprint"
     )
+    plot_overlay._footprint_name = footprint_name
+    title = f"{footprint_name} footprint for ASKAP MkII PAF (sky view)"
 
     # ── plot ──────────────────────────────────────────────────────────────────
     plot_overlay(

@@ -117,12 +117,12 @@ def build_port_table() -> dict:
 def grid_to_xy(row: int, col: int):
     """
     Convert (row, col) in 1-based 12×12 grid to sky-view plot (x,y).
-    Sky-view convention: sky-North = up, sky-East = right.
-    x increases rightward (col decreases: col 1 → right, col 12 → left).
+    Sky-view convention: sky-North = up, sky-East = LEFT (standard astronomy).
+    x increases leftward (col increases: col 1 → left, col 12 → right).
     y increases upward   (row increases: row 12 → top,  row 1  → bottom).
     Returns centred coordinates so (0,0) = centre of 12×12 grid.
     """
-    x = 6.5 - col    # cols 1–12; col 1 at right (+5.5), col 12 at left (−5.5)
+    x = col - 6.5    # cols 1–12; col 1 at left (−5.5), col 12 at right (+5.5)
     y = row - 6.5    # rows 1–12; row 12 at top (+5.5), row 1 at bottom (−5.5)
     return x, y
 
@@ -261,8 +261,8 @@ def sky_to_paf_grid(beams: dict,
     for bid, (x_sky, y_sky) in beams.items():
         u = scale / pitch_deg * (-y_sky * nd[0] - x_sky * ed[0])
         v = scale / pitch_deg * (-y_sky * nd[1] - x_sky * ed[1])
-        # Negate both to convert rear-view focal-plane to sky-view (N up, E right)
-        result[bid] = (float(-u), float(-v))
+        # Negate v only: converts rear-view to sky-view (N up, E left / astro convention)
+        result[bid] = (float(u), float(-v))
     return result
 
 
@@ -401,25 +401,25 @@ def draw_paf_elements(ax: plt.Axes,
                             fontsize=PORT_FONTSIZE, color='0.15',
                             fontweight='bold', zorder=6)
 
-        # Unpaired top-arm dots
+        # Unpaired bottom-arm dots (sky-view: cols_this - cols_prev = no row below)
         for col in sorted(cols_this - cols_prev, reverse=True):
             key = (row, col, 'xtop')
             if key in drawn:
                 continue
             drawn.add(key)
             x, y_this = grid_to_xy(row, col)
-            ax.plot(x, y_this + ELEM_SIZE + ARM_LEN, 'o',
+            ax.plot(x, y_this - ELEM_SIZE - ARM_LEN, 'o',
                     ms=DOT_SIZE * 0.75, color='0.72',
                     markeredgewidth=0.3, markeredgecolor='0.50', zorder=4)
 
-        # Unpaired bottom-arm dots
+        # Unpaired top-arm dots (sky-view: cols_this - cols_next = no row above)
         for col in sorted(cols_this - cols_next, reverse=True):
             key = (row, col, 'xbot')
             if key in drawn:
                 continue
             drawn.add(key)
             x, y_this = grid_to_xy(row, col)
-            ax.plot(x, y_this - ELEM_SIZE - ARM_LEN, 'o',
+            ax.plot(x, y_this + ELEM_SIZE + ARM_LEN, 'o',
                     ms=DOT_SIZE * 0.75, color='0.72',
                     markeredgewidth=0.3, markeredgecolor='0.50', zorder=4)
 
@@ -456,7 +456,7 @@ def draw_paf_elements(ax: plt.Axes,
                             fontsize=PORT_FONTSIZE, color='#885500',
                             fontweight='bold', zorder=6)
 
-        # Unpaired right-arm dots
+        # Unpaired low-col arm dots (E-left: col-1 is to the LEFT → arm extends left)
         for row in sorted(rows_this - rows_prev):
             key = (row, col, 'yleft')
             if key in drawn:
@@ -467,7 +467,7 @@ def draw_paf_elements(ax: plt.Axes,
                     ms=DOT_SIZE * 0.65, color='0.72',
                     markeredgewidth=0.3, markeredgecolor='0.50', zorder=4)
 
-        # Unpaired left-arm dots
+        # Unpaired high-col arm dots (E-left: col+1 is to the RIGHT → arm extends right)
         for row in sorted(rows_this - rows_next):
             key = (row, col, 'yright')
             if key in drawn:
@@ -489,15 +489,15 @@ def draw_paf_elements(ax: plt.Axes,
     # ── Step 5: leg arrows and wedge labels ───────────────────────────────────
     wedge_labels = {
         'R': ( 0.0, -5.5, 'center', 'top'),      # Leg1/Leg2 side: bottom in sky-view
-        'G': ( 5.5,  0.0, 'left',   'center'),   # Leg2/Leg3 side: right  in sky-view
+        'G': (-5.5,  0.0, 'right',  'center'),   # Leg2/Leg3 side: left (East) in sky-view
         'B': ( 0.0,  5.5, 'center', 'bottom'),   # Leg3/Leg4 side: top    in sky-view
-        'Y': (-5.5,  0.0, 'right',  'center'),   # Leg4/Leg1 side: left   in sky-view
+        'Y': ( 5.5,  0.0, 'left',   'center'),   # Leg4/Leg1 side: right (West) in sky-view
     }
     leg_positions = {
-        'Leg 1\n(+90°)':  (-6.2, -5.8, 'right', 'top',    '0.35', '0.30'),
-        'Leg 2\n(180°)':  ( 6.2, -5.8, 'left',  'top',    '0.35', '0.30'),
-        'Leg 3\n(−90°)':  ( 6.2,  5.8, 'left',  'bottom', '0.35', '0.30'),
-        'Leg 4\n(0°)':    (-6.2,  5.8, 'right', 'bottom', 'red',  'red'),
+        'Leg 1\n(+90°)':  ( 6.2, -5.8, 'left',  'top',    '0.35', '0.30'),
+        'Leg 2\n(180°)':  (-6.2, -5.8, 'right', 'top',    '0.35', '0.30'),
+        'Leg 3\n(−90°)':  (-6.2,  5.8, 'right', 'bottom', '0.35', '0.30'),
+        'Leg 4\n(0°)':    ( 6.2,  5.8, 'left',  'bottom', 'red',  'red'),
     }
     for lbl, (tx, ty, ha, va) in wedge_labels.items():
         ax.text(tx, ty, lbl, ha=ha, va=va, fontsize=13,
@@ -517,10 +517,107 @@ def frame_axis(ax: plt.Axes, title: str = "") -> None:
     ax.plot(0, 0, 'k+', ms=8, mew=1.5, zorder=7)
     ax.set_title(title, fontsize=9, pad=3)
     ax.tick_params(labelsize=6)
-    ax.set_xlabel("← Leg1/Leg2      col      Leg3/Leg4 side →  [sky-East right]", fontsize=7)
-    ax.set_ylabel("← Leg1/Leg2      row      Leg3/Leg4 side ↑  [sky-North up]",   fontsize=7)
-    ax.text(0.01, 0.01, "Sky view (N up, E right)\nLeg4=upper-left  Leg3=upper-right",
+    ax.set_xlabel("← Leg2/Leg3 (E)      col      Leg4/Leg1 (W) →  [sky-East LEFT]", fontsize=7)
+    ax.set_ylabel("← Leg1/Leg2      row      Leg3/Leg4 side ↑  [sky-North up]",     fontsize=7)
+    ax.text(0.01, 0.01, "Sky view (N up, E left — astro convention)\nLeg4=upper-right  Leg3=upper-left",
             transform=ax.transAxes, fontsize=5.5, color='0.45', va='bottom')
+
+
+def draw_compass_rose(ax: plt.Axes,
+                      nd: np.ndarray,
+                      ed: np.ndarray,
+                      lim: float = 9.0,
+                      pol_axis_deg: Optional[float] = None) -> None:
+    """
+    Draw a diamond-needle compass rose in the top-left corner of *ax*.
+
+    Parameters
+    ----------
+    nd, ed      : sky-North and sky-East unit vectors in plot coordinates.
+    lim         : axis half-extent (element spacings); controls placement.
+    pol_axis_deg: if given, printed as a small italic label below the pivot.
+
+    This is the single canonical implementation — both plot_paf_beam_overlay
+    and plot_paf_beam_movie import and call this function.
+    """
+    from matplotlib.patches import Polygon as _Poly
+    org  = np.array([-0.87 * lim,  0.87 * lim])
+    alen = 0.77    # needle half-length (element spacings) [was 1.10, scaled ×0.7]
+    wid  = 0.11    # diamond half-width                    [was 0.16, scaled ×0.7]
+
+    def _needle(centre, tip_vec, hw):
+        perp = np.array([-tip_vec[1], tip_vec[0]])
+        n = np.linalg.norm(perp)
+        if n > 1e-9:
+            perp /= n
+        tail = centre - tip_vec * 0.18
+        return np.array([centre + tip_vec,
+                         centre + perp * hw,
+                         tail,
+                         centre - perp * hw])
+
+    for tip, fc, ec, lbl, lc in [
+        ( alen * nd, 'red',       'darkred', 'N', 'darkred'),
+        (-alen * nd, 'white',     '0.45',    'S', '0.45'   ),
+        ( alen * ed, 'steelblue', 'navy',    'E', 'navy'   ),
+        (-alen * ed, 'white',     '0.45',    'W', '0.45'   ),
+    ]:
+        ax.add_patch(_Poly(_needle(org, tip, wid), closed=True,
+                           facecolor=fc, edgecolor=ec, lw=0.8, zorder=12))
+        lpos = org + (alen + 0.27) * (tip / alen)
+        ax.text(*lpos, lbl, color=lc, fontsize=6.0, fontweight='bold',
+                ha='center', va='center', zorder=13)
+
+    ax.plot(*org, 'o', ms=3.2, color='0.2', markeredgewidth=0, zorder=12)
+    if pol_axis_deg is not None:
+        ax.text(org[0], org[1] - alen - 0.53,
+                f'pol_axis={pol_axis_deg:+.0f}°',
+                color='0.35', fontsize=6, ha='center', va='top',
+                style='italic', zorder=12)
+
+
+def draw_info_box(
+    ax: plt.Axes,
+    sbid: str = "",
+    alias: str = "",
+    freq_mhz: Optional[float] = None,
+    pol_axis_deg: Optional[float] = None,
+    pol_axis_src: str = "",
+    footprint_pitch_deg: Optional[float] = None,
+    elem_pitch_deg: Optional[float] = None,
+    n_beams: Optional[int] = None,
+) -> None:
+    """
+    Draw the parameter annotation box in the upper-right corner of *ax*.
+
+    This is the single canonical implementation used by both
+    plot_paf_beam_overlay and plot_paf_beam_movie.  All parameters are
+    optional so callers can pass only what is available.
+    """
+    freq_str = f"{freq_mhz:.1f} MHz" if freq_mhz is not None else "freq unknown"
+    sb_str   = f"SB{sbid}" + (f" ({alias})" if alias else "")
+
+    if pol_axis_deg is not None:
+        pa_str = f"pol_axis={pol_axis_deg:+.1f}°"
+        if pol_axis_src:
+            pa_str += f"  ({pol_axis_src})"
+    else:
+        pa_str = "pol_axis=?"
+
+    fp_str = (f"footprint pitch={footprint_pitch_deg:.3f}°"
+              if footprint_pitch_deg is not None else "footprint pitch=?")
+    ep_str = (f"element pitch={elem_pitch_deg:.3f}°"
+              if elem_pitch_deg is not None else "element pitch=?")
+    nb_str = f"beams: {n_beams}" if n_beams is not None else "beams: ?"
+
+    txt = "\n".join([sb_str, f"Frequency:   {freq_str}", pa_str, fp_str, ep_str, nb_str])
+    ax.annotate(
+        txt,
+        xy=(0.99, 0.99), xycoords="axes fraction",
+        fontsize=8, color="0.4",
+        ha="right", va="top",
+        bbox=dict(boxstyle="square,pad=0.3", fc="white", ec="none", alpha=0.7),
+    )
 
 
 # ─── Main: generate layout plot ───────────────────────────────────────────────
@@ -535,7 +632,7 @@ def _draw_sky_overlay(ax: plt.Axes, pol_axis_deg: float,
     #   (canonical formula — matches sky_to_paf_grid() in this file)
     north_angle_rad = np.radians(+45.0 - pol_axis_deg)
     nd = np.array([np.cos(north_angle_rad), np.sin(north_angle_rad)])
-    ed = np.array([nd[1], -nd[0]])   # East = 90° CW from North in rear-view
+    ed = np.array([-nd[1], nd[0]])   # East = 90° CCW from North (E-left display)
 
     _scale = DEFAULT_PITCH_DEG / DEFAULT_ELEM_PITCH_DEG
     _dist  = star_dist_pitches * _scale
@@ -584,7 +681,7 @@ def plot_paf_layout(output: str         = "/tmp/paf_layout_overlay.png",
     if footprint_file:
         overlay_beam_footprint(ax, footprint_file=footprint_file, pol_axis_deg=pol_axis_deg)
     _draw_sky_overlay(ax, pol_axis_deg)
-    frame_axis(ax, "MkII PAF 112-element / 188-port layout on 12×12 grid (rear view)\n"
+    frame_axis(ax, "MkII PAF 112-element / 188-port layout on 12×12 grid (sky view: N up, E left)\n"
                    "● x-ports 1–94 (vertical, cols 2–11)   "
                    "■ y-ports 95–188 (horizontal, rows 2–11)   "
                    "grey = unconnected arm   circles = closepack36 beams")
@@ -602,7 +699,7 @@ def plot_paf_polaxis_panels(output:         str   = "/tmp/paf_polaxis_panels.png
     port_table, unused_sockets = build_port_table()
 
     fig, axes = plt.subplots(2, 2, figsize=(18, 16), facecolor='white')
-    fig.suptitle("MkII PAF — sky orientation for different pol_axis values (rear view)\n"
+    fig.suptitle("MkII PAF — sky orientation for different pol_axis values (sky view: N up, E left)\n"
                  "Red ★ = pointing direction   Gold ★ = source 3 beam-pitches South of pointing",
                  fontsize=11, y=1.01)
 
@@ -626,7 +723,7 @@ def plot_paf_polaxis_footprint_panels(output:        str  = "/tmp/paf_polaxis_fo
     port_table, unused_sockets = build_port_table()
     fig, axes = plt.subplots(2, 2, figsize=(18, 16), facecolor='white')
     fig.suptitle(
-        "MkII PAF — closepack36 beam footprint for different pol_axis values (rear view)\n"
+        "MkII PAF — closepack36 beam footprint for different pol_axis values (sky view: N up, E left)\n"
         "Red ★ = pointing direction   Gold ★ = source 3 pitches South of pointing",
         fontsize=11, y=1.01)
     for ax, pa in zip(axes.flat, pol_axis_list):
