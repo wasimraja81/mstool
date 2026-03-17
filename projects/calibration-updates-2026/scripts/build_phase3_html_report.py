@@ -999,15 +999,24 @@ def assemble_package(
     print(f"Package ready at {package_dir}  ({total / 1e6:.1f} MB total)")
 
 
-def run_upstream_pipeline(data_root: Path, phase2_dir: Path) -> None:
-    """Run the three upstream pipeline scripts in order:
-      1. build_phase2_isolation_tables.py  — (re)generate phase-2 CSVs
-      2. build_leakage_cube.py             — rebuild leakage_cube.nc
-      3. plot_leakage_footprint.py         — regenerate footprint PNGs (dL + QU)
+def run_upstream_pipeline(
+        data_root: Path,
+        phase2_dir: Path,
+        manifest_path=None,
+        start_index: int = 0,
+        end_index: int = 999,
+        exclude_indices: str = None,
+) -> None:
+    """Run the four upstream pipeline scripts in order:
+      1. build_phase1_master_table.py      — (re)generate leakage_master_table.csv
+      2. build_phase2_isolation_tables.py  — (re)generate phase-2 CSVs
+      3. build_leakage_cube.py             — rebuild leakage_cube.nc
+      4. plot_leakage_footprint.py         — regenerate footprint PNGs (dL + QU)
 
-    Only runs if the master leakage CSV exists.  Uses the same Python
-    interpreter as the current process.  Failures are reported but do not
-    abort the HTML build (existing outputs will still be used).
+    Step 1 runs if a manifest is available; steps 2-4 run once the master
+    CSV exists.  Uses the same Python interpreter as the current process.
+    Failures are reported but do not abort the HTML build (existing outputs
+    will still be used).
     """
     import subprocess
     import sys
@@ -1015,10 +1024,29 @@ def run_upstream_pipeline(data_root: Path, phase2_dir: Path) -> None:
     scripts_dir = Path(__file__).resolve().parent
     python = sys.executable
 
-    master_csv  = data_root / "leakage_master_table.csv"
+    master_csv = data_root / "leakage_master_table.csv"
+
+    # Step 1: regenerate the master leakage CSV from all available manifest rows
+    if manifest_path is not None and Path(manifest_path).exists():
+        print(f"\n── Running: Phase-1 master table ──")
+        cmd = [
+            python, str(scripts_dir / "build_phase1_master_table.py"),
+            "--manifest",    str(manifest_path),
+            "--local-base",  str(data_root),
+            "--output-csv",  str(master_csv),
+            "--start-index", str(start_index),
+            "--end-index",   str(end_index),
+        ]
+        if exclude_indices:
+            cmd += ["--exclude-indices", exclude_indices]
+        result = subprocess.run(cmd, text=True)
+        if result.returncode != 0:
+            print(f"  WARNING: 'Phase-1 master table' exited with code {result.returncode} — continuing with existing outputs.")
+    else:
+        print("Phase-1 master table step skipped: no manifest available.")
 
     if not master_csv.exists():
-        print(f"Upstream pipeline skipped: master CSV not found at {master_csv}")
+        print(f"Upstream pipeline steps 2-4 skipped: master CSV not found at {master_csv}")
         return
 
     steps = [
@@ -1118,6 +1146,29 @@ def main():
         help="Fractional polarisation threshold (0–1) for highlight rings on pol-source markers "
              "(e.g. 0.10 = 10%%).  If omitted, all sources are shown at full alpha with no ring.",
     )
+    parser.add_argument(
+        "--start-index",
+        type=int,
+        default=0,
+        metavar="N",
+        help="First manifest row index (0-based) to include when rebuilding the master leakage CSV "
+             "(passed to build_phase1_master_table.py).  Default: 0.",
+    )
+    parser.add_argument(
+        "--end-index",
+        type=int,
+        default=999,
+        metavar="N",
+        help="Last manifest row index (inclusive) to include when rebuilding the master leakage CSV. "
+             "Default: 999 (all rows).",
+    )
+    parser.add_argument(
+        "--exclude-indices",
+        default=None,
+        metavar="RANGES",
+        help="Comma-separated list of indices or ranges to exclude from the master CSV rebuild "
+             "(e.g. '24-29' or '24-29,31').  Passed directly to build_phase1_master_table.py.",
+    )
     args = parser.parse_args()
 
     data_root = Path(args.data_root)
@@ -1163,7 +1214,13 @@ def main():
     media_map = media_info if media_info else None
 
     # ── Run upstream pipeline steps ──────────────────────────────────────
-    run_upstream_pipeline(data_root, phase2_dir)
+    run_upstream_pipeline(
+        data_root, phase2_dir,
+        manifest_path=manifest_path,
+        start_index=args.start_index,
+        end_index=args.end_index,
+        exclude_indices=args.exclude_indices,
+    )
 
     inputs = {
         "beam_x_field_at_fixed_odc.csv": phase2_dir / "beam_x_field_at_fixed_odc.csv",
