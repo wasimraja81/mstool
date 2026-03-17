@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Resolve the repo root from this script's real location (follows symlinks).
+# Resolve the real location of this script, following symlinks.
 SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
-REPO="${SCRIPTS}/../.."
-SLURM="${REPO}/slurm"
-MANIFESTS="${REPO}/manifests"
+SLURM="${SCRIPTS}/../slurm"
+MANIFESTS="${SCRIPTS}/../manifests"
 
 "${SLURM}"/submit_pipeline.sh \
   --stage ref \

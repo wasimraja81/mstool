@@ -86,6 +86,10 @@ set -euo pipefail
 SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
 DATA_ROOT="${HOME}/DATA/reffield-average"
 
+# Activate the repo's virtual environment.
+REPO_ROOT="$(cd "${SCRIPTS}/../../.." && pwd)"
+source "${REPO_ROOT}/.venv/bin/activate"
+
 # ─────────────────────────────────────────────────────────────────────────────
 # ACTIVE COMMAND — standard rebuild with polarised-source overlays
 # ─────────────────────────────────────────────────────────────────────────────
