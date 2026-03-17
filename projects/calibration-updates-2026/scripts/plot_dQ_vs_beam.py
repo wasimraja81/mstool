@@ -68,7 +68,7 @@ def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
     sb_markers = {sb: MARKERS[i % len(MARKERS)] for i, sb in enumerate(sbs)}
 
     fig, ax = plt.subplots(figsize=(9, 5))
-    fig.suptitle(f"{field}  —  signed {ylabel} vs beam  —  variant: {variant}",
+    fig.suptitle(f"{field}  —  {ylabel} signed (%) vs beam  —  variant: {variant}",
                  fontsize=12, y=1.01)
 
     for odc in odcs:
@@ -90,7 +90,9 @@ def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
 
     ax.axhline(0, color="black", linewidth=0.6, linestyle="--", alpha=0.4)
     if ylim is not None:
-        ax.set_ylim(-ylim, ylim)
+        data_extreme = df_field[quantity].abs().max()
+        effective_ylim = max(ylim, data_extreme * 1.1)
+        ax.set_ylim(-effective_ylim, effective_ylim)
     ax.set_xlabel("Beam", fontsize=9)
     ax.set_ylabel(f"{ylabel} signed (%)", fontsize=9)
     ax.tick_params(labelsize=8)
@@ -112,7 +114,7 @@ def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
               loc="upper right", ncol=2)
 
     plt.tight_layout()
-    qty_tag   = quantity.replace("leak_", "").replace("_over_i_signed_pct", "")
+    qty_tag   = "d" + quantity.replace("leak_", "").replace("_over_i_signed_pct", "").upper()
     field_tag = field.replace("/", "-")
     out_path  = output_dir / f"{qty_tag}_vs_beam_{field_tag}_{variant}.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
@@ -124,7 +126,7 @@ def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Plot signed dQ/I (and optionally dU/I) vs beam per reference field",
+        description="Plot signed dQ (and optionally dU) vs beam per reference field",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
@@ -166,7 +168,7 @@ def main():
     )
     parser.add_argument(
         "--dU", action="store_true",
-        help="Also produce a matching figure for signed dU/I.",
+        help="Also produce a matching figure for signed dU.",
     )
     parser.add_argument(
         "--fields", default=None,
@@ -175,8 +177,9 @@ def main():
              "Omit to plot all fields selected by the manifest.",
     )
     parser.add_argument(
-        "--ylim", type=float, default=5.0, metavar="PCT",
-        help="Symmetric y-axis limit in %% (e.g. 5 → ±5%%). Pass 0 to use auto-scale.",
+        "--ylim", type=float, default=2.5, metavar="PCT",
+        help="Minimum symmetric y-axis half-range in %% (default ±2.5%%). "
+             "Automatically expands if data exceeds this bound. Pass 0 to fully auto-scale.",
     )
     parser.add_argument("--show", action="store_true",
                         help="Display plots interactively after saving.")
@@ -241,9 +244,9 @@ def main():
         return
 
     variants  = ["regular", "lcal"] if args.variant == "both" else [args.variant]
-    quantities = [("leak_q_over_i_signed_pct", "dQ/I")]
+    quantities = [("leak_q_over_i_signed_pct", "dQ")]
     if args.dU:
-        quantities.append(("leak_u_over_i_signed_pct", "dU/I"))
+        quantities.append(("leak_u_over_i_signed_pct", "dU"))
 
     for field in fields_to_plot:
         df_field = df[df["ref_fieldname"] == field]
