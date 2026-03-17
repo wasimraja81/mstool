@@ -81,7 +81,9 @@
 
 set -euo pipefail
 
-SCRIPTS="projects/calibration-updates-2026/scripts"
+# Script lives in projects/calibration-updates-2026/scripts/ — resolve its
+# own directory so it works when invoked with or without a path prefix.
+SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 DATA_ROOT="${HOME}/DATA/reffield-average"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -91,6 +93,7 @@ python3 "${SCRIPTS}"/build_phase3_html_report.py \
     --data-root          "${DATA_ROOT}" \
     --pol-sources \
     --highlight-frac-pol 0.10 \
+    --package           "${DATA_ROOT}/final_mvp_share" \
     --force
 
 echo ""
