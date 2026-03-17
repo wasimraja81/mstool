@@ -204,6 +204,7 @@ def generate_paf_overlays(
     force: bool = False,
     pol_sources: bool = False,
     catalog_dir: Path = None,
+    highlight_frac_pol: float = None,
 ) -> dict:
     """Generate a PAF beam-overlay PNG for each SB_REF that has the required
     metadata files (footprintOutput + schedblock-info).  Skips silently if
@@ -258,6 +259,8 @@ def generate_paf_overlays(
                 _overlay_cmd.append("--pol-sources")
                 if catalog_dir is not None:
                     _overlay_cmd += ["--catalog-dir", str(catalog_dir)]
+                if highlight_frac_pol is not None:
+                    _overlay_cmd += ["--highlight-frac-pol", str(highlight_frac_pol)]
             subprocess.run(_overlay_cmd, check=True, capture_output=True)
             print(f"{out_path.stat().st_size // 1024} KB")
             result[sb_ref] = out_fname
@@ -274,6 +277,7 @@ def generate_paf_movies(
     force: bool = False,
     pol_sources: bool = False,
     catalog_dir: Path = None,
+    highlight_frac_pol: float = None,
 ) -> dict:
     """Generate a PAF beam-scan MP4 for each SB_REF that has the required
     metadata files (footprintOutput + schedblock-info), by invoking
@@ -335,6 +339,8 @@ def generate_paf_movies(
                 _movie_cmd.append("--pol-sources")
                 if catalog_dir is not None:
                     _movie_cmd += ["--catalog-dir", str(catalog_dir)]
+                if highlight_frac_pol is not None:
+                    _movie_cmd += ["--highlight-frac-pol", str(highlight_frac_pol)]
             subprocess.run(_movie_cmd, check=True, capture_output=True)
             print(f"{out_path.stat().st_size // 1024} KB")
             result[sb_ref] = out_fname
@@ -1099,6 +1105,14 @@ def main():
         metavar="DIR",
         help="Directory for cached catalog CSVs used by --pol-sources (default: <output-dir>/catalogs).",
     )
+    parser.add_argument(
+        "--highlight-frac-pol",
+        type=float,
+        default=None,
+        metavar="FRAC",
+        help="Fractional polarisation threshold (0–1) for highlight rings on pol-source markers "
+             "(e.g. 0.10 = 10%%).  If omitted, all sources are shown at full alpha with no ring.",
+    )
     args = parser.parse_args()
 
     data_root = Path(args.data_root)
@@ -1315,6 +1329,7 @@ def main():
         force=args.force,
         pol_sources=args.pol_sources,
         catalog_dir=_cat_dir,
+        highlight_frac_pol=args.highlight_frac_pol,
     )
     print(f"  {len(paf_overlay_info)} PAF overlay(s) ready")
 
@@ -1324,6 +1339,7 @@ def main():
         force=args.force,
         pol_sources=args.pol_sources,
         catalog_dir=_cat_dir,
+        highlight_frac_pol=args.highlight_frac_pol,
     )
     print(f"  {len(paf_movie_info)} PAF movie(s) ready")
 
