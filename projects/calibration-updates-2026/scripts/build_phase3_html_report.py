@@ -1234,6 +1234,13 @@ def main():
             end_index=args.end_index,
             exclude_indices=args.exclude_indices,
         )
+        # Copy cube from phase2/ into output_dir so it sits alongside index.html
+        _cube_src = phase2_dir / "leakage_cube.nc"
+        _cube_dst = output_dir / "leakage_cube.nc"
+        if _cube_src.exists():
+            import shutil as _shutil
+            _shutil.copy2(_cube_src, _cube_dst)
+            print(f"Cube copied to {_cube_dst}  ({_cube_dst.stat().st_size // 1024} KB)")
 
     inputs = {
         "beam_x_field_at_fixed_odc.csv": phase2_dir / "beam_x_field_at_fixed_odc.csv",
@@ -1385,15 +1392,15 @@ def main():
     beam_links_html = f"<ul>{''.join(beam_links)}</ul>" if beam_links else ""
 
     # ── Cube link ────────────────────────────────────────────────────────
-    cube_path = data_root / "phase2" / "leakage_cube.nc"
+    cube_path = output_dir / "leakage_cube.nc"
     if cube_path.exists():
         cube_size_kb = cube_path.stat().st_size / 1024
         cube_link_html = (
-            f"<p><a href='../phase2/leakage_cube.nc' download>leakage_cube.nc</a>"
+            f"<p><a href='leakage_cube.nc' download>leakage_cube.nc</a>"
             f" ({cube_size_kb:.0f}&nbsp;KB)</p>"
         )
     else:
-        cube_link_html = "<p class='meta'>Cube file not found &mdash; run <code>build_leakage_cube.py</code> first.</p>"
+        cube_link_html = "<p class='meta'>Cube file not found &mdash; run the full pipeline (without <code>--html-only</code>) to generate it.</p>"
 
     # ── Build index page ────────────────────────────────────────────────
 # ── PAF beam-overlay plots (per SB_REF) ─────────────────────────────
