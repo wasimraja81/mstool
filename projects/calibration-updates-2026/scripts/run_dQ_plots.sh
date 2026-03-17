@@ -54,7 +54,7 @@
 
 set -euo pipefail
 
-SCRIPTS="$(cd "$(dirname "$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$0")")" && pwd)"
+SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
 DATA_ROOT="${HOME}/DATA/reffield-average"
 
 REPO_ROOT="$(cd "${SCRIPTS}/../../.." && pwd)"
