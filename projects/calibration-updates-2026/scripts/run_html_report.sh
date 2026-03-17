@@ -95,6 +95,9 @@ source "${REPO_ROOT}/.venv/bin/activate"
 # ─────────────────────────────────────────────────────────────────────────────
 python3 "${SCRIPTS}"/build_phase3_html_report.py \
     --data-root          "${DATA_ROOT}" \
+    --start-index        14 \
+    --end-index          49 \
+    --exclude-indices    "24-29" \
     --pol-sources \
     --highlight-frac-pol 0.10 \
     --package           "${DATA_ROOT}/final_mvp_share" \
@@ -123,6 +126,19 @@ echo "Report written to: ${DATA_ROOT}/phase3/index.html"
 # --manifest /path/to/sb_manifest_reffield_average.txt
 #     Explicitly set the manifest.  If omitted, the script searches
 #     <repo>/projects/calibration-updates-2026/manifests/ then <data-root>.
+
+# ── Manifest row selection (for master CSV rebuild) ──────────────────────────
+
+# --start-index N
+#     First manifest row index (0-based) to include when regenerating
+#     leakage_master_table.csv.  Default: 0.
+
+# --end-index N
+#     Last manifest row index (inclusive) to include.  Default: 999 (all rows).
+
+# --exclude-indices RANGES
+#     Comma-separated indices or ranges to skip, e.g. '24-29' or '24-29,31'.
+#     Rows in the existing master CSV are preserved for excluded indices.
 
 # ── Regeneration ──────────────────────────────────────────────────────────────
 

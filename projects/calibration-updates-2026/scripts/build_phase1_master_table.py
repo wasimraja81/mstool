@@ -409,6 +409,9 @@ def main():
     for tuple_info in tuples:
         tuple_rel = tuple_info["tuple_rel_path"]
         tuple_dir = local_base / tuple_rel
+        if not tuple_dir.exists():
+            print(f"  Skipping {tuple_rel!r}: local directory not found")
+            continue
         metadata_dir = tuple_dir / "metadata"
         assessment_dir = tuple_dir / f"1934-processing-SB-{tuple_info['sb_target_1934']}" / "assessment_results"
 
