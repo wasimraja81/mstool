@@ -33,7 +33,7 @@ import matplotlib.patheffects as mpe
 
 # ── Import shared helpers from plot_paf_beam_overlay ─────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
-from paf_port_layout import build_port_table, draw_paf_elements, draw_compass_rose, draw_info_box
+from paf_port_layout import build_port_table, draw_paf_elements, draw_compass_rose, draw_info_box, draw_pol_sources
 from plot_paf_beam_overlay import (
     read_footprint_output,
     read_schedblock_param,
@@ -155,6 +155,9 @@ def build_movie(
     freq_mhz_override: float = None,
     elem_pitch_override: float = None,
     dish_diam_override: float = None,
+    extgal_df=None,
+    pulsar_df=None,
+    frac_pol_highlight=None,
 ) -> None:
     # ── Read inputs ───────────────────────────────────────────────────────────
     beams_sky = read_footprint_output(footprint_path)
@@ -259,6 +262,27 @@ def build_movie(
         elem_pitch_deg      = elem_pitch,
         n_beams             = n_beams,
     )
+
+    # ── Static polarised-source overlay (drawn once, not animated) ──────────
+    _fc = None
+    try:
+        from fetch_pol_catalogs import read_field_direction
+        _fc = read_field_direction(schedblock_path)
+    except ImportError:
+        pass
+    if (extgal_df is not None or pulsar_df is not None) and _fc is not None:
+        sm, _hover_artists = draw_pol_sources(  # hover_artists unused in movie
+            ax, extgal_df, pulsar_df,
+            field_ra_deg       = _fc[0],
+            field_dec_deg      = _fc[1],
+            pol_axis_deg       = pol_axis,
+            pitch_deg          = pitch_deg,
+            elem_pitch_deg     = elem_pitch,
+            frac_pol_highlight = frac_pol_highlight,
+        )
+        cbar = fig.colorbar(sm, ax=ax, fraction=0.03, pad=0.01, shrink=0.5,
+                            label="RM [rad m\u207b\u00b2]")
+        cbar.ax.tick_params(labelsize=7)
 
     # Small dot at each beam centre (always visible)
     dot_artists = {}
@@ -374,7 +398,44 @@ def main():
                         help="Override element pitch (deg)")
     parser.add_argument("--dish-diam",  type=float, default=None,
                         help="Override dish diameter (m)")
+    # Polarised-source catalog overlay
+    parser.add_argument("--pol-sources", action="store_true", default=False,
+                        help="Overlay polarised sources from POSSUM/Taylor 2009 and ATNF pulsars. "
+                             "POSSUM AS203 data needs CASDA credentials: set env vars "
+                             "CASDA_USER and CASDA_PASSWORD, or add 'machine casda.csiro.au' "
+                             "to ~/.netrc (see fetch_pol_catalogs.py for details).")
+    parser.add_argument("--catalog-dir", default=None, metavar="DIR",
+                        help="Directory for cached catalog CSVs (default: same dir as --output)")
+    parser.add_argument("--refresh-catalogs", action="store_true", default=False,
+                        help="Re-download catalogs even if CSV cache exists")
+    parser.add_argument("--cone-radius", type=float, default=3.5, metavar="DEG",
+                        help="Cone search radius for catalog query in degrees (default 3.5)")
+    parser.add_argument("--highlight-frac-pol", type=float, nargs="?",
+                        const=0.10, default=None, metavar="FRAC",
+                        help="Draw a coloured ring around sources with frac_pol ≥ FRAC "
+                             "(default threshold 0.10 = 10%% if flag given without value)")
     args = parser.parse_args()
+
+    # ── catalog fetch (optional) ───────────────────────────────────────
+    extgal_df = pulsar_df = None
+    if args.pol_sources:
+        try:
+            from fetch_pol_catalogs import read_field_direction, get_pol_sources
+            from pathlib import Path as _Path
+            _fc = read_field_direction(args.schedblock)
+            if _fc is not None:
+                _sbid, _alias = read_sbid_from_schedblock(args.schedblock)
+                _cat_dir = _Path(args.catalog_dir) if args.catalog_dir else _Path(args.output).parent / "catalogs"
+                _field = _alias or _sbid or "field"
+                print(f"Fetching polarised-source catalogs for {_field} …")
+                extgal_df, pulsar_df = get_pol_sources(
+                    _field, _fc[0], _fc[1], _cat_dir,
+                    radius_deg=args.cone_radius, refresh=args.refresh_catalogs,
+                )
+            else:
+                print("WARNING: --pol-sources: field_direction not in schedblock; skipping")
+        except ImportError:
+            print("WARNING: fetch_pol_catalogs not found; skipping --pol-sources")
 
     build_movie(
         footprint_path      = args.footprint,
@@ -391,6 +452,9 @@ def main():
         freq_mhz_override   = args.freq_mhz,
         elem_pitch_override = args.elem_pitch,
         dish_diam_override  = args.dish_diam,
+        extgal_df           = extgal_df,
+        pulsar_df           = pulsar_df,
+        frac_pol_highlight  = getattr(args, 'highlight_frac_pol', None),
     )
 
 

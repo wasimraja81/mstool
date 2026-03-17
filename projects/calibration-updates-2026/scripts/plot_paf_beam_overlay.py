@@ -33,7 +33,7 @@ from typing import Optional
 
 # Import the correct 112-element 12×12 PAF layout from paf_port_layout
 sys.path.insert(0, str(Path(__file__).parent))
-from paf_port_layout import build_port_table, draw_paf_elements, sky_to_paf_grid, draw_compass_rose, draw_info_box
+from paf_port_layout import build_port_table, draw_paf_elements, sky_to_paf_grid, draw_compass_rose, draw_info_box, draw_pol_sources
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
@@ -199,6 +199,8 @@ def plot_overlay(
     title: str = "closepack36 footprint for ASKAP MkII PAF (sky view)",
     annotate_beams: bool = True,
     show_sky_markers: bool = False,
+    extgal_df=None,
+    pulsar_df=None,
 ) -> None:
     fig, ax = plt.subplots(figsize=(12, 10), facecolor="white")
 
@@ -268,6 +270,52 @@ def plot_overlay(
     ax.grid(True, lw=0.25, alpha=0.35, color="0.5")
     ax.tick_params(labelsize=8)
 
+    # ── polarised-source catalog overlay ──────────────────────────────────────
+    _field_ra  = getattr(plot_overlay, '_field_ra',  None)
+    _field_dec = getattr(plot_overlay, '_field_dec', None)
+    _pitch_c2  = getattr(plot_overlay, '_pitch',     0.9)
+    _elem_c2   = getattr(plot_overlay, '_elem_pitch', DEFAULT_ELEM_PITCH_DEG)
+    _pol_c2    = getattr(plot_overlay, '_pol_axis',  0.0)
+    if (extgal_df is not None or pulsar_df is not None) and _field_ra is not None:
+        sm, hover_artists = draw_pol_sources(
+            ax, extgal_df, pulsar_df,
+            field_ra_deg        = _field_ra,
+            field_dec_deg       = _field_dec,
+            pol_axis_deg        = _pol_c2,
+            pitch_deg           = _pitch_c2,
+            elem_pitch_deg      = _elem_c2,
+            frac_pol_highlight  = getattr(plot_overlay, '_frac_pol_highlight', None),
+        )
+        n_eg = len(extgal_df) if extgal_df is not None else 0
+        n_ps = len(pulsar_df) if pulsar_df is not None else 0
+        src_label = getattr(extgal_df, 'attrs', {}).get('source', 'Taylor2009') if n_eg else ''
+        cbar = fig.colorbar(sm, ax=ax, fraction=0.03, pad=0.01, shrink=0.55,
+                            label="RM [rad m\u207b\u00b2]")
+        cbar.ax.tick_params(labelsize=7)
+        eg_src = extgal_df['source'].iloc[0] if n_eg else '—'
+        legend_txt = (f"{n_eg} extgal [{eg_src}]  {n_ps} pulsars [ATNF]")
+        ax.set_title(f"{ax.get_title()}\n{legend_txt}", fontsize=9)
+
+        # ── interactive hover tooltips (interactive backends only) ────────────
+        try:
+            import matplotlib as _mpl, mplcursors as _mc
+            if _mpl.get_backend().lower() not in ("agg", "pdf", "svg", "ps", "cairo"):
+                for sc, tips in hover_artists:
+                    cursor = _mc.cursor(sc, hover=True)
+                    cursor.connect(
+                        "add",
+                        lambda sel, _tips=tips: (
+                            sel.annotation.set_text(_tips[sel.index]),
+                            sel.annotation.get_bbox_patch().set(
+                                boxstyle="round,pad=0.4", fc="lightyellow",
+                                ec="0.3", alpha=0.92,
+                            ),
+                            sel.annotation.set_fontsize(7),
+                        ),
+                    )
+        except ImportError:
+            pass  # mplcursors not available – silent fallback
+
     # ── parameter annotation ──────────────────────────────────────────────────
     draw_info_box(
         ax,
@@ -283,8 +331,14 @@ def plot_overlay(
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
     print(f"Saved → {output_path}")
+    if getattr(plot_overlay, '_show', False):
+        import matplotlib as _mpl
+        if _mpl.get_backend().lower() == "agg":
+            print("WARNING: --show has no effect with the Agg backend (non-interactive).")
+        else:
+            plt.show()   # blocks until window closed; mplcursors hover active
+    plt.close(fig)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -322,6 +376,8 @@ def parse_args():
     # Output
     ap.add_argument("--output", default="paf_beam_overlay.png",
                     help="Output PNG path (default paf_beam_overlay.png)")
+    ap.add_argument("--show", action="store_true", default=False,
+                    help="Show the figure interactively after saving (enables hover tooltips)")
     ap.add_argument("--no-labels", dest="annotate", action="store_false", default=True,
                     help="Suppress beam number labels")
     ap.add_argument("--sky-markers", dest="sky_markers", action="store_true", default=False,
@@ -330,6 +386,24 @@ def parse_args():
     ap.add_argument("--beam-radius", type=float, default=None,
                     help="Beam circle radius in element units; overrides frequency-derived "
                          f"calculation (fallback default {BEAM_RADIUS_ELEM} when no freq available)")
+
+    # Polarised-source catalog overlay
+    grp4 = ap.add_argument_group("Polarised-source catalog overlay")
+    grp4.add_argument("--pol-sources", action="store_true", default=False,
+                      help="Overlay polarised sources from POSSUM/Taylor 2009 and ATNF pulsars. "
+                           "POSSUM AS203 data needs CASDA credentials: set env vars "
+                           "CASDA_USER and CASDA_PASSWORD, or add 'machine casda.csiro.au' "
+                           "to ~/.netrc (see fetch_pol_catalogs.py for details).")
+    grp4.add_argument("--catalog-dir", default=None, metavar="DIR",
+                      help="Directory for cached catalog CSVs (default: same dir as --output)")
+    grp4.add_argument("--refresh-catalogs", action="store_true", default=False,
+                      help="Re-download catalogs even if CSV cache exists")
+    grp4.add_argument("--cone-radius", type=float, default=3.5, metavar="DEG",
+                      help="Cone search radius for catalog query in degrees (default 3.5)")
+    grp4.add_argument("--highlight-frac-pol", type=float, nargs="?",
+                      const=0.10, default=None, metavar="FRAC",
+                      help="Draw a coloured ring around sources with frac_pol ≥ FRAC "
+                           "(default threshold 0.10 = 10%% if flag given without value)")
     return ap.parse_args()
 
 
@@ -418,6 +492,12 @@ def main():
     plot_overlay._sbid       = sbid
     plot_overlay._alias      = alias
 
+    # ── field centre (needed for catalog overlay) ─────────────────────────────
+    from fetch_pol_catalogs import read_field_direction
+    _fc = read_field_direction(args.schedblock)
+    plot_overlay._field_ra  = _fc[0] if _fc else None
+    plot_overlay._field_dec = _fc[1] if _fc else None
+
     # ── footprint name and title ───────────────────────────────────────────────
     footprint_name = (
         read_schedblock_param(args.schedblock, "weights.footprint_name")
@@ -427,7 +507,24 @@ def main():
     plot_overlay._footprint_name = footprint_name
     title = f"{footprint_name} footprint for ASKAP MkII PAF (sky view)"
 
+    # ── catalog fetch (optional) ───────────────────────────────────────────────
+    extgal_df = pulsar_df = None
+    if args.pol_sources and _fc is not None:
+        from fetch_pol_catalogs import get_pol_sources
+        from pathlib import Path
+        cat_dir = Path(args.catalog_dir) if args.catalog_dir else Path(args.output).parent / "catalogs"
+        field_name = alias or sbid or "field"
+        print(f"Fetching polarised-source catalogs for {field_name} …")
+        extgal_df, pulsar_df = get_pol_sources(
+            field_name, _fc[0], _fc[1], cat_dir,
+            radius_deg=args.cone_radius, refresh=args.refresh_catalogs,
+        )
+    elif args.pol_sources and _fc is None:
+        print("WARNING: --pol-sources requested but field_direction not found in schedblock; skipping")
+
     # ── plot ──────────────────────────────────────────────────────────────────
+    plot_overlay._show              = args.show
+    plot_overlay._frac_pol_highlight = getattr(args, 'highlight_frac_pol', None)
     plot_overlay(
         beams_paf,
         beam_radius      = beam_radius,
@@ -435,6 +532,8 @@ def main():
         title            = title,
         annotate_beams   = args.annotate,
         show_sky_markers = args.sky_markers,
+        extgal_df        = extgal_df,
+        pulsar_df        = pulsar_df,
     )
 
 

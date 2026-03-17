@@ -202,6 +202,8 @@ def generate_paf_overlays(
     plots_dir: Path,
     amp_suffix: str = "AMP_STRATEGY-multiply-insituPreflags",
     force: bool = False,
+    pol_sources: bool = False,
+    catalog_dir: Path = None,
 ) -> dict:
     """Generate a PAF beam-overlay PNG for each SB_REF that has the required
     metadata files (footprintOutput + schedblock-info).  Skips silently if
@@ -246,16 +248,17 @@ def generate_paf_overlays(
             continue
         print(f"  PAF overlay [{sb_ref}] … ", end="", flush=True)
         try:
-            subprocess.run(
-                [
-                    sys.executable, str(overlay_script),
-                    "--footprint", str(footprint),
-                    "--schedblock", str(sb_file),
-                    "--output", str(out_path),
-                ],
-                check=True,
-                capture_output=True,
-            )
+            _overlay_cmd = [
+                sys.executable, str(overlay_script),
+                "--footprint", str(footprint),
+                "--schedblock", str(sb_file),
+                "--output", str(out_path),
+            ]
+            if pol_sources:
+                _overlay_cmd.append("--pol-sources")
+                if catalog_dir is not None:
+                    _overlay_cmd += ["--catalog-dir", str(catalog_dir)]
+            subprocess.run(_overlay_cmd, check=True, capture_output=True)
             print(f"{out_path.stat().st_size // 1024} KB")
             result[sb_ref] = out_fname
         except subprocess.CalledProcessError as exc:
@@ -269,6 +272,8 @@ def generate_paf_movies(
     plots_dir: Path,
     amp_suffix: str = "AMP_STRATEGY-multiply-insituPreflags",
     force: bool = False,
+    pol_sources: bool = False,
+    catalog_dir: Path = None,
 ) -> dict:
     """Generate a PAF beam-scan MP4 for each SB_REF that has the required
     metadata files (footprintOutput + schedblock-info), by invoking
@@ -319,17 +324,18 @@ def generate_paf_movies(
             continue
         print(f"  PAF movie [{sb_ref}] … ", end="", flush=True)
         try:
-            subprocess.run(
-                [
-                    sys.executable, str(movie_script),
-                    "--footprint",  str(footprint),
-                    "--schedblock", str(sb_file),
-                    "--output",     str(out_path),
-                    "--trail",      "0",
-                ],
-                check=True,
-                capture_output=True,
-            )
+            _movie_cmd = [
+                sys.executable, str(movie_script),
+                "--footprint",  str(footprint),
+                "--schedblock", str(sb_file),
+                "--output",     str(out_path),
+                "--trail",      "0",
+            ]
+            if pol_sources:
+                _movie_cmd.append("--pol-sources")
+                if catalog_dir is not None:
+                    _movie_cmd += ["--catalog-dir", str(catalog_dir)]
+            subprocess.run(_movie_cmd, check=True, capture_output=True)
             print(f"{out_path.stat().st_size // 1024} KB")
             result[sb_ref] = out_fname
         except subprocess.CalledProcessError as exc:
@@ -1081,6 +1087,18 @@ def main():
         default=False,
         help="Regenerate PAF overlay PNGs and beam-scan movies even if output files already exist.",
     )
+    parser.add_argument(
+        "--pol-sources",
+        action="store_true",
+        default=False,
+        help="Overlay polarised sources (POSSUM/Taylor+2009 extragalactic and ATNF pulsars) on PAF overlay PNGs and movies.",
+    )
+    parser.add_argument(
+        "--catalog-dir",
+        default=None,
+        metavar="DIR",
+        help="Directory for cached catalog CSVs used by --pol-sources (default: <output-dir>/catalogs).",
+    )
     args = parser.parse_args()
 
     data_root = Path(args.data_root)
@@ -1290,12 +1308,23 @@ def main():
 
     # ── Build index page ────────────────────────────────────────────────
 # ── PAF beam-overlay plots (per SB_REF) ─────────────────────────────
+    _cat_dir = Path(args.catalog_dir) if args.catalog_dir else output_dir / "catalogs"
     print("\nGenerating PAF beam-overlay plots …")
-    paf_overlay_info = generate_paf_overlays(manifest_rows, data_root, plots_dir, force=args.force)
+    paf_overlay_info = generate_paf_overlays(
+        manifest_rows, data_root, plots_dir,
+        force=args.force,
+        pol_sources=args.pol_sources,
+        catalog_dir=_cat_dir,
+    )
     print(f"  {len(paf_overlay_info)} PAF overlay(s) ready")
 
     print("Generating PAF beam-scan movies …")
-    paf_movie_info = generate_paf_movies(manifest_rows, data_root, plots_dir, force=args.force)
+    paf_movie_info = generate_paf_movies(
+        manifest_rows, data_root, plots_dir,
+        force=args.force,
+        pol_sources=args.pol_sources,
+        catalog_dir=_cat_dir,
+    )
     print(f"  {len(paf_movie_info)} PAF movie(s) ready")
 
 # ── Leakage spectra cards (per SB_REF) ──────────────────────────────

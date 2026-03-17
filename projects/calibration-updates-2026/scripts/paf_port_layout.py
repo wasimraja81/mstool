@@ -737,5 +737,214 @@ def plot_paf_polaxis_footprint_panels(output:        str  = "/tmp/paf_polaxis_fo
     print(f"Saved → {output}")
 
 
+# ---------------------------------------------------------------------------
+# Polarised-source overlay
+# ---------------------------------------------------------------------------
+
+def draw_pol_sources(
+    ax: plt.Axes,
+    extgal_df,                      # pandas DataFrame or None
+    pulsar_df,                      # pandas DataFrame or None
+    field_ra_deg: float,
+    field_dec_deg: float,
+    pol_axis_deg: float = 0.0,
+    pitch_deg: float = DEFAULT_PITCH_DEG,
+    elem_pitch_deg: float = DEFAULT_ELEM_PITCH_DEG,
+    rm_lim: float = 300.0,
+    frac_pol_highlight: float = None,
+):
+    """
+    Overlay polarised-source catalog markers on a PAF sky-view plot.
+
+    Uses the *identical* sky → PAF grid transform as ``sky_to_paf_grid``:
+    the projective geometry (telescope focal-plane inversion + PAF orientation
+    + sky-view sign flip on v) maps (RA, Dec) sky positions onto the same (u,v)
+    grid as the beam circles.
+
+    Parameters
+    ----------
+    ax            : target Axes (must already contain the beam overlay).
+    extgal_df     : DataFrame with cols ra_deg, dec_deg, rm, rm_err, flux_mjy,
+                    frac_pol.  Plotted as circles sized by frac_pol (or fixed
+                    if frac_pol is NaN), coloured by RM.  None = skip.
+    pulsar_df     : DataFrame with same cols.  Plotted as star markers. None=skip.
+    field_ra_deg  : RA of the field centre [deg].
+    field_dec_deg : Dec of the field centre [deg].
+    pol_axis_deg  : pol_axis setting [deg] – must match the beam overlay.
+    pitch_deg     : footprint beam pitch [deg].
+    elem_pitch_deg: PAF element pitch [deg].
+    rm_lim        : symmetric colorbar range [±rm_lim rad m⁻²].
+
+    Returns
+    -------
+    matplotlib.cm.ScalarMappable
+        Suitable for ``plt.colorbar(sm, ax=ax, label='RM [rad m⁻²]')``.
+        Returns a ScalarMappable with no data if both DataFrames are empty.
+    """
+    import matplotlib.cm as cm
+    import matplotlib.colors as mcolors
+
+    cmap  = cm.RdBu_r
+    norm  = mcolors.Normalize(vmin=-rm_lim, vmax=rm_lim)
+    sm    = cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+
+    scale = pitch_deg / elem_pitch_deg
+    na    = np.radians(+45.0 - pol_axis_deg)
+    nd    = np.array([np.cos(na),  np.sin(na)])
+    ed    = np.array([nd[1],      -nd[0]])
+    cos_d = np.cos(np.radians(field_dec_deg))
+
+    def sky_to_uv(ra_arr, dec_arr):
+        x_sky = (ra_arr - field_ra_deg) * cos_d   # East offset [deg]
+        y_sky =  dec_arr - field_dec_deg           # North offset [deg]
+        u = scale / pitch_deg * (-y_sky * nd[0] - x_sky * ed[0])
+        v = scale / pitch_deg * (-y_sky * nd[1] - x_sky * ed[1])
+        return u, -v   # negate v → sky-view (N up)
+
+    hover_artists: list = []   # [(PathCollection, [tooltip_str, ...])]
+    fp_ring_cmap = cm.YlOrRd   # defined here so legend block can always access it
+    fp_ring_norm = mcolors.Normalize(vmin=frac_pol_highlight or 0.0, vmax=0.5)
+
+    # --- extragalactic sources ---
+    if extgal_df is not None and len(extgal_df) > 0:
+        df   = extgal_df.copy().reset_index(drop=True)
+        u, v = sky_to_uv(df["ra_deg"].values, df["dec_deg"].values)
+        rm   = df["rm"].values
+        flux = df["flux_mjy"].values
+
+        # frac_pol needed for both highlighting and tooltips
+        fp_col  = df["frac_pol"].values  if "frac_pol"  in df.columns else np.full(len(df), np.nan)
+        err_col = df["rm_err"].values    if "rm_err"    in df.columns else np.full(len(df), np.nan)
+
+        # Highlight mask: sources with frac_pol >= threshold
+        if frac_pol_highlight is not None:
+            hi_mask = np.isfinite(fp_col) & (fp_col >= frac_pol_highlight)
+            lo_mask = ~hi_mask
+        else:
+            hi_mask = np.zeros(len(df), dtype=bool)
+            lo_mask = np.ones(len(df),  dtype=bool)
+
+        # Marker size: s = 10 + flux[mJy]*0.2, capped at 120; NaN flux → 20
+        ms = np.where(np.isfinite(flux), np.clip(10.0 + flux * 0.2, 10.0, 120.0), 20.0)
+
+        # Colour by RM; grey edge for sources with no RM
+        rm_plot = np.where(np.isfinite(rm), rm, 0.0)
+        edge_c  = np.where(np.isfinite(rm), "k", "grey")
+
+        # Below-threshold (or all, if no highlighting): dimmed
+        _alpha_lo = 0.30 if frac_pol_highlight is not None else 0.85
+        sc_eg = ax.scatter(u, v,
+                           s=ms, c=rm_plot, cmap=cmap, norm=norm,
+                           marker="o", edgecolors=edge_c, linewidths=0.5,
+                           zorder=6, alpha=_alpha_lo)
+
+        # Ring highlight for sources above threshold: coloured by frac_pol
+        # using a sequential colormap (white→yellow→orange→red)
+        fp_ring_cmap = cm.YlOrRd
+        fp_ring_norm = mcolors.Normalize(
+            vmin=frac_pol_highlight if frac_pol_highlight is not None else 0.0,
+            vmax=max(float(np.nanmax(fp_col[hi_mask])) if np.any(hi_mask) else 1.0, 0.5),
+        )
+        if np.any(hi_mask):
+            ring_colors = [fp_ring_cmap(fp_ring_norm(fp_col[i])) for i in np.where(hi_mask)[0]]
+            ax.scatter(u[hi_mask], v[hi_mask],
+                       s=ms[hi_mask] * 3.5,
+                       c="none", marker="o",
+                       edgecolors=ring_colors, linewidths=2.0,
+                       zorder=6.5, alpha=1.0)
+            # Re-draw the fill at full alpha so highlighted sources pop
+            ax.scatter(u[hi_mask], v[hi_mask],
+                       s=ms[hi_mask], c=rm_plot[hi_mask], cmap=cmap, norm=norm,
+                       marker="o", edgecolors=edge_c[hi_mask], linewidths=0.5,
+                       zorder=6.6, alpha=0.90)
+        src_col = df["source"].values    if "source"    in df.columns else np.full(len(df), "")
+        name_col= df["name"].values      if "name"      in df.columns else np.full(len(df), "")
+        tips_eg = []
+        for i in range(len(df)):
+            nm  = str(name_col[i]) if str(name_col[i]) not in ("nan", "") else "—"
+            src = str(src_col[i])
+            rm_s  = f"{rm[i]:+.1f}" if np.isfinite(rm[i]) else "N/A"
+            err_s = f"±{err_col[i]:.1f}" if np.isfinite(err_col[i]) else ""
+            fx_s  = f"{flux[i]:.1f} mJy" if np.isfinite(flux[i]) else "N/A"
+            fp_s  = f"{fp_col[i]*100:.1f}%" if np.isfinite(fp_col[i]) else "N/A"
+            tips_eg.append(
+                f"{src}  {nm}\n"
+                f"RA {df['ra_deg'].iloc[i]:.4f}°  Dec {df['dec_deg'].iloc[i]:.4f}°\n"
+                f"RM {rm_s}{err_s} rad m⁻²\n"
+                f"Flux {fx_s}   frac_pol {fp_s}"
+            )
+        hover_artists.append((sc_eg, tips_eg))
+
+    # --- pulsars ---
+    if pulsar_df is not None and len(pulsar_df) > 0:
+        df   = pulsar_df.copy().reset_index(drop=True)
+        u, v = sky_to_uv(df["ra_deg"].values, df["dec_deg"].values)
+        rm   = df["rm"].values
+        rm_plot = np.where(np.isfinite(rm), rm, 0.0)
+        edge_c  = np.where(np.isfinite(rm), "k", "grey")
+
+        sc_ps = ax.scatter(u, v,
+                           s=80, c=rm_plot, cmap=cmap, norm=norm,
+                           marker="*", edgecolors=edge_c, linewidths=0.5,
+                           zorder=7, alpha=0.95)
+
+        err_col  = df["rm_err"].values  if "rm_err"  in df.columns else np.full(len(df), np.nan)
+        name_col = df["name"].values    if "name"    in df.columns else np.full(len(df), "")
+        tips_ps = []
+        for i in range(len(df)):
+            nm    = str(name_col[i]) if str(name_col[i]) not in ("nan", "") else "—"
+            rm_s  = f"{rm[i]:+.1f}" if np.isfinite(rm[i]) else "N/A"
+            err_s = f"±{err_col[i]:.1f}" if np.isfinite(err_col[i]) else ""
+            tips_ps.append(
+                f"Pulsar  {nm}\n"
+                f"RA {df['ra_deg'].iloc[i]:.4f}°  Dec {df['dec_deg'].iloc[i]:.4f}°\n"
+                f"RM {rm_s}{err_s} rad m⁻²"
+            )
+        hover_artists.append((sc_ps, tips_ps))
+
+    # ── size legend: flux reference circles ───────────────────────────────────
+    _ref_fluxes = [10, 50, 100, 250]   # mJy
+    _legend_handles = []
+    for _f in _ref_fluxes:
+        _s = float(np.clip(10.0 + _f * 0.2, 10.0, 120.0))
+        _legend_handles.append(
+            ax.scatter([], [], s=_s, c="none", edgecolors="0.35",
+                       linewidths=0.7, marker="o",
+                       label=f"{_f} mJy")
+        )
+    if frac_pol_highlight is not None:
+        # Add a mini gradient bar in the legend showing the ring colormap range
+        import matplotlib.patches as _mpatch
+        _fp_pct = frac_pol_highlight * 100
+        for _fp_val, _label in [
+            (frac_pol_highlight,       f"{_fp_pct:.0f}%"),
+            (frac_pol_highlight * 2.0, f"{_fp_pct*2:.0f}%"),
+            (min(frac_pol_highlight * 4.0, 1.0), f"{min(_fp_pct*4,100):.0f}%"),
+        ]:
+            _rc = fp_ring_cmap(fp_ring_norm(_fp_val))
+            _legend_handles.append(
+                ax.scatter([], [], s=55, c="none",
+                           edgecolors=[_rc], linewidths=2.0,
+                           marker="o", label=f"fp≥{_label}")
+            )
+    leg = ax.legend(
+        handles=_legend_handles,
+        title="Flux (total)",
+        title_fontsize=6,
+        fontsize=5.5,
+        loc="lower left",
+        framealpha=0.75,
+        edgecolor="0.5",
+        handlelength=1.0,
+        borderpad=0.6,
+        labelspacing=0.5,
+        scatterpoints=1,
+    )
+    leg.set_zorder(9)
+
+    return sm, hover_artists
+
+
 if __name__ == "__main__":
     plot_paf_polaxis_footprint_panels()
