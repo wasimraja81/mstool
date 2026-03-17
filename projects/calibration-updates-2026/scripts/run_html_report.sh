@@ -81,9 +81,9 @@
 
 set -euo pipefail
 
-# Script lives in projects/calibration-updates-2026/scripts/ — resolve its
-# own directory so it works when invoked with or without a path prefix.
-SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
+# Resolve the real location of this script, following symlinks.
+# Uses Python (already a dependency) for macOS-portable realpath.
+SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
 DATA_ROOT="${HOME}/DATA/reffield-average"
 
 # ─────────────────────────────────────────────────────────────────────────────

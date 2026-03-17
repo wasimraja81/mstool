@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-../projects/calibration-updates-2026/scripts/assess_possum_1934s.sh \
-  --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+# Resolve the repo root from this script's real location (follows symlinks).
+SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
+REPO="${SCRIPTS}/../.."
+MANIFESTS="${REPO}/manifests"
+
+"${SCRIPTS}"/assess_possum_1934s.sh \
+  --manifest "${MANIFESTS}"/sb_manifest_reffield_average.txt \
   --start-index 2 --end-index 2 \
   --beam-start 0 --beam-end 3

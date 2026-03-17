@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-../projects/calibration-updates-2026/slurm/submit_pipeline.sh \
+# Resolve the repo root from this script's real location (follows symlinks).
+SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
+REPO="${SCRIPTS}/../.."
+SLURM="${REPO}/slurm"
+MANIFESTS="${REPO}/manifests"
+
+"${SLURM}"/submit_pipeline.sh \
   --stage 1934 \
-  --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --manifest "${MANIFESTS}"/sb_manifest_reffield_average.txt \
   --start-index 2 --end-index 2
