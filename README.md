@@ -29,82 +29,15 @@ This will build the fortran libraries, and install the scripts in `/usr/local/bi
 askapuser>$ msInfo.py -h
 ```
 
-### Project-specific workflow (calibration updates)
+### Projects
 
-This calibration-update workflow is project-specific and lives under `projects/calibration-updates-2026`.
-
-Run order is strict:
-
-1) **refField processing** (must run first)
-	 - Generates bandpass/leakage tables consumed by later stages.
-	- SLURM script: `projects/calibration-updates-2026/slurm/start_refField.slurm`
-	- Wrapper: `projects/calibration-updates-2026/scripts/run_stage-1.sh`
-2) **1934 processing**
-	 - Uses tables produced in stage-1.
-	- SLURM script: `projects/calibration-updates-2026/slurm/start_1934s.slurm`
-	- Wrapper: `projects/calibration-updates-2026/scripts/run_stage-2.sh`
-3) **assessment processing**
-	 - Runs `averageMS.py`-based assessment on 1934 outputs (quality check of on-axis calibration).
-	- Script: `projects/calibration-updates-2026/scripts/assess_possum_1934s.sh`
-	- Wrapper: `projects/calibration-updates-2026/scripts/run_stage-3.sh`
-	- Produces per-beam assessment products consumed by `mstool/bin/combine_beam_outputs.py` in stage-4.
-4) **combine outputs**
-	- Produces summary products via `projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh`.
-	- If you prefer wrappers, run `projects/calibration-updates-2026/scripts/run_stage-4.sh`.
-	- This stage can run locally after stages 1-3 complete on HPC.
-	- The combine engine is `mstool/bin/combine_beam_outputs.py`.
-	- `copy_and_combine_assessment_results.sh` first copies assessment output directories from remote HPC to local, then invokes `combine_beam_outputs.py` per copied directory.
-
-### Where each stage should run
-
-- **HPC (Setonix/remote)**: stage-1, stage-2, stage-3
-- **Local machine (optional)**: stage-4 using copy+combine after stages 1-3 complete on HPC
-
-### Quick start with helper scripts
-
-From `~/mstool/scratch`, helper wrappers are provided:
-
-- `../projects/calibration-updates-2026/scripts/run_stage-1.sh`
-- `../projects/calibration-updates-2026/scripts/run_stage-2.sh`
-- `../projects/calibration-updates-2026/scripts/run_stage-3.sh`
-- `../projects/calibration-updates-2026/scripts/run_stage-4.sh`
-
-These wrappers demonstrate a minimal single-index flow (`idx=2`) and are intended as starter templates.
-
-### Manual commands (explicit)
-
-```bash
-# Stage-1 (HPC)
-sbatch ./projects/calibration-updates-2026/slurm/start_refField.slurm \
-	--manifest ./projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
-
-# Stage-2 (HPC)
-sbatch ./projects/calibration-updates-2026/slurm/start_1934s.slurm \
-	--manifest ./projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
-
-# Stage-3 (HPC)
-./projects/calibration-updates-2026/scripts/assess_possum_1934s.sh \
-	--manifest ./projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
-
-# Stage-4 (local or HPC)
-./projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
-	--manifest ./projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
-```
-
-### For users other than `raj030`
-
-Before running on your environment, update paths and access settings in your manifest and/or script options:
-
-- `REMOTE` (your HPC login/host)
-- `REMOTE_BASE_ROOT` and ODC paths matching your project storage
-- `LOCAL_BASE` (your local destination)
-- Any module/environment requirements needed for `schedblock`/ASKAP tooling
-
-Prefer overriding via manifest `KEY=VALUE` entries and CLI arguments rather than hard-coding user-specific paths in scripts.
+| Project | Description |
+|---------|-------------|
+| [`projects/calibration-updates-2026`](projects/calibration-updates-2026/README.md) | Calibration updates using reference fields — 4-stage HPC pipeline, leakage diagnostics, PAF visualisation tools (beam overlay + animated beam-scan movies), polarised-source catalog overlay (POSSUM AS203 / Taylor 2009 / ATNF pulsars); `run_html_report.sh` as the canonical local entry point for HTML report generation |
 
 ### Release tag checklist (recommended)
 
-Before creating a release tag (for example `3.4`):
+Before creating a release tag (for example `3.10`):
 
 1. Ensure `CHANGELOG.md` has an entry for that exact version.
 2. Merge release changes from `develop` into `main`.
@@ -113,10 +46,10 @@ Before creating a release tag (for example `3.4`):
 If you discover issues *before public release consumption*, you may move the same tag to a newer commit:
 
 ```bash
-git tag -f 3.4 <new-commit>
-git push origin 3.4 --force
+git tag -f 3.10 <new-commit>
+git push origin 3.10 --force
 ```
 
-If the release is already public/consumed, do **not** move the existing tag; publish a new patch version (for example `3.4.1`).
+If the release is already public/consumed, do **not** move the existing tag; publish a new patch version (for example `3.10.1`).
 
 

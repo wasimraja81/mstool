@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-../projects/calibration-updates-2026/slurm/submit_pipeline.sh \
+# Resolve the real location of this script, following symlinks.
+SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
+SLURM="${SCRIPTS}/../slurm"
+MANIFESTS="${SCRIPTS}/../manifests"
+
+"${SLURM}"/submit_pipeline.sh \
   --stage ref \
-  --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --manifest "${MANIFESTS}"/sb_manifest_reffield_average.txt \
   --start-index 2 --end-index 2

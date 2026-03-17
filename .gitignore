@@ -11,3 +11,4 @@ __pycache__/
 # Generated artefacts (project-specific)
 projects/calibration-updates-2026/reports/
 projects/calibration-updates-2026/metadata/
+scratch/run_html_report.sh

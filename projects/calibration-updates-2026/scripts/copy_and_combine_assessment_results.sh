@@ -15,6 +15,7 @@ LOCAL_BASE_EXPLICIT=0
 DRY_RUN=0
 COPY_METADATA=0
 METADATA_ONLY=0
+COMBINE_ONLY=0
 OVERRIDE_SB_REF=""
 OVERRIDE_SB_1934=""
 OVERRIDE_SB_HOLO=""
@@ -491,6 +492,7 @@ Options:
   --dry-run                 Show what would be copied/processed; do not copy or run combine.
   --copy-metadata           Also copy tuple sibling metadata/ directories (default: off).
   --metadata-only           Fetch only tuple sibling metadata/ directories; skip assessment copy and combine.
+  --combine-only            Skip all remote SSH/copy steps; run combine_beam_outputs.py on already-local data only.
   --remote USER@HOST        Remote SSH target (default: raj030@setonix-dm03.pawsey.org.au).
   --odc-weight-id ID        ODC weight ID (e.g. 5231 or ODC-5231).
   --remote-base PATH        Remote base directory containing SB_REF-* paths.
@@ -546,6 +548,10 @@ while [[ $# -gt 0 ]]; do
     --metadata-only)
       METADATA_ONLY=1
       COPY_METADATA=1
+      shift
+      ;;
+    --combine-only)
+      COMBINE_ONLY=1
       shift
       ;;
     --remote)
@@ -698,6 +704,7 @@ echo "  Local destination: ${LOCAL_BASE}"
 echo "  Dry run: ${DRY_RUN}"
 echo "  Copy metadata: ${COPY_METADATA}"
 echo "  Metadata only: ${METADATA_ONLY}"
+echo "  Combine only:  ${COMBINE_ONLY}"
 echo "  Manifest: ${MANIFEST_FILE:-none}"
 echo "  Manifest row range: ${START_INDEX_OVERRIDE:-all}..${END_INDEX_OVERRIDE:-all}"
 echo "  Excluded indices: ${EXCLUDE_INDICES_RAW:-none}"
@@ -712,7 +719,9 @@ echo "  Generated SUBPATH count: ${#SUBPATHS[@]}"
 echo "==> Checking prerequisites"
 command -v tar >/dev/null 2>&1 || { echo "ERROR: tar not found"; exit 1; }
 command -v python >/dev/null 2>&1 || { echo "ERROR: python not found"; exit 1; }
-command -v ssh >/dev/null 2>&1 || { echo "ERROR: ssh not found"; exit 1; }
+if [[ ${COMBINE_ONLY} -eq 0 ]]; then
+  command -v ssh >/dev/null 2>&1 || { echo "ERROR: ssh not found"; exit 1; }
+fi
 [[ -f "${COMBINE_SCRIPT}" ]] || { echo "ERROR: combine script not found at ${COMBINE_SCRIPT}"; exit 1; }
 
 if [[ ${DRY_RUN} -eq 0 ]]; then
@@ -730,8 +739,7 @@ for i in "${!SUBPATHS[@]}"; do
   remote_base_for_sub="${SUBPATH_REMOTE_BASES[$i]:-${REMOTE_BASE}}"
   sub_rel="${sub%/}"
   remote_path="${remote_base_for_sub}/${sub_rel}"
-  if [[ ${METADATA_ONLY} -eq 0 ]]; then
-    echo "  - ${remote_path}"
+  if [[ ${METADATA_ONLY} -eq 0 && ${COMBINE_ONLY} -eq 0 ]]; then
     if ssh "${REMOTE}" "test -d \"${remote_path}\""; then
       if [[ ${DRY_RUN} -eq 1 ]]; then
         echo "    DRY-RUN: ssh ${REMOTE} \"tar -C '${remote_base_for_sub}' -cf - '${sub_rel}'\" | tar -C '${LOCAL_BASE}' -xf -"
@@ -778,6 +786,8 @@ done
 
 if [[ ${METADATA_ONLY} -eq 1 ]]; then
   echo "==> Assessment copy summary: skipped (metadata-only mode)"
+elif [[ ${COMBINE_ONLY} -eq 1 ]]; then
+  echo "==> Assessment copy summary: skipped (combine-only mode)"
 else
   echo "==> Copy summary: found ${copied_count}, missing ${missing_count}"
 fi
@@ -785,7 +795,7 @@ if [[ ${COPY_METADATA} -eq 1 ]]; then
   echo "==> Metadata copy summary: copied ${metadata_copied_count}, skipped-existing ${metadata_skipped_existing_count}, missing ${metadata_missing_count}"
 fi
 
-if [[ ${METADATA_ONLY} -eq 0 && ${copied_count} -eq 0 ]]; then
+if [[ ${METADATA_ONLY} -eq 0 && ${COMBINE_ONLY} -eq 0 && ${copied_count} -eq 0 ]]; then
   echo "ERROR: None of the configured remote assessment_results directories were found."
   echo "Check --remote-base and subpaths, or update SUBPATHS in this script."
   exit 1

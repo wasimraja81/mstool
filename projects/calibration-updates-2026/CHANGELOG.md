@@ -1,4 +1,74 @@
-# Changelog — calibration-updates-2026
+# Changelog — calibration-u
+## 3.9 — 2026-03-16
+
+### PAF plots: transform fix, astronomical sky-view, shared helpers, metadata-driven annotations
+
+- **Bug fix — `sky_to_paf_grid()` in `paf_port_layout.py`**: corrected sign
+  constant from `−45°` to `+45°` in `na = radians(+45 − pol_axis_deg)`.
+  The previous sign omitted the rear-view left-right mirror reflection;
+  beam positions were systematically ~90° off. Verified against system
+  scientist's beam→max-port table (0-based indexing confirmed; inner-beam
+  agreement ≥ 17/36 exact after offset correction, consistent with
+  Airy-theory vs max-SNR centroid difference for outer beams).
+
+- **Duplicate-transform elimination**: `sky_to_paf()` in
+  `plot_paf_beam_overlay.py` is now a thin wrapper delegating to the
+  canonical `sky_to_paf_grid()` in `paf_port_layout.py`. Independent
+  copies of the transform formula removed from both overlay and movie
+  scripts; a single definition is the source of truth.
+
+- **Astronomical sky-view convention (E left)**: all plots now display the
+  standard astronomy orientation — sky-North up, sky-East **left**:
+  - `grid_to_xy()` updated: `x = col − 6.5, y = row − 6.5` (col 1 at left,
+    col 12 at right — East to the left).
+  - `_leg_colour()` decoupled from `grid_to_xy()` — retains fixed rear-view
+    formula so leg colours remain physically correct.
+  - `sky_to_paf_grid()` returns `(u, −v)` (flip v-axis only for E-left).
+  - East unit vector: `ed = [−nd[1], nd[0]]` (90° CCW from North) in all
+    three scripts.
+  - Leg/wedge labels, axis labels, and `frame_axis()` corner annotation
+    updated to reflect the new orientation.
+  - Arm-tip unpaired dots corrected for E-left direction.
+
+- **Compass rose improvements** (`draw_compass_rose()` in `paf_port_layout.py`):
+  - Single canonical implementation; both overlay and movie call it — no
+    duplicate compass code.
+  - Size reduced ~30% (`alen 1.10 → 0.77`, `wid 0.16 → 0.11`, font 8.5 → 6pt).
+  - Repositioned to `0.87 × lim` (was `0.78 × lim`) to avoid overlapping Leg 4.
+  - `pol_axis` label removed from under the compass pivot.
+
+- **Parameter annotation box** — upper-right inset on both plots:
+  - Shows: SB number + alias, frequency, pol_axis (+ source), footprint pitch,
+    element pitch, beam count.
+  - Movie title animates per-frame as `"<footprint> footprint … — beam N"`;
+    `title_artist.set_animated(True)` for blit compatibility.
+
+- **`draw_info_box()` added to `paf_port_layout.py`** — single canonical
+  function for the annotation box; both overlay and movie import and call it,
+  eliminating duplicated `ax.annotate()` blocks.
+
+- **Footprint name read from metadata** — hardcoded `"closepack36"` removed
+  from both script titles. Name is now resolved at runtime from the schedblock:
+  1. `weights.footprint_name` (primary key)
+  2. `common.target.src%d.footprint.name` (fallback)
+  Scripts are now footprint-agnostic; the only hardcoded values are the MkII
+  PAF physical layout constants in `paf_port_layout.py`.
+
+- **All plotted parameters are metadata-driven**:
+  | Parameter | Source |
+  |---|---|
+  | footprint name | schedblock (`weights.footprint_name`) |
+  | pol_axis | schedblock (`common.target.src*.pol_axis`) |
+  | frequency | schedblock (`weights.centre_frequency`) |
+  | sbid / alias | schedblock header |
+  | footprint pitch | derived from actual beam positions (min separation) |
+  | element pitch | CLI `--elem-pitch` (default 0.677°, MkII physical constant) |
+  | beam count | `len(beams)` from footprint file |
+
+- **`run_paf_beam_overlay.sh`** — convenience caller for the overlay script,
+  matching the style of `run_paf_beam_movie.sh`.
+
+---
 
 ## 3.8 — 2026-03-15
 

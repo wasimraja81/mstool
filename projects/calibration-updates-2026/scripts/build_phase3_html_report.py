@@ -201,10 +201,15 @@ def generate_paf_overlays(
     data_root: Path,
     plots_dir: Path,
     amp_suffix: str = "AMP_STRATEGY-multiply-insituPreflags",
+    force: bool = False,
+    pol_sources: bool = False,
+    catalog_dir: Path = None,
+    highlight_frac_pol: float = None,
 ) -> dict:
     """Generate a PAF beam-overlay PNG for each SB_REF that has the required
     metadata files (footprintOutput + schedblock-info).  Skips silently if
     either file is missing or if plot_paf_beam_overlay.py is not found.
+    Set *force=True* to regenerate even if the output already exists.
 
     Returns dict: sb_ref -> overlay PNG filename (relative, inside plots_dir).
     """
@@ -239,21 +244,104 @@ def generate_paf_overlays(
             continue
         out_fname = f"paf_overlay_{sb_ref}.png"
         out_path  = plots_dir / out_fname
-        if out_path.exists():
+        if out_path.exists() and not force:
             result[sb_ref] = out_fname
             continue
         print(f"  PAF overlay [{sb_ref}] … ", end="", flush=True)
         try:
-            subprocess.run(
-                [
-                    sys.executable, str(overlay_script),
-                    "--footprint", str(footprint),
-                    "--schedblock", str(sb_file),
-                    "--output", str(out_path),
-                ],
-                check=True,
-                capture_output=True,
-            )
+            _overlay_cmd = [
+                sys.executable, str(overlay_script),
+                "--footprint", str(footprint),
+                "--schedblock", str(sb_file),
+                "--output", str(out_path),
+            ]
+            if pol_sources:
+                _overlay_cmd.append("--pol-sources")
+                if catalog_dir is not None:
+                    _overlay_cmd += ["--catalog-dir", str(catalog_dir)]
+                if highlight_frac_pol is not None:
+                    _overlay_cmd += ["--highlight-frac-pol", str(highlight_frac_pol)]
+            subprocess.run(_overlay_cmd, check=True, capture_output=True)
+            print(f"{out_path.stat().st_size // 1024} KB")
+            result[sb_ref] = out_fname
+        except subprocess.CalledProcessError as exc:
+            print(f"FAILED ({exc.returncode})")
+    return result
+
+
+def generate_paf_movies(
+    manifest_rows: list,
+    data_root: Path,
+    plots_dir: Path,
+    amp_suffix: str = "AMP_STRATEGY-multiply-insituPreflags",
+    force: bool = False,
+    pol_sources: bool = False,
+    catalog_dir: Path = None,
+    highlight_frac_pol: float = None,
+) -> dict:
+    """Generate a PAF beam-scan MP4 for each SB_REF that has the required
+    metadata files (footprintOutput + schedblock-info), by invoking
+    plot_paf_beam_movie.py as a subprocess.  Skips silently if either file is
+    missing, if the script is not found, or (unless *force*) if the output
+    already exists.
+
+    Returns dict: sb_ref -> mp4 filename (relative, inside plots_dir).
+    """
+    scripts_dir  = Path(__file__).resolve().parent
+    movie_script = scripts_dir / "plot_paf_beam_movie.py"
+    if not movie_script.exists():
+        print(f"WARNING: {movie_script} not found – skipping PAF movies.")
+        # Fall back to discovery only
+        result = {}
+        for row in manifest_rows:
+            sb_ref = row["sb_ref"]
+            fname  = f"paf_beam_movie_{sb_ref}.mp4"
+            if (plots_dir / fname).exists():
+                result[sb_ref] = fname
+        return result
+
+    plots_dir.mkdir(parents=True, exist_ok=True)
+    result = {}
+    for row in manifest_rows:
+        sb_ref    = row["sb_ref"]
+        sb_1934   = row["sb_1934"]
+        sb_holo   = row["sb_holo"]
+        field     = row.get("ref_fieldname", "")
+        sb_dir    = data_root / f"SB_REF-{sb_ref}_SB_1934-{sb_1934}_SB_HOLO-{sb_holo}_{amp_suffix}"
+        meta_dir  = sb_dir / "metadata"
+        if not meta_dir.is_dir():
+            continue
+        fp_plain = meta_dir / f"footprintOutput-sb{sb_ref}-{field}.txt"
+        fp_src1  = meta_dir / f"footprintOutput-sb{sb_ref}-src1-{field}.txt"
+        footprint = fp_plain if fp_plain.exists() else (fp_src1 if fp_src1.exists() else None)
+        if footprint is None:
+            continue
+        sb_file = meta_dir / f"schedblock-info-{sb_ref}.txt"
+        if not sb_file.exists():
+            sb_file = meta_dir / f"schedblock-info-{sb_1934}.txt"
+        if not sb_file.exists():
+            continue
+        out_fname = f"paf_beam_movie_{sb_ref}.mp4"
+        out_path  = plots_dir / out_fname
+        if out_path.exists() and not force:
+            result[sb_ref] = out_fname
+            continue
+        print(f"  PAF movie [{sb_ref}] … ", end="", flush=True)
+        try:
+            _movie_cmd = [
+                sys.executable, str(movie_script),
+                "--footprint",  str(footprint),
+                "--schedblock", str(sb_file),
+                "--output",     str(out_path),
+                "--trail",      "0",
+            ]
+            if pol_sources:
+                _movie_cmd.append("--pol-sources")
+                if catalog_dir is not None:
+                    _movie_cmd += ["--catalog-dir", str(catalog_dir)]
+                if highlight_frac_pol is not None:
+                    _movie_cmd += ["--highlight-frac-pol", str(highlight_frac_pol)]
+            subprocess.run(_movie_cmd, check=True, capture_output=True)
             print(f"{out_path.stat().st_size // 1024} KB")
             result[sb_ref] = out_fname
         except subprocess.CalledProcessError as exc:
@@ -263,7 +351,8 @@ def generate_paf_overlays(
 
 def build_spectra_cards(manifest_rows: list, media_info: dict,
                         media_rel_prefix: str = "media",
-                        paf_overlay_info: dict = None) -> str:
+                        paf_overlay_info: dict = None,
+                        paf_movie_info: dict = None) -> str:
     """Return HTML for the 'Leakage spectra' section.
 
     One <details id='sbref-{r}'> card per SB_REF, sorted by ODC then field.
@@ -350,18 +439,32 @@ def build_spectra_cards(manifest_rows: list, media_info: dict,
             "</table>"
         )
 
-        # ── PAF beam-overlay row ───────────────────────────────────────
+        # ── PAF layout banner ──────────────────────────────────────────
         paf_row_html = ""
-        if paf_overlay_info and sb_ref in paf_overlay_info:
-            overlay_href = f"plots/{quote(paf_overlay_info[sb_ref])}"
-            paf_btn = (
-                f"<button class='media-btn media-btn--paf'"
-                f" onclick=\"openModal('{overlay_href}','img')\">"
-                f"&#9634; PAF overlay</button>"
-            )
+        has_overlay = paf_overlay_info and sb_ref in paf_overlay_info
+        has_movie   = paf_movie_info   and sb_ref in paf_movie_info
+        if has_overlay or has_movie:
+            btns = []
+            if has_overlay:
+                overlay_href = f"plots/{quote(paf_overlay_info[sb_ref])}"
+                btns.append(
+                    f"<button class='media-btn media-btn--paf'"
+                    f" onclick=\"openModal('{overlay_href}','img')\">"
+                    f"&#128444; Overlay</button>"
+                )
+            if has_movie:
+                movie_href = f"plots/{quote(paf_movie_info[sb_ref])}"
+                btns.append(
+                    f"<button class='media-btn media-btn--paf-movie'"
+                    f" onclick=\"openModal('{movie_href}','video')\">"
+                    f"&#9654; Movie</button>"
+                )
             paf_row_html = (
-                f"<div style='margin-top:6px;padding-top:6px;"
-                f"border-top:1px solid #eee'>{paf_btn}</div>"
+                f"<div style='margin-top:8px;padding-top:6px;border-top:1px solid #eee'>"
+                f"<span style='font-size:11px;font-weight:bold;color:#666;"
+                f"letter-spacing:0.05em;text-transform:uppercase'>PAF layout</span>"
+                f"<div style='margin-top:4px'>{''.join(btns)}</div>"
+                f"</div>"
             )
 
         summary_text = (
@@ -829,11 +932,16 @@ def assemble_package(
     (package_dir / "media").mkdir(exist_ok=True)
 
     # ── plots/ ────────────────────────────────────────────────────────
-    n_plots = 0
-    for f in sorted((phase3_dir / "plots").glob("*.png")):
-        shutil.copy2(f, package_dir / "plots" / f.name)
-        n_plots += 1
-    print(f"  plots: {n_plots} PNGs")
+    # Copy PNGs (footprint_*, paf_beam_overlay_*) and MP4s (paf_beam_movie_*)
+    n_plots_png = n_plots_mp4 = 0
+    for f in sorted((phase3_dir / "plots").iterdir()):
+        if f.suffix == ".png":
+            shutil.copy2(f, package_dir / "plots" / f.name)
+            n_plots_png += 1
+        elif f.suffix == ".mp4":
+            shutil.copy2(f, package_dir / "plots" / f.name)
+            n_plots_mp4 += 1
+    print(f"  plots: {n_plots_png} PNGs, {n_plots_mp4} MP4s")
 
     # ── cube ──────────────────────────────────────────────────────────
     if cube_src.exists():
@@ -983,6 +1091,32 @@ def main():
             "If given, assemble a self-contained shareable package at this path. "
             "Includes only PNG + MP4 + plots + cube; strips GIFs, PDFs and CSV tables."
         ),
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Regenerate PAF overlay PNGs and beam-scan movies even if output files already exist.",
+    )
+    parser.add_argument(
+        "--pol-sources",
+        action="store_true",
+        default=False,
+        help="Overlay polarised sources (POSSUM/Taylor+2009 extragalactic and ATNF pulsars) on PAF overlay PNGs and movies.",
+    )
+    parser.add_argument(
+        "--catalog-dir",
+        default=None,
+        metavar="DIR",
+        help="Directory for cached catalog CSVs used by --pol-sources (default: <output-dir>/catalogs).",
+    )
+    parser.add_argument(
+        "--highlight-frac-pol",
+        type=float,
+        default=None,
+        metavar="FRAC",
+        help="Fractional polarisation threshold (0–1) for highlight rings on pol-source markers "
+             "(e.g. 0.10 = 10%%).  If omitted, all sources are shown at full alpha with no ring.",
     )
     args = parser.parse_args()
 
@@ -1193,13 +1327,32 @@ def main():
 
     # ── Build index page ────────────────────────────────────────────────
 # ── PAF beam-overlay plots (per SB_REF) ─────────────────────────────
+    _cat_dir = Path(args.catalog_dir) if args.catalog_dir else output_dir / "catalogs"
     print("\nGenerating PAF beam-overlay plots …")
-    paf_overlay_info = generate_paf_overlays(manifest_rows, data_root, plots_dir)
+    paf_overlay_info = generate_paf_overlays(
+        manifest_rows, data_root, plots_dir,
+        force=args.force,
+        pol_sources=args.pol_sources,
+        catalog_dir=_cat_dir,
+        highlight_frac_pol=args.highlight_frac_pol,
+    )
     print(f"  {len(paf_overlay_info)} PAF overlay(s) ready")
+
+    print("Generating PAF beam-scan movies …")
+    paf_movie_info = generate_paf_movies(
+        manifest_rows, data_root, plots_dir,
+        force=args.force,
+        pol_sources=args.pol_sources,
+        catalog_dir=_cat_dir,
+        highlight_frac_pol=args.highlight_frac_pol,
+    )
+    print(f"  {len(paf_movie_info)} PAF movie(s) ready")
 
 # ── Leakage spectra cards (per SB_REF) ──────────────────────────────
     spectra_cards_html = build_spectra_cards(
-        manifest_rows, media_info, paf_overlay_info=paf_overlay_info
+        manifest_rows, media_info,
+        paf_overlay_info=paf_overlay_info,
+        paf_movie_info=paf_movie_info,
     )
 
     html_content = f"""<!doctype html>
@@ -1232,6 +1385,8 @@ def main():
     .media-btn--beamwise:hover {{ background:#1e7e34; }}
     .media-btn--paf {{ background:#7952b3; }}
     .media-btn--paf:hover {{ background:#5e3d8f; }}
+    .media-btn--paf-movie {{ background:#4a7ab3; }}
+    .media-btn--paf-movie:hover {{ background:#35608f; }}
     .media-btn--page {{ background:#6c757d; }}
     .media-btn--page:hover {{ background:#545b62; }}
     #media-modal {{ display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;align-items:center;justify-content:center; }}

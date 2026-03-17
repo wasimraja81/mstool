@@ -30,13 +30,13 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.patches as mpatches
 import matplotlib.patheffects as mpe
-from matplotlib.patches import Polygon as _MplPoly
 
 # ── Import shared helpers from plot_paf_beam_overlay ─────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
-from paf_port_layout import build_port_table, draw_paf_elements
+from paf_port_layout import build_port_table, draw_paf_elements, draw_compass_rose, draw_info_box, draw_pol_sources
 from plot_paf_beam_overlay import (
     read_footprint_output,
+    read_schedblock_param,
     read_pol_axis_from_schedblock,
     read_centre_freq_from_schedblock,
     read_sbid_from_schedblock,
@@ -138,36 +138,7 @@ def airy_rgba_disk(
     return rgba.astype(np.float32)
 
 
-# ── Compass rose helper (copied from plot_paf_beam_overlay) ───────────────────
-def _draw_compass(ax, nd, ed, lim=_PAF_LIM):
-    """Draw a diamond-needle compass rose in the top-left corner."""
-    org   = np.array([-0.78 * lim, 0.78 * lim])
-    alen  = 1.10
-    wid   = 0.16
-
-    def _needle(centre, tip_vec, hw):
-        perp = np.array([-tip_vec[1], tip_vec[0]])
-        n = np.linalg.norm(perp)
-        if n > 1e-9:
-            perp /= n
-        tail = centre - tip_vec * 0.18
-        return np.array([centre + tip_vec, centre + perp * hw,
-                         tail, centre - perp * hw])
-
-    for tip, fc, ec, lbl, lc in [
-        ( alen * nd, "red",       "darkred", "N", "darkred"),
-        (-alen * nd, "white",     "0.45",    "S", "0.45"),
-        ( alen * ed, "steelblue", "navy",    "E", "navy"),
-        (-alen * ed, "white",     "0.45",    "W", "0.45"),
-    ]:
-        ax.add_patch(_MplPoly(_needle(org, tip, wid), closed=True,
-                              facecolor=fc, edgecolor=ec, lw=0.8, zorder=12))
-        lpos = org + (alen + 0.38) * (tip / alen)
-        ax.text(*lpos, lbl, color=lc, fontsize=8.5, fontweight="bold",
-                ha="center", va="center", zorder=13)
-
-
-# ── Main animation builder ────────────────────────────────────────────────────
+# ── Main animation builder ────────────────────────────────────────────────────────
 
 def build_movie(
     footprint_path: str,
@@ -184,6 +155,9 @@ def build_movie(
     freq_mhz_override: float = None,
     elem_pitch_override: float = None,
     dish_diam_override: float = None,
+    extgal_df=None,
+    pulsar_df=None,
+    frac_pol_highlight=None,
 ) -> None:
     # ── Read inputs ───────────────────────────────────────────────────────────
     beams_sky = read_footprint_output(footprint_path)
@@ -215,10 +189,10 @@ def build_movie(
     beam_ids  = sorted(beams_paf.keys())
     n_beams   = len(beam_ids)
 
-    # ── North/East unit vectors on PAF rear-view ──────────────────────────────
-    na = np.radians(-45.0 - pol_axis)
-    nd = np.array([np.cos(na),  np.sin(na)])
-    ed = np.array([ nd[1],     -nd[0]])
+    # ── North/East unit vectors in sky-view (N up, E left — astro convention) ──
+    na = np.radians(+45.0 - pol_axis)
+    nd = np.array([np.cos(na),  np.sin(na)])   # sky-North direction
+    ed = np.array([-nd[1],      nd[0]])         # sky-East  direction (E-left: 90° CCW)
 
     # ── Airy grid ─────────────────────────────────────────────────────────────
     lim  = _PAF_LIM
@@ -246,13 +220,13 @@ def build_movie(
     ax.set_aspect("equal")
     ax.set_xlim(-lim, lim)
     ax.set_ylim(-lim, lim)
-    ax.set_xlabel("PAF u (element spacings ← E / W →)", fontsize=9)
-    ax.set_ylabel("PAF v (element spacings ↓ N / S ↑)", fontsize=9)
+    ax.set_xlabel("PAF u (element spacings  ← E / W →)", fontsize=9)
+    ax.set_ylabel("PAF v (element spacings  ↓ S / N ↑)", fontsize=9)
 
     # ── Static layers ─────────────────────────────────────────────────────────
     port_table, unused_set = build_port_table()
     draw_paf_elements(ax, port_table, unused_set, show_port_numbers=True)
-    _draw_compass(ax, nd, ed, lim)
+    draw_compass_rose(ax, nd, ed, lim=lim)
 
     # small cross-hair at PAF centre
     ax.axhline(0, color="0.85", lw=0.5, zorder=0)
@@ -267,11 +241,48 @@ def build_movie(
                            extent=extent, origin="lower",
                            interpolation="bilinear", zorder=5, animated=True)
 
-    # Beam-number text (top-right corner)
-    beam_lbl = ax.text(0.97, 0.97, "", transform=ax.transAxes,
-                       ha="right", va="top", fontsize=14, fontweight="bold",
-                       color="#1a4e8a", zorder=11,
-                       path_effects=[mpe.withStroke(linewidth=2.5, foreground="white")])
+    # Beam-number text in title (animated per frame)
+    footprint_name = (
+        read_schedblock_param(schedblock_path, "weights.footprint_name")
+        or read_schedblock_param(schedblock_path, "common.target.src%d.footprint.name")
+        or "unknown footprint"
+    )
+    title_base = f"{footprint_name} footprint for ASKAP MkII PAF (sky view)"
+    title_artist = ax.set_title(f"{title_base}  —  beam —", fontsize=10, pad=6)
+    title_artist.set_animated(True)
+
+    # Static annotation box (upper-right)
+    draw_info_box(
+        ax,
+        sbid                = sbid,
+        alias               = alias,
+        freq_mhz            = freq_mhz,
+        pol_axis_deg        = pol_axis,
+        footprint_pitch_deg = pitch_deg,
+        elem_pitch_deg      = elem_pitch,
+        n_beams             = n_beams,
+    )
+
+    # ── Static polarised-source overlay (drawn once, not animated) ──────────
+    _fc = None
+    try:
+        from fetch_pol_catalogs import read_field_direction
+        _fc = read_field_direction(schedblock_path)
+    except ImportError:
+        pass
+    if (extgal_df is not None or pulsar_df is not None) and _fc is not None:
+        sm, _hover_artists = draw_pol_sources(  # hover_artists unused in movie
+            ax, extgal_df, pulsar_df,
+            field_ra_deg       = _fc[0],
+            field_dec_deg      = _fc[1],
+            pol_axis_deg       = pol_axis,
+            pitch_deg          = pitch_deg,
+            elem_pitch_deg     = elem_pitch,
+            frac_pol_highlight = frac_pol_highlight,
+        )
+        cbar = fig.colorbar(sm, ax=ax, fraction=0.03, pad=0.01, shrink=0.5,
+                            label="RM [rad m\u207b\u00b2]")
+        cbar.ax.tick_params(labelsize=7)
 
     # Small dot at each beam centre (always visible)
     dot_artists = {}
@@ -280,12 +291,6 @@ def build_movie(
         dot, = ax.plot(cx, cy, "o", ms=2.0, color="0.5",
                        alpha=0.4, zorder=6, animated=True)
         dot_artists[bid] = dot
-
-    title_str = (
-        f"PAF beam-overlay  SB{sbid} · {alias}\n"
-        f"{freq_mhz:.1f} MHz   pol_axis={pol_axis:+.1f}°"
-    )
-    ax.set_title(title_str, fontsize=10, pad=6)
 
     # ── Animation frames ──────────────────────────────────────────────────────
     # Frame layout: n_beams active frames + hold_frames at end
@@ -296,7 +301,7 @@ def build_movie(
 
         if frame_idx >= n_beams:
             # Hold: just keep the final state, no change needed
-            return [trail_im, current_im, beam_lbl] + list(dot_artists.values())
+            return [trail_im, current_im, title_artist] + list(dot_artists.values())
 
         bid = beam_ids[frame_idx]
         cx, cy = beams_paf[bid]
@@ -314,8 +319,8 @@ def build_movie(
             trail_rgba = np.clip(trail_rgba + prev * trail_alpha_scale, 0, 1)
         trail_im.set_data(trail_rgba)
 
-        # Update beam label
-        beam_lbl.set_text(f"beam {bid}")
+        # Update beam number in title
+        title_artist.set_text(f"{title_base}  —  beam {bid}")
 
         # Highlight current beam dot in blue, others grey
         for b, dot in dot_artists.items():
@@ -332,7 +337,7 @@ def build_movie(
                 dot.set_alpha(0.3)
                 dot.set_markersize(2.0)
 
-        return [trail_im, current_im, beam_lbl] + list(dot_artists.values())
+        return [trail_im, current_im, title_artist] + list(dot_artists.values())
 
     ani = animation.FuncAnimation(
         fig, update, frames=total_frames,
@@ -393,7 +398,44 @@ def main():
                         help="Override element pitch (deg)")
     parser.add_argument("--dish-diam",  type=float, default=None,
                         help="Override dish diameter (m)")
+    # Polarised-source catalog overlay
+    parser.add_argument("--pol-sources", action="store_true", default=False,
+                        help="Overlay polarised sources from POSSUM/Taylor 2009 and ATNF pulsars. "
+                             "POSSUM AS203 data needs CASDA credentials: set env vars "
+                             "CASDA_USER and CASDA_PASSWORD, or add 'machine casda.csiro.au' "
+                             "to ~/.netrc (see fetch_pol_catalogs.py for details).")
+    parser.add_argument("--catalog-dir", default=None, metavar="DIR",
+                        help="Directory for cached catalog CSVs (default: same dir as --output)")
+    parser.add_argument("--refresh-catalogs", action="store_true", default=False,
+                        help="Re-download catalogs even if CSV cache exists")
+    parser.add_argument("--cone-radius", type=float, default=3.5, metavar="DEG",
+                        help="Cone search radius for catalog query in degrees (default 3.5)")
+    parser.add_argument("--highlight-frac-pol", type=float, nargs="?",
+                        const=0.10, default=None, metavar="FRAC",
+                        help="Draw a coloured ring around sources with frac_pol ≥ FRAC "
+                             "(default threshold 0.10 = 10%% if flag given without value)")
     args = parser.parse_args()
+
+    # ── catalog fetch (optional) ───────────────────────────────────────
+    extgal_df = pulsar_df = None
+    if args.pol_sources:
+        try:
+            from fetch_pol_catalogs import read_field_direction, get_pol_sources
+            from pathlib import Path as _Path
+            _fc = read_field_direction(args.schedblock)
+            if _fc is not None:
+                _sbid, _alias = read_sbid_from_schedblock(args.schedblock)
+                _cat_dir = _Path(args.catalog_dir) if args.catalog_dir else _Path(args.output).parent / "catalogs"
+                _field = _alias or _sbid or "field"
+                print(f"Fetching polarised-source catalogs for {_field} …")
+                extgal_df, pulsar_df = get_pol_sources(
+                    _field, _fc[0], _fc[1], _cat_dir,
+                    radius_deg=args.cone_radius, refresh=args.refresh_catalogs,
+                )
+            else:
+                print("WARNING: --pol-sources: field_direction not in schedblock; skipping")
+        except ImportError:
+            print("WARNING: fetch_pol_catalogs not found; skipping --pol-sources")
 
     build_movie(
         footprint_path      = args.footprint,
@@ -410,6 +452,9 @@ def main():
         freq_mhz_override   = args.freq_mhz,
         elem_pitch_override = args.elem_pitch,
         dish_diam_override  = args.dish_diam,
+        extgal_df           = extgal_df,
+        pulsar_df           = pulsar_df,
+        frac_pol_highlight  = getattr(args, 'highlight_frac_pol', None),
     )
 
 

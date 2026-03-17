@@ -33,7 +33,7 @@ from typing import Optional
 
 # Import the correct 112-element 12×12 PAF layout from paf_port_layout
 sys.path.insert(0, str(Path(__file__).parent))
-from paf_port_layout import build_port_table, draw_paf_elements
+from paf_port_layout import build_port_table, draw_paf_elements, sky_to_paf_grid, draw_compass_rose, draw_info_box, draw_pol_sources
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
@@ -179,39 +179,10 @@ def sky_to_paf(
     pol_axis_deg: float = 0.0,
 ) -> dict:
     """
-    Project sky-frame beam offsets (x_sky=East, y_sky=North, degrees) onto
-    the PAF rear-view grid using the physically-motivated compass transform.
-
-    Physics:
-      - Telescope focal-plane inverts the sky image: source at (x,y) sky
-        appears at (-x,-y) on the focal plane in the sky frame.
-      - pol_axis=0  →  Leg4 points North (Reynolds convention).
-      - Rear view  →  East/West are mirrored vs sky; East on sky appears to
-        the left (toward Leg3) in the rear-view diagram.
-      - North on PAF rear-view: angle = -45° - pol_axis_deg from the +u axis.
-      - East on PAF rear-view: 90° clockwise from North.
-
-    Parameters
-    ----------
-    beams         : {beam_id: (x_sky, y_sky)} in degrees
-    pitch_deg     : beam pitch (degrees)
-    elem_pitch_deg: PAF physical element pitch in degrees
-    pol_axis_deg  : feed rotator angle (degrees); 0 = Leg4 toward North
-
-    Returns
-    -------
-    dict {beam_id: (u_elem, v_elem)} in units of one PAF element spacing
+    Thin wrapper — delegates to the canonical sky_to_paf_grid() in
+    paf_port_layout.py.  Do NOT copy the transform logic here.
     """
-    scale = pitch_deg / elem_pitch_deg
-    na    = np.radians(-45.0 - pol_axis_deg)
-    nd    = np.array([np.cos(na),  np.sin(na)])   # North unit vector
-    ed    = np.array([nd[1],      -nd[0]])          # East  unit vector (90° CW in rear view)
-    result = {}
-    for bid, (x_sky, y_sky) in beams.items():
-        u = scale / pitch_deg * (-y_sky * nd[0] - x_sky * ed[0])
-        v = scale / pitch_deg * (-y_sky * nd[1] - x_sky * ed[1])
-        result[bid] = (float(u), float(v))
-    return result
+    return sky_to_paf_grid(beams, pitch_deg, elem_pitch_deg, pol_axis_deg)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -225,9 +196,11 @@ def plot_overlay(
     beams_paf: dict,
     beam_radius: float = BEAM_RADIUS_ELEM,
     output_path: str = "paf_beam_overlay.png",
-    title: str = "closepack36 beams on MkII PAF (rear view)",
+    title: str = "closepack36 footprint for ASKAP MkII PAF (sky view)",
     annotate_beams: bool = True,
     show_sky_markers: bool = False,
+    extgal_df=None,
+    pulsar_df=None,
 ) -> None:
     fig, ax = plt.subplots(figsize=(12, 10), facecolor="white")
 
@@ -258,53 +231,12 @@ def plot_overlay(
     _pol_axis_c  = getattr(plot_overlay, '_pol_axis',   0.0)
     _elem_pitch_c = getattr(plot_overlay, '_elem_pitch', DEFAULT_ELEM_PITCH_DEG)
     _pitch_c     = getattr(plot_overlay, '_pitch',      0.9)
-    _na  = np.radians(-45.0 - _pol_axis_c)
-    _nd  = np.array([np.cos(_na),  np.sin(_na)])   # North unit vector on PAF rear-view
-    _ed  = np.array([_nd[1], -_nd[0]])             # East  = 90° CW from North
+    _na  = np.radians(+45.0 - _pol_axis_c)
+    _nd  = np.array([np.cos(_na),  np.sin(_na)])   # sky-North direction in sky-view (N up)
+    _ed  = np.array([-_nd[1], _nd[0]])             # sky-East  = 90° CCW from North (E-left)
 
-    # ── compass rose (always shown) ───────────────────────────────────────────
-    from matplotlib.patches import Polygon as _MplPolygon
-    _lim_c = _PAF_LIM
-    _org   = np.array([-0.78 * _lim_c, 0.78 * _lim_c])
-    _alen  = 1.10   # needle half-length (element spacings)
-    _wid   = 0.16   # diamond half-width
-
-    def _compass_needle(centre, tip_vec, half_width):
-        """Diamond needle: fills from slightly behind centre to tip."""
-        perp = np.array([-tip_vec[1], tip_vec[0]])
-        norm = np.linalg.norm(perp)
-        if norm > 1e-9:
-            perp /= norm
-        tail = centre - tip_vec * 0.18
-        return np.array([
-            centre + tip_vec,
-            centre + perp * half_width,
-            tail,
-            centre - perp * half_width,
-        ])
-
-    # N needle – red; S needle – white; E needle – steel blue; W needle – white
-    _needles = [
-        ( _alen * _nd,  'red',       'darkred',  'N', 'darkred'),
-        (-_alen * _nd,  'white',     '0.45',     'S', '0.45'  ),
-        ( _alen * _ed,  'steelblue', 'navy',     'E', 'navy'  ),
-        (-_alen * _ed,  'white',     '0.45',     'W', '0.45'  ),
-    ]
-    for _tip, _fc, _ec, _lbl, _lc in _needles:
-        ax.add_patch(_MplPolygon(
-            _compass_needle(_org, _tip, _wid),
-            closed=True, facecolor=_fc, edgecolor=_ec, linewidth=0.8, zorder=8,
-        ))
-        _lpos = _org + (_alen + 0.38) * (_tip / _alen)
-        ax.text(*_lpos, _lbl, color=_lc, fontsize=8.5, fontweight='bold',
-                ha='center', va='center', zorder=9)
-
-    # Centre pivot dot
-    ax.plot(*_org, 'o', ms=4.5, color='0.2', markeredgewidth=0, zorder=9)
-    ax.text(_org[0], _org[1] - _alen - 0.75,
-            f'pol_axis={_pol_axis_c:+.0f}°',
-            color='0.35', fontsize=6, ha='center', va='top',
-            style='italic', zorder=8)
+    # ── compass rose (canonical implementation in paf_port_layout.draw_compass_rose) ──
+    draw_compass_rose(ax, _nd, _ed, lim=_PAF_LIM)
 
     # ── sky-direction diagnostic markers (--sky-markers only) ────────────────
     if show_sky_markers:
@@ -314,17 +246,17 @@ def plot_overlay(
         ax.text(0.25, 0.15, 'pointing', fontsize=5.5, color='darkred',
                 fontweight='bold', ha='left', va='bottom', zorder=6)
         _dist = 3.0 * (_pitch_c / _elem_pitch_c)
-        # Gold star: South sky source → focal plane inverts → toward North on PAF
+        # Gold star: sky-North source → appears toward North (up) in sky-view
         u_s, v_s = _dist * _nd
         ax.plot(u_s, v_s, marker='*', markersize=18, color='gold',
                 markeredgecolor='darkorange', markeredgewidth=1.0, zorder=6)
-        ax.text(u_s + 0.25, v_s, 'S sky\nsource', fontsize=5.5,
+        ax.text(u_s + 0.25, v_s, 'N sky\nsource', fontsize=5.5,
                 color='darkorange', fontweight='bold', ha='left', va='center', zorder=6)
-        # Cyan star: West sky source → appears toward East on PAF
+        # Cyan star: sky-East source → appears toward East (right) in sky-view
         u_w, v_w = _dist * _ed
         ax.plot(u_w, v_w, marker='*', markersize=18, color='cyan',
                 markeredgecolor='teal', markeredgewidth=1.0, zorder=6)
-        ax.text(u_w + 0.25, v_w, 'W sky\nsource', fontsize=5.5,
+        ax.text(u_w + 0.25, v_w, 'E sky\nsource', fontsize=5.5,
                 color='teal', fontweight='bold', ha='left', va='center', zorder=6)
 
     # ── frame ─────────────────────────────────────────────────────────────────
@@ -332,30 +264,81 @@ def plot_overlay(
     ax.set_ylim(-_PAF_LIM, _PAF_LIM)
 
     ax.set_aspect("equal")
-    ax.set_xlabel("PAF u  (element spacings, rear-view)", fontsize=9)
-    ax.set_ylabel("PAF v  (element spacings, rear-view)", fontsize=9)
+    ax.set_xlabel("PAF u  (element spacings, sky-view  ← E / W →)", fontsize=9)
+    ax.set_ylabel("PAF v  (element spacings, sky-view  ↓ S / N ↑)", fontsize=9)
     ax.set_title(title, fontsize=10)
     ax.grid(True, lw=0.25, alpha=0.35, color="0.5")
     ax.tick_params(labelsize=8)
 
+    # ── polarised-source catalog overlay ──────────────────────────────────────
+    _field_ra  = getattr(plot_overlay, '_field_ra',  None)
+    _field_dec = getattr(plot_overlay, '_field_dec', None)
+    _pitch_c2  = getattr(plot_overlay, '_pitch',     0.9)
+    _elem_c2   = getattr(plot_overlay, '_elem_pitch', DEFAULT_ELEM_PITCH_DEG)
+    _pol_c2    = getattr(plot_overlay, '_pol_axis',  0.0)
+    if (extgal_df is not None or pulsar_df is not None) and _field_ra is not None:
+        sm, hover_artists = draw_pol_sources(
+            ax, extgal_df, pulsar_df,
+            field_ra_deg        = _field_ra,
+            field_dec_deg       = _field_dec,
+            pol_axis_deg        = _pol_c2,
+            pitch_deg           = _pitch_c2,
+            elem_pitch_deg      = _elem_c2,
+            frac_pol_highlight  = getattr(plot_overlay, '_frac_pol_highlight', None),
+        )
+        n_eg = len(extgal_df) if extgal_df is not None else 0
+        n_ps = len(pulsar_df) if pulsar_df is not None else 0
+        src_label = getattr(extgal_df, 'attrs', {}).get('source', 'Taylor2009') if n_eg else ''
+        cbar = fig.colorbar(sm, ax=ax, fraction=0.03, pad=0.01, shrink=0.55,
+                            label="RM [rad m\u207b\u00b2]")
+        cbar.ax.tick_params(labelsize=7)
+        eg_src = extgal_df['source'].iloc[0] if n_eg else '—'
+        legend_txt = (f"{n_eg} extgal [{eg_src}]  {n_ps} pulsars [ATNF]")
+        ax.set_title(f"{ax.get_title()}\n{legend_txt}", fontsize=9)
+
+        # ── interactive hover tooltips (interactive backends only) ────────────
+        try:
+            import matplotlib as _mpl, mplcursors as _mc
+            if _mpl.get_backend().lower() not in ("agg", "pdf", "svg", "ps", "cairo"):
+                for sc, tips in hover_artists:
+                    cursor = _mc.cursor(sc, hover=True)
+                    cursor.connect(
+                        "add",
+                        lambda sel, _tips=tips: (
+                            sel.annotation.set_text(_tips[sel.index]),
+                            sel.annotation.get_bbox_patch().set(
+                                boxstyle="round,pad=0.4", fc="lightyellow",
+                                ec="0.3", alpha=0.92,
+                            ),
+                            sel.annotation.set_fontsize(7),
+                        ),
+                    )
+        except ImportError:
+            pass  # mplcursors not available – silent fallback
+
     # ── parameter annotation ──────────────────────────────────────────────────
-    n_beams = len(beams_paf)
-    param_txt = (
-        f"beams: {n_beams}  |  "
-        f"pol_axis={getattr(plot_overlay, '_pol_axis', '?')}°  "
-        f"elem_pitch={getattr(plot_overlay, '_elem_pitch', '?')}°"
-    )
-    ax.annotate(
-        param_txt,
-        xy=(0.01, 0.01), xycoords="axes fraction",
-        fontsize=6, color="0.4",
-        bbox=dict(boxstyle="square,pad=0.2", fc="white", ec="none", alpha=0.7),
+    draw_info_box(
+        ax,
+        sbid                = getattr(plot_overlay, '_sbid',       ''),
+        alias               = getattr(plot_overlay, '_alias',      ''),
+        freq_mhz            = getattr(plot_overlay, '_freq_mhz',   None),
+        pol_axis_deg        = getattr(plot_overlay, '_pol_axis',   None),
+        pol_axis_src        = getattr(plot_overlay, '_pol_src',    ''),
+        footprint_pitch_deg = getattr(plot_overlay, '_pitch',      None),
+        elem_pitch_deg      = getattr(plot_overlay, '_elem_pitch', None),
+        n_beams             = len(beams_paf),
     )
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
     print(f"Saved → {output_path}")
+    if getattr(plot_overlay, '_show', False):
+        import matplotlib as _mpl
+        if _mpl.get_backend().lower() == "agg":
+            print("WARNING: --show has no effect with the Agg backend (non-interactive).")
+        else:
+            plt.show()   # blocks until window closed; mplcursors hover active
+    plt.close(fig)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -393,6 +376,8 @@ def parse_args():
     # Output
     ap.add_argument("--output", default="paf_beam_overlay.png",
                     help="Output PNG path (default paf_beam_overlay.png)")
+    ap.add_argument("--show", action="store_true", default=False,
+                    help="Show the figure interactively after saving (enables hover tooltips)")
     ap.add_argument("--no-labels", dest="annotate", action="store_false", default=True,
                     help="Suppress beam number labels")
     ap.add_argument("--sky-markers", dest="sky_markers", action="store_true", default=False,
@@ -401,6 +386,24 @@ def parse_args():
     ap.add_argument("--beam-radius", type=float, default=None,
                     help="Beam circle radius in element units; overrides frequency-derived "
                          f"calculation (fallback default {BEAM_RADIUS_ELEM} when no freq available)")
+
+    # Polarised-source catalog overlay
+    grp4 = ap.add_argument_group("Polarised-source catalog overlay")
+    grp4.add_argument("--pol-sources", action="store_true", default=False,
+                      help="Overlay polarised sources from POSSUM/Taylor 2009 and ATNF pulsars. "
+                           "POSSUM AS203 data needs CASDA credentials: set env vars "
+                           "CASDA_USER and CASDA_PASSWORD, or add 'machine casda.csiro.au' "
+                           "to ~/.netrc (see fetch_pol_catalogs.py for details).")
+    grp4.add_argument("--catalog-dir", default=None, metavar="DIR",
+                      help="Directory for cached catalog CSVs (default: same dir as --output)")
+    grp4.add_argument("--refresh-catalogs", action="store_true", default=False,
+                      help="Re-download catalogs even if CSV cache exists")
+    grp4.add_argument("--cone-radius", type=float, default=3.5, metavar="DEG",
+                      help="Cone search radius for catalog query in degrees (default 3.5)")
+    grp4.add_argument("--highlight-frac-pol", type=float, nargs="?",
+                      const=0.10, default=None, metavar="FRAC",
+                      help="Draw a coloured ring around sources with frac_pol ≥ FRAC "
+                           "(default threshold 0.10 = 10%% if flag given without value)")
     return ap.parse_args()
 
 
@@ -464,7 +467,7 @@ def main():
         f"pitch={pitch}°  rotation={rotation}°  "
         f"elem_pitch={args.elem_pitch}°  scale={pitch/args.elem_pitch:.3f} elem/beam"
     )
-    print(f"Transform: pol_axis={pol_axis:+.1f}°  (source: {pol_axis_src}, compass-based, rear view)")
+    print(f"Transform: pol_axis={pol_axis:+.1f}°  (source: {pol_axis_src}, sky-view: N up, E left)")
     print(f"Beam radius: {beam_radius_src}")
 
     # ── transform ─────────────────────────────────────────────────────────────
@@ -480,19 +483,48 @@ def main():
         print(f"  beam {bid:2d}: ({beams_paf[bid][0]:+.3f}, {beams_paf[bid][1]:+.3f})")
 
     # ── stash params for annotation ───────────────────────────────────────────
-    plot_overlay._pol_axis  = pol_axis
+    plot_overlay._pol_axis   = pol_axis
+    plot_overlay._pol_src    = pol_axis_src
     plot_overlay._elem_pitch = args.elem_pitch
-    plot_overlay._pitch     = pitch
-
-    # ── title ─────────────────────────────────────────────────────────────────
+    plot_overlay._pitch      = pitch
+    plot_overlay._freq_mhz   = freq_mhz
     sbid, alias = read_sbid_from_schedblock(args.schedblock)
-    pol_axis_src_label = f"pol_axis={pol_axis:+.0f}° ({pol_axis_src})"
-    title = (
-        f"closepack36 beams on MkII PAF (rear view) — "
-        f"SB{sbid} ({alias})   {pol_axis_src_label}"
+    plot_overlay._sbid       = sbid
+    plot_overlay._alias      = alias
+
+    # ── field centre (needed for catalog overlay) ─────────────────────────────
+    from fetch_pol_catalogs import read_field_direction
+    _fc = read_field_direction(args.schedblock)
+    plot_overlay._field_ra  = _fc[0] if _fc else None
+    plot_overlay._field_dec = _fc[1] if _fc else None
+
+    # ── footprint name and title ───────────────────────────────────────────────
+    footprint_name = (
+        read_schedblock_param(args.schedblock, "weights.footprint_name")
+        or read_schedblock_param(args.schedblock, "common.target.src%d.footprint.name")
+        or "unknown footprint"
     )
+    plot_overlay._footprint_name = footprint_name
+    title = f"{footprint_name} footprint for ASKAP MkII PAF (sky view)"
+
+    # ── catalog fetch (optional) ───────────────────────────────────────────────
+    extgal_df = pulsar_df = None
+    if args.pol_sources and _fc is not None:
+        from fetch_pol_catalogs import get_pol_sources
+        from pathlib import Path
+        cat_dir = Path(args.catalog_dir) if args.catalog_dir else Path(args.output).parent / "catalogs"
+        field_name = alias or sbid or "field"
+        print(f"Fetching polarised-source catalogs for {field_name} …")
+        extgal_df, pulsar_df = get_pol_sources(
+            field_name, _fc[0], _fc[1], cat_dir,
+            radius_deg=args.cone_radius, refresh=args.refresh_catalogs,
+        )
+    elif args.pol_sources and _fc is None:
+        print("WARNING: --pol-sources requested but field_direction not found in schedblock; skipping")
 
     # ── plot ──────────────────────────────────────────────────────────────────
+    plot_overlay._show              = args.show
+    plot_overlay._frac_pol_highlight = getattr(args, 'highlight_frac_pol', None)
     plot_overlay(
         beams_paf,
         beam_radius      = beam_radius,
@@ -500,6 +532,8 @@ def main():
         title            = title,
         annotate_beams   = args.annotate,
         show_sky_markers = args.sky_markers,
+        extgal_df        = extgal_df,
+        pulsar_df        = pulsar_df,
     )
 
 

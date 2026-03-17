@@ -2,6 +2,44 @@
 
 All notable changes to this project are documented in this file.
 
+## 3.10 — 2026-03-17
+
+Adds a polarised-source catalog overlay to PAF plots, wires it through the HTML report builder, and hardens all run scripts for symlink-safe execution.
+
+### Added
+- `fetch_pol_catalogs.py`: multi-catalog download and local CSV cache — priority chain POSSUM AS203 (CASDA) → Taylor 2009 (VizieR) → ATNF pulsar catalog; CASDA credentials via `CASDA_USER`/`CASDA_PASSWORD` env vars or `~/.netrc`; `--refresh` to force re-download; `--cone-radius` for source selection.
+- `paf_port_layout.py` — `draw_pol_sources()`: overlays polarised sources on PAF diagrams with flux-scaled markers, RM-coloured (RdBu) fill, and optional fractional-polarisation highlight rings (YlOrRd); mplcursors hover tooltips showing source name, flux, RM, and frac-pol.
+- `plot_paf_beam_overlay.py` / `plot_paf_beam_movie.py`: new flags `--pol-sources`, `--highlight-frac-pol <threshold>`, `--catalog-dir`, `--cone-radius`, `--show`.
+- `run_html_report.sh`: canonical local entry point for HTML report generation; all CLI options documented inline; uses `python3` realpath for symlink-safe `SCRIPTS` resolution; activates `.venv`.
+
+### Changed
+- `build_phase3_html_report.py`: `--pol-sources`, `--catalog-dir`, and `--highlight-frac-pol` wired through to per-SB subprocess calls; `assemble_package()` now copies `plots/*.mp4` (PAF beam-scan movies) in addition to PNGs; `--force` flag to regenerate existing plots; `--combine-only` to skip per-SB plots and just rebuild the report.
+- All `run_*.sh` scripts: `SCRIPTS` resolved via `python3 -c 'import os, sys; ...'` for full symlink safety regardless of CWD or invocation path; venv activated only in local scripts (`run_stage-4.sh`, `run_html_report.sh`); HPC slurm-driving scripts (`run_stage-1/2/3.sh`) no longer attempt local venv activation.
+- `scratch/run_*.sh`: replaced plain copies with symlinks to the canonical repo scripts; listed in `scratch/.gitignore`.
+
+## 3.9 — 2026-03-16
+
+Refactors PAF plot annotation and fixes the sky→PAF coordinate transform.
+
+### Changed
+- `paf_port_layout.py` / `plot_paf_beam_overlay.py`: shared annotation info-box driven by a metadata dict (SBID, field, pol_axis, frequency); eliminates duplicated annotation code across single and multi-panel plots.
+- `paf_port_layout.py`: corrected sky→PAF transform — `pol_axis` rotation sign was inverted by 45°; fixed sky-view display orientation.
+- `projects/calibration-updates-2026/README.md`: project workflow moved here from the top-level README; top-level README now points to it.
+
+### Removed
+- Obsolete helper scripts: `make_single_index_manifest`, `extract_ref_fieldnames`, `sb-to-field-mapping`.
+
+## 3.8 — 2026-03-15
+
+Adds an animated PAF beam-scan movie and integrates PAF overlays into the HTML report.
+
+### Added
+- `plot_paf_beam_movie.py`: renders an MP4 animation sweeping the closepack-36 beam footprint across the PAF element grid to simulate a beam scan; `--trail <n>` ghost frames, `--fps`, `--dpi`; `create_paf_beam_movie.sh` + `run_paf_beam_movie.sh` convenience wrappers.
+- `build_phase3_html_report.py`: PAF beam-overlay PNGs and beam-scan MP4s embedded as collapsible cards per `SB_REF`; `--end-index` extended to cover full manifest range; `--combine-only` flag.
+
+### Changed
+- `paf_port_layout.py`: reduced PAF element fill alpha (active 0.28 → 0.08; inactive 0.07 → 0.03) so beam footprint circles are clearly visible against the element grid.
+
 ## 3.7 — 2026-03-15
 
 Adds two PAF visualisation scripts and a minor fix to the HTML report.
