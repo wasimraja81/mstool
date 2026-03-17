@@ -2,3 +2,7 @@
 *
 !.gitignore
 !README.md
+run_stage-1.sh
+run_stage-2.sh
+run_stage-3.sh
+run_stage-4.sh
