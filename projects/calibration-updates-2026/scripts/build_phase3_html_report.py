@@ -932,11 +932,16 @@ def assemble_package(
     (package_dir / "media").mkdir(exist_ok=True)
 
     # ── plots/ ────────────────────────────────────────────────────────
-    n_plots = 0
-    for f in sorted((phase3_dir / "plots").glob("*.png")):
-        shutil.copy2(f, package_dir / "plots" / f.name)
-        n_plots += 1
-    print(f"  plots: {n_plots} PNGs")
+    # Copy PNGs (footprint_*, paf_beam_overlay_*) and MP4s (paf_beam_movie_*)
+    n_plots_png = n_plots_mp4 = 0
+    for f in sorted((phase3_dir / "plots").iterdir()):
+        if f.suffix == ".png":
+            shutil.copy2(f, package_dir / "plots" / f.name)
+            n_plots_png += 1
+        elif f.suffix == ".mp4":
+            shutil.copy2(f, package_dir / "plots" / f.name)
+            n_plots_mp4 += 1
+    print(f"  plots: {n_plots_png} PNGs, {n_plots_mp4} MP4s")
 
     # ── cube ──────────────────────────────────────────────────────────
     if cube_src.exists():
