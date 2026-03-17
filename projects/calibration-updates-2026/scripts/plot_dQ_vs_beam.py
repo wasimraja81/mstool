@@ -35,6 +35,7 @@ Usage
 import argparse
 import sys
 from pathlib import Path
+from typing import Optional
 
 import matplotlib
 matplotlib.use("Agg")
@@ -58,7 +59,7 @@ MANIFEST_DEFAULT = "projects/calibration-updates-2026/manifests/sb_manifest_reff
 
 
 def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
-                ylabel: str, output_dir: Path, show: bool):
+                ylabel: str, output_dir: Path, show: bool, ylim: Optional[float] = 5.0):
     """Generate one figure (single axes) for a single ref_fieldname."""
     odcs = sorted(df_field["odc_weight"].unique())
     odc_colours = {odc: cm.tab10(i / max(len(odcs) - 1, 1)) for i, odc in enumerate(odcs)}
@@ -88,6 +89,8 @@ def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
             )
 
     ax.axhline(0, color="black", linewidth=0.6, linestyle="--", alpha=0.4)
+    if ylim is not None:
+        ax.set_ylim(-ylim, ylim)
     ax.set_xlabel("Beam", fontsize=9)
     ax.set_ylabel(f"{ylabel} signed (%)", fontsize=9)
     ax.tick_params(labelsize=8)
@@ -171,6 +174,10 @@ def main():
              "Case-insensitive partial match: '1324-28' matches 'REF_1324-28'. "
              "Omit to plot all fields selected by the manifest.",
     )
+    parser.add_argument(
+        "--ylim", type=float, default=5.0, metavar="PCT",
+        help="Symmetric y-axis limit in %% (e.g. 5 → ±5%%). Pass 0 to use auto-scale.",
+    )
     parser.add_argument("--show", action="store_true",
                         help="Display plots interactively after saving.")
 
@@ -249,7 +256,8 @@ def main():
                 print(f"  No rows for {field} / variant={v}, skipping.")
                 continue
             for col, label in quantities:
-                make_figure(sub, field, v, col, label, output_dir, args.show)
+                make_figure(sub, field, v, col, label, output_dir, args.show,
+                            ylim=args.ylim if args.ylim > 0 else None)
 
 
 if __name__ == "__main__":
