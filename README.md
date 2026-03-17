@@ -33,11 +33,11 @@ askapuser>$ msInfo.py -h
 
 | Project | Description |
 |---------|-------------|
-| [`projects/calibration-updates-2026`](projects/calibration-updates-2026/README.md) | Calibration updates using reference fields — 4-stage HPC pipeline, leakage diagnostics, PAF visualisation tools |
+| [`projects/calibration-updates-2026`](projects/calibration-updates-2026/README.md) | Calibration updates using reference fields — 4-stage HPC pipeline, leakage diagnostics, PAF visualisation tools (beam overlay + animated beam-scan movies), polarised-source catalog overlay (POSSUM AS203 / Taylor 2009 / ATNF pulsars); `run_html_report.sh` as the canonical local entry point for HTML report generation |
 
 ### Release tag checklist (recommended)
 
-Before creating a release tag (for example `3.4`):
+Before creating a release tag (for example `3.10`):
 
 1. Ensure `CHANGELOG.md` has an entry for that exact version.
 2. Merge release changes from `develop` into `main`.
@@ -46,10 +46,10 @@ Before creating a release tag (for example `3.4`):
 If you discover issues *before public release consumption*, you may move the same tag to a newer commit:
 
 ```bash
-git tag -f 3.4 <new-commit>
-git push origin 3.4 --force
+git tag -f 3.10 <new-commit>
+git push origin 3.10 --force
 ```
 
-If the release is already public/consumed, do **not** move the existing tag; publish a new patch version (for example `3.4.1`).
+If the release is already public/consumed, do **not** move the existing tag; publish a new patch version (for example `3.10.1`).
 
 
