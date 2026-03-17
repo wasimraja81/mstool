@@ -91,17 +91,31 @@ REPO_ROOT="$(cd "${SCRIPTS}/../../.." && pwd)"
 source "${REPO_ROOT}/.venv/bin/activate"
 
 # ─────────────────────────────────────────────────────────────────────────────
+# QUICK HTML-ONLY REBUILD (skips all upstream pipeline steps)
+# Use this to preview HTML/CSS/layout changes without re-running the pipeline.
+# ─────────────────────────────────────────────────────────────────────────────
+ python3 "${SCRIPTS}"/build_phase3_html_report.py \
+     --data-root          "${DATA_ROOT}" \
+     --start-index        14 \
+     --end-index          49 \
+     --exclude-indices    "24-29" \
+     --pol-sources \
+     --highlight-frac-pol 0.10 \
+     --html-only
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ACTIVE COMMAND — standard rebuild with polarised-source overlays
 # ─────────────────────────────────────────────────────────────────────────────
-python3 "${SCRIPTS}"/build_phase3_html_report.py \
-    --data-root          "${DATA_ROOT}" \
-    --start-index        14 \
-    --end-index          49 \
-    --exclude-indices    "24-29" \
-    --pol-sources \
-    --highlight-frac-pol 0.10 \
-    --package           "${DATA_ROOT}/final_mvp_share" \
-    --force
+#python3 "${SCRIPTS}"/build_phase3_html_report.py \
+#    --data-root          "${DATA_ROOT}" \
+#    --start-index        14 \
+#    --end-index          49 \
+#    --exclude-indices    "24-29" \
+#    --pol-sources \
+#    --highlight-frac-pol 0.10 \
+#    --package           "${DATA_ROOT}/final_mvp_share" \
+#    --html-only \
+#    --force
 
 echo ""
 echo "Report written to: ${DATA_ROOT}/phase3/index.html"
@@ -141,6 +155,11 @@ echo "Report written to: ${DATA_ROOT}/phase3/index.html"
 #     Rows in the existing master CSV are preserved for excluded indices.
 
 # ── Regeneration ──────────────────────────────────────────────────────────────
+
+# --html-only
+#     Skip ALL upstream steps (master CSV rebuild, phase-2 tables, cube,
+#     footprints, PAF overlay PNGs and movies).  Reads existing data files
+#     and only regenerates index.html.  Fast — useful for layout/CSS previews.
 
 # --force
 #     Regenerate PAF overlay PNGs and beam-scan movies even if existing.

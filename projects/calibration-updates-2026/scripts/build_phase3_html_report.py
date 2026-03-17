@@ -353,13 +353,13 @@ def build_spectra_cards(manifest_rows: list, media_info: dict,
                         media_rel_prefix: str = "media",
                         paf_overlay_info: dict = None,
                         paf_movie_info: dict = None) -> str:
-    """Return HTML for the 'Leakage spectra' section.
+    """Return HTML for the 'Downloads (GIF / PDF)' section.
 
     One <details id='sbref-{r}'> card per SB_REF, sorted by ODC then field.
-    Each card has a 2×2 video grid (stokes/pol-degree × regular/lcal)
-    plus inline PDFs for combined_beams.
+    Each card contains GIF animation buttons and combined_beams PDF/PNG links
+    for both calibration variants (regular / lcal).  MP4s, all-beams PNGs,
+    beamwise stats, and PAF plots are now shown inline in the summary tables.
     """
-    # Sort by (odc_weight, ref_fieldname, sb_ref); skip rows with no media on disk
     ordered = sorted(
         [
             r for r in manifest_rows
@@ -369,103 +369,52 @@ def build_spectra_cards(manifest_rows: list, media_info: dict,
     )
     cards = []
     for row in ordered:
-        sb_ref = row["sb_ref"]
-        info   = media_info[sb_ref]
-        stem   = info["stem"]
+        sb_ref  = row["sb_ref"]
+        info    = media_info[sb_ref]
+        stem    = info["stem"]
         present = info["present"]
-        odc    = row["odc_weight"]
-        field  = row["ref_fieldname"]
+        odc     = row["odc_weight"]
+        field   = row["ref_fieldname"]
         card_id = f"sbref-{sb_ref}"
-        rel    = f"{media_rel_prefix}/SB_REF-{sb_ref}"
+        rel     = f"{media_rel_prefix}/SB_REF-{sb_ref}"
 
-        # ── 2×2 video grid ────────────────────────────────────────────
-        grid_cells = []
+        # ── GIFs + combined_beams PDF/PNG per variant ──────────────────
+        variant_sections = []
         for variant_label, vtag in [("regular", ""), ("lcal", ".lcal")]:
-            for plot_stem, plot_label in [
-                ("beams_stokes",    "Stokes"),
-                ("beams_pol-degree","Pol. degree"),
-            ]:
-                mp4_fname = f"{stem}.{plot_stem}{vtag}.mp4"
-                gif_fname = f"{stem}.{plot_stem}{vtag}.gif"
-                mp4_href  = f"{rel}/{quote(mp4_fname)}"
-                gif_href  = f"{rel}/{quote(gif_fname)}"
-                inner = (
-                    f"<p style='margin:0 0 6px'><b>{html.escape(plot_label)}"
-                    f" <span style='font-weight:normal;color:#666'>[{html.escape(variant_label)}]</span></b></p>"
-                )
-                btns = []
-                if mp4_fname in present:
-                    btns.append(
-                        f"<button class='media-btn' "
-                        f"onclick=\"openModal('{mp4_href}','video')\">"
-                        f"&#9654; MP4</button>"
-                    )
-                if gif_fname in present:
-                    btns.append(
-                        f"<button class='media-btn media-btn--gif' "
-                        f"onclick=\"openModal('{gif_href}','gif')\">"
-                        f"&#128247; GIF</button>"
-                    )
-                # All-beams combined PNG (p01 = Stokes, p02 = Pol. degree)
-                page_tag = "p01" if plot_stem == "beams_stokes" else "p02"
-                png_all  = f"{stem}.combined_beams{vtag}_{page_tag}.png"
-                if png_all in present:
-                    png_href_all = f"{rel}/{quote(png_all)}"
-                    btns.append(
-                        f"<button class='media-btn'"
-                        f" onclick=\"openModal('{png_href_all}','img')\">"
-                        f"&#8862; all beams</button>"
-                    )
-                # Leakage stats (beamwise, channel-averaged) — only for pol-degree cells
-                if plot_stem == "beams_pol-degree":
-                    lstats_fname = f"{stem}.leakage_stats{vtag}.png"
-                    if lstats_fname in present:
-                        lstats_href = f"{rel}/{quote(lstats_fname)}"
-                        btns.append(
-                            f"<button class='media-btn media-btn--beamwise'"
-                            f" onclick=\"openModal('{lstats_href}','img')\">"
-                            f"&#128200; beamwise</button>"
-                        )
-                if btns:
-                    inner += f"<p style='margin:4px 0 0'>{' '.join(btns)}</p>"
-                else:
-                    inner += "<span style='color:#888;font-size:12px'>(not available)</span>"
-                grid_cells.append(
-                    f"<td style='padding:10px;vertical-align:top;width:25%'>{inner}</td>"
-                )
-        grid_html = (
-            "<table style='width:100%;border-collapse:collapse;border:none'>"
-            f"<tr>{''.join(grid_cells)}</tr>"
-            "</table>"
-        )
-
-        # ── PAF layout banner ──────────────────────────────────────────
-        paf_row_html = ""
-        has_overlay = paf_overlay_info and sb_ref in paf_overlay_info
-        has_movie   = paf_movie_info   and sb_ref in paf_movie_info
-        if has_overlay or has_movie:
             btns = []
-            if has_overlay:
-                overlay_href = f"plots/{quote(paf_overlay_info[sb_ref])}"
-                btns.append(
-                    f"<button class='media-btn media-btn--paf'"
-                    f" onclick=\"openModal('{overlay_href}','img')\">"
-                    f"&#128444; Overlay</button>"
+            for plot_stem, plot_label in [
+                ("beams_stokes",     "Stokes"),
+                ("beams_pol-degree", "Pol. degree"),
+            ]:
+                gif_fname = f"{stem}.{plot_stem}{vtag}.gif"
+                if gif_fname in present:
+                    gif_href = f"{rel}/{quote(gif_fname)}"
+                    btns.append(
+                        f"<button class='media-btn media-btn--gif'"
+                        f" onclick=\"openModal('{gif_href}','gif')\">"
+                        f"&#128247;&nbsp;{html.escape(plot_label)}&nbsp;GIF</button>"
+                    )
+            # combined_beams PDF (both pages as PNG if rendered, else raw PDF)
+            for vtag2, label2 in [(vtag, variant_label)]:
+                pdf_fname = f"{stem}.combined_beams{vtag2}.pdf"
+                if pdf_fname in present:
+                    pdf_href = f"{rel}/{quote(pdf_fname)}"
+                    btns.append(
+                        f"<a href='{pdf_href}' download"
+                        f" class='media-btn media-btn--page'"
+                        f" style='text-decoration:none'>"
+                        f"&#8675;&nbsp;combined beams PDF</a>"
+                    )
+            if btns:
+                variant_sections.append(
+                    f"<div style='margin-bottom:8px'>"
+                    f"<span style='font-size:11px;font-weight:600;color:#555'>{html.escape(variant_label)}</span>"
+                    f"<div style='margin-top:3px;line-height:1.8'>{'&thinsp;'.join(btns)}</div>"
+                    f"</div>"
                 )
-            if has_movie:
-                movie_href = f"plots/{quote(paf_movie_info[sb_ref])}"
-                btns.append(
-                    f"<button class='media-btn media-btn--paf-movie'"
-                    f" onclick=\"openModal('{movie_href}','video')\">"
-                    f"&#9654; Movie</button>"
-                )
-            paf_row_html = (
-                f"<div style='margin-top:8px;padding-top:6px;border-top:1px solid #eee'>"
-                f"<span style='font-size:11px;font-weight:bold;color:#666;"
-                f"letter-spacing:0.05em;text-transform:uppercase'>PAF layout</span>"
-                f"<div style='margin-top:4px'>{''.join(btns)}</div>"
-                f"</div>"
-            )
+
+        if not variant_sections:
+            continue  # nothing to show for this SB_REF
 
         summary_text = (
             f"SB_REF-{html.escape(sb_ref)}"
@@ -477,15 +426,12 @@ def build_spectra_cards(manifest_rows: list, media_info: dict,
             f" style='margin:6px 0;border:1px solid #ddd;border-radius:4px'>"
             f"<summary style='cursor:pointer;padding:8px 12px;font-weight:bold'>"
             f"{summary_text}</summary>"
-            f"<div style='padding:10px 14px'>"
-            f"{grid_html}"
-            f"{paf_row_html}"
-            f"</div>"
+            f"<div style='padding:10px 14px'>{''.join(variant_sections)}</div>"
             f"</details>"
         )
 
     if not cards:
-        return "<p class='meta'>No media files found – run <code>copy_media_files()</code> first.</p>"
+        return "<p class='meta'>No GIF / PDF files found.</p>"
     return "\n".join(cards)
 
 
@@ -599,7 +545,7 @@ def localize_plot_links(rows, tables_dir: Path, asset_root: Path, asset_http_bas
         row["sb_ref_plot_links"] = ";".join(localized)
 
 
-def build_summary_table(rows, plots_dir=None, media_map=None):
+def build_summary_table(rows, plots_dir=None, media_map=None, paf_overlay_info=None, paf_movie_info=None):
     """Render an inline HTML table with summary columns and clickable SB_REF links.
 
     If plots_dir is given, the reference-field cell links to the individual
@@ -607,6 +553,9 @@ def build_summary_table(rows, plots_dir=None, media_map=None):
 
     If media_map is given ({sb_ref: {'stem': str, 'present': set}}), the
     sb_ref_values column gains anchor + download links (↓pdf, ↓mp4, ↓gif).
+
+    paf_overlay_info and paf_movie_info ({sb_ref: relative_path}) are used to
+    render inline PAF overlay image and movie buttons per SB_REF.
     """
     headers = [
         "odc_weight", "variant", "ref_fieldname", "n_candidates",
@@ -644,7 +593,7 @@ def build_summary_table(rows, plots_dir=None, media_map=None):
                     dl_badge = (
                         f" <a href='plots/{quote(dl_png)}'"
                         f" onclick=\"openModal(this.href,'img');return false;\""
-                        f" class='plot-badge'>L</a>"
+                        f" class='plot-badge'>dL</a>"
                     )
                 else:
                     dl_badge = ""
@@ -654,33 +603,86 @@ def build_summary_table(rows, plots_dir=None, media_map=None):
                     qu_badge = (
                         f" <a href='plots/{quote(qu_png)}'"
                         f" onclick=\"openModal(this.href,'img');return false;\""
-                        f" class='plot-badge'>|Q|,|U|</a>"
+                        f" class='plot-badge'>|dQ|,|dU|</a>"
                     )
                 else:
                     qu_badge = ""
-                cells.append(f"<td>{html.escape(str(v))}{dl_badge}{qu_badge}</td>")
+                # Badge 3: all-ODC comparison dL (both variants, field-level only)
+                cmp_dl_png = f"footprint_dL_{field_safe}.png"
+                if (plots_dir / cmp_dl_png).exists():
+                    cmp_dl_badge = (
+                        f" <a href='plots/{quote(cmp_dl_png)}'"
+                        f" onclick=\"openModal(this.href,'img');return false;\""
+                        f" class='plot-badge plot-badge--cmp' title='All-ODC comparison (regular + lcal)'>dL&#x2248;</a>"
+                    )
+                else:
+                    cmp_dl_badge = ""
+                # Badge 4: all-ODC comparison Q/U (both variants, field-level only)
+                cmp_qu_png = f"footprint_QU_{field_safe}.png"
+                if (plots_dir / cmp_qu_png).exists():
+                    cmp_qu_badge = (
+                        f" <a href='plots/{quote(cmp_qu_png)}'"
+                        f" onclick=\"openModal(this.href,'img');return false;\""
+                        f" class='plot-badge plot-badge--cmp' title='All-ODC comparison (regular + lcal)'>|dQ|,|dU|&#x2248;</a>"
+                    )
+                else:
+                    cmp_qu_badge = ""
+                cells.append(f"<td>{html.escape(str(v))}{dl_badge}{qu_badge}{cmp_dl_badge}{cmp_qu_badge}</td>")
             elif h == "sb_ref_values":
-                plot_raw = row.get("sb_ref_plot_links", "")
-                plot_map = {}
-                if plot_raw:
-                    for part in str(plot_raw).split(";"):
-                        if not part:
-                            continue
-                        pieces = part.split("|", 1)
-                        sb = pieces[0].strip()
-                        link = pieces[1].strip() if len(pieces) > 1 else ""
-                        if sb:
-                            plot_map[sb] = link
+                variant = row.get("variant", "regular")
+                vtag = ".lcal" if variant == "lcal" else ""
                 parts = [p.strip() for p in str(v).split(";") if p.strip()]
                 badge_parts = []
                 for sb in parts:
                     anchor = f"#sbref-{sb}"
-                    badge_parts.append(
+                    link_html = (
                         f"<a href='{html.escape(anchor)}'"
                         f" onclick=\"openSpectraCard('sbref-{html.escape(sb)}');return false;\">"
                         f"SB_REF-{html.escape(sb)}</a>"
                     )
-                cells.append(f"<td>{'<br>'.join(badge_parts)}</td>")
+                    btns = []
+                    m = media_map.get(sb) if media_map else None
+                    if m:
+                        stem = m["stem"]
+                        present = m["present"]
+                        rel = f"media/SB_REF-{sb}"
+                        mp4_stokes = f"{stem}.beams_stokes{vtag}.mp4"
+                        if mp4_stokes in present:
+                            href = f"{rel}/{quote(mp4_stokes)}"
+                            btns.append(f"<button class='media-btn' onclick=\"openModal('{href}','video')\">&#9654;&nbsp;IQUV</button>")
+                        png_stokes = f"{stem}.combined_beams{vtag}_p01.png"
+                        if png_stokes in present:
+                            href = f"{rel}/{quote(png_stokes)}"
+                            btns.append(f"<button class='media-btn media-btn--page' onclick=\"openModal('{href}','img')\">&#8862;&nbsp;IQUV</button>")
+                        mp4_poldeg = f"{stem}.beams_pol-degree{vtag}.mp4"
+                        if mp4_poldeg in present:
+                            href = f"{rel}/{quote(mp4_poldeg)}"
+                            btns.append(f"<button class='media-btn' onclick=\"openModal('{href}','video')\">&#9654;&nbsp;dP</button>")
+                        png_poldeg = f"{stem}.combined_beams{vtag}_p02.png"
+                        if png_poldeg in present:
+                            href = f"{rel}/{quote(png_poldeg)}"
+                            btns.append(f"<button class='media-btn media-btn--page' onclick=\"openModal('{href}','img')\">&#8862;&nbsp;dP</button>")
+                        lstats = f"{stem}.leakage_stats{vtag}.png"
+                        if lstats in present:
+                            href = f"{rel}/{quote(lstats)}"
+                            btns.append(f"<button class='media-btn media-btn--beamwise' onclick=\"openModal('{href}','img')\">&#128200;&nbsp;beamwise</button>")
+                    if paf_overlay_info and sb in paf_overlay_info:
+                        href = f"plots/{quote(paf_overlay_info[sb])}"
+                        btns.append(f"<button class='media-btn media-btn--paf' onclick=\"openModal('{href}','img')\">&#128444;&nbsp;PAF</button>")
+                    if paf_movie_info and sb in paf_movie_info:
+                        href = f"plots/{quote(paf_movie_info[sb])}"
+                        btns.append(f"<button class='media-btn media-btn--paf-movie' onclick=\"openModal('{href}','video')\">&#9654;&nbsp;PAF</button>")
+                    if btns:
+                        btn_inner = "".join(btns)
+                        badge_parts.append(
+                            f"<div class='sbref-popup-wrap'>"
+                            f"<button class='sbref-trigger' onclick='toggleSbRefPopup(this,event)'>{link_html}&thinsp;&#9660;</button>"
+                            f"<div class='sbref-popup'>{btn_inner}</div>"
+                            f"</div>"
+                        )
+                    else:
+                        badge_parts.append(f"<div style='margin-bottom:2px'>{link_html}</div>")
+                cells.append(f"<td>{''.join(badge_parts)}</td>")
             elif h in numeric_cols:
                 cells.append(f"<td>{html.escape(fmt_num(v, digits=3))}</td>")
             elif h == "n_candidates":
@@ -1169,6 +1171,14 @@ def main():
         help="Comma-separated list of indices or ranges to exclude from the master CSV rebuild "
              "(e.g. '24-29' or '24-29,31').  Passed directly to build_phase1_master_table.py.",
     )
+    parser.add_argument(
+        "--html-only",
+        action="store_true",
+        default=False,
+        help="Skip all upstream pipeline steps (master CSV rebuild, phase-2 tables, leakage cube, "
+             "footprints, PAF overlays, PAF movies) and regenerate only the HTML report from "
+             "existing data in --output-dir.  Useful for quickly previewing layout changes.",
+    )
     args = parser.parse_args()
 
     data_root = Path(args.data_root)
@@ -1214,13 +1224,16 @@ def main():
     media_map = media_info if media_info else None
 
     # ── Run upstream pipeline steps ──────────────────────────────────────
-    run_upstream_pipeline(
-        data_root, phase2_dir,
-        manifest_path=manifest_path,
-        start_index=args.start_index,
-        end_index=args.end_index,
-        exclude_indices=args.exclude_indices,
-    )
+    if args.html_only:
+        print("--html-only: skipping upstream pipeline (master CSV, phase-2 tables, cube, footprints, PAF).")
+    else:
+        run_upstream_pipeline(
+            data_root, phase2_dir,
+            manifest_path=manifest_path,
+            start_index=args.start_index,
+            end_index=args.end_index,
+            exclude_indices=args.exclude_indices,
+        )
 
     inputs = {
         "beam_x_field_at_fixed_odc.csv": phase2_dir / "beam_x_field_at_fixed_odc.csv",
@@ -1429,23 +1442,31 @@ def main():
     a {{ color: #0366d6; }}
     .plot-badge {{ display:inline-block;font-size:10px;font-weight:bold;padding:1px 5px;border-radius:3px;border:1px solid #0366d6;color:#0366d6;text-decoration:none;margin-left:4px;white-space:nowrap; }}
     .plot-badge:hover {{ background:#0366d6;color:#fff; }}
+    .plot-badge--cmp {{ border-color:#b07d00;color:#b07d00; }}
+    .plot-badge--cmp:hover {{ background:#b07d00;color:#fff; }}
     .footprint-overview {{ border-collapse:collapse;margin:8px 0; }}
     .footprint-overview th {{ font-size:11px;font-weight:600;padding:3px 12px 3px 6px;border-bottom:1px solid #ccc;text-align:left;color:#555; }}
     .footprint-overview td {{ padding:3px 8px 3px 6px;font-size:12px;vertical-align:middle; }}
     .footprint-overview td.field-name {{ font-family:monospace;font-size:12px;padding-right:14px; }}
     .footprint-overview tr:hover td {{ background:#f0f6ff; }}
-    .media-btn {{ display:inline-flex;align-items:center;height:26px;background:#0366d6;color:#fff;border:none;padding:0 11px;border-radius:4px;cursor:pointer;font-size:12px;margin-right:6px;margin-bottom:4px;white-space:nowrap; }}
-    .media-btn:hover {{ background:#0256b4; }}
-    .media-btn--gif {{ background:#28a745; }}
-    .media-btn--gif:hover {{ background:#1e7e34; }}
-    .media-btn--beamwise {{ background:#28a745; }}
-    .media-btn--beamwise:hover {{ background:#1e7e34; }}
-    .media-btn--paf {{ background:#7952b3; }}
-    .media-btn--paf:hover {{ background:#5e3d8f; }}
-    .media-btn--paf-movie {{ background:#4a7ab3; }}
-    .media-btn--paf-movie:hover {{ background:#35608f; }}
-    .media-btn--page {{ background:#6c757d; }}
-    .media-btn--page:hover {{ background:#545b62; }}
+    .media-btn {{ display:inline-flex;align-items:center;height:auto;background:none;color:#111;border:1px solid #111;padding:1px 5px;border-radius:3px;cursor:pointer;font-size:12px;white-space:nowrap;text-decoration:none; }}
+    .media-btn:hover {{ background:#f0f0f0; }}
+    .media-btn--gif {{ color:#111; }}
+    .media-btn--gif:hover {{ background:#f0f0f0; }}
+    .media-btn--beamwise {{ color:#111; }}
+    .media-btn--beamwise:hover {{ background:#f0f0f0; }}
+    .media-btn--paf {{ color:#111; }}
+    .media-btn--paf:hover {{ background:#f0f0f0; }}
+    .media-btn--paf-movie {{ color:#111; }}
+    .media-btn--paf-movie:hover {{ background:#f0f0f0; }}
+    .media-btn--page {{ color:#111; }}
+    .media-btn--page:hover {{ background:#f0f0f0; }}
+    .sbref-popup-wrap {{ position:relative;display:block;margin:2px 0; }}
+    .sbref-trigger {{ background:none;border:1px solid #b0b8c4;border-radius:3px;cursor:pointer;font-size:12px;padding:2px 7px;color:#0366d6;white-space:nowrap; }}
+    .sbref-trigger:hover {{ background:#f0f6ff;border-color:#0366d6; }}
+    .sbref-popup {{ display:none;position:absolute;left:0;top:calc(100% + 3px);z-index:500;background:#fff;border:1px solid #ccc;border-radius:5px;box-shadow:0 4px 18px rgba(0,0,0,0.18);padding:6px 10px;white-space:nowrap; }}
+    .sbref-popup.open {{ display:flex;flex-direction:column;align-items:flex-start;gap:1px; }}
+    .sbref-popup .media-btn {{ margin:0; }}
     #media-modal {{ display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;align-items:center;justify-content:center; }}
     #media-modal-box {{ position:relative;max-width:92vw;max-height:92vh;text-align:center; }}
     #media-modal-close {{ position:absolute;top:-36px;right:0;background:none;border:none;color:#fff;font-size:28px;line-height:1;cursor:pointer; }}
@@ -1502,12 +1523,27 @@ def main():
       document.getElementById('media-modal-content').innerHTML = '';
       document.body.style.overflow = '';
     }}
-    document.addEventListener('keydown', function(e) {{ if (e.key === 'Escape') closeModal(); }});
+    function toggleSbRefPopup(btn, e) {{
+      e.stopPropagation();
+      var popup = btn.nextElementSibling;
+      var wasOpen = popup.classList.contains('open');
+      document.querySelectorAll('.sbref-popup.open').forEach(function(p){{ p.classList.remove('open'); }});
+      if (!wasOpen) popup.classList.add('open');
+    }}
+    document.addEventListener('click', function() {{
+      document.querySelectorAll('.sbref-popup.open').forEach(function(p){{ p.classList.remove('open'); }});
+    }});
+    document.addEventListener('keydown', function(e) {{ if (e.key === 'Escape') {{ closeModal(); document.querySelectorAll('.sbref-popup.open').forEach(function(p){{ p.classList.remove('open'); }}); }} }});
   </script>
 </head>
 <body>
   <h1>Summary of Residual On-axis Leakage</h1>
-  <p class='meta'>Scope: MVP subset (indices 14&ndash;35, excluding 24&ndash;29).</p>
+  <p class='meta'><b>Scope:</b> manifest indices 14&ndash;49, excluding 24&ndash;29 (ODC-5241 era; ODC-3611 legacy fields not included).<br>
+     Each table row is one (ODC weight, calibration variant, reference field) combination, aggregated over all SB_REF observations of that field.<br>
+     <b>Bandpass calibrated</b> (regular) and <b>Bandpass + Leakage on-axis calibrated</b> (lcal) variants are shown in separate tables.<br>
+     Plot badges on the <i>Reference field</i> column link to per-ODC and all-ODC footprint heatmaps (see legend below).
+     SB_REF media (Stokes/pol.degree MP4, combined-beams PNG, beamwise stats, PAF overlay and movie) are accessible
+     via the drop-down trigger on each SB_REF ID in the <i>Observed SB_REF IDs</i> column.</p>
 
   <h2>Column legend</h2>
   <p class='meta'><b>Notation convention:</b> the superscript in parentheses denotes the index (dimension) over which the statistic is computed.
@@ -1529,22 +1565,19 @@ def main():
   </table>
   <p class='meta'>All statistics are over percentage linear polarisation leakage, \\(dL\\) (%).
      \\(dL = 100 \\times L/I\\), where \\(L\\) is the linear polarisation intensity and \\(I\\) is the Stokes&nbsp;I total intensity.</p>
+  <p class='meta'><b>Plot badges on Reference field column:</b><br>
+     <b>dL</b> / <b>|dQ|,|dU|</b> (blue) &mdash; per-ODC footprint for that row&apos;s variant;<br>
+     <b style='color:#b07d00'>dL&#x2248;</b> / <b style='color:#b07d00'>|dQ|,|dU|&#x2248;</b> &mdash; all-ODC comparison footprint (regular&nbsp;+&nbsp;lcal stacked).<br>
+     <b>dL</b> = residual leakage (dL&nbsp;=&nbsp;&radic;(Q&sup2;+U&sup2;)/I&nbsp;(%)), faceted by ODC weight and calibration variant.<br>
+     <b>|dQ|,|dU|</b> = split-circle plots of |Q|/I (top-left) and |U|/I (bottom-right).</p>
 
   <h2>Bandpass calibrated</h2>
-  {build_summary_table(field_regular, plots_dir=output_dir / 'plots', media_map=media_map)}
+  {build_summary_table(field_regular, plots_dir=output_dir / 'plots', media_map=media_map,
+                       paf_overlay_info=paf_overlay_info, paf_movie_info=paf_movie_info)}
 
   <h2>Bandpass + Leakage (on-axis) calibrated</h2>
-  {build_summary_table(field_lcal, plots_dir=output_dir / 'plots', media_map=media_map)}
-
-  <h2>Footprint heatmaps</h2>
-  <p class='meta'>Beam-layout footprint plots for each reference field. <b>L</b>: residual leakage dL&nbsp;=&nbsp;&radic;(Q&sup2;+U&sup2;)/I (%), faceted by ODC weight and calibration variant. <b>|Q|,|U|</b>: split-circle plots of |Q|/I (top-left) and |U|/I (bottom-right).</p>
-  {combined_footprint_html}
-
-  <h2>Leakage statistics for beams (per SB_REF)</h2>
-  <p class='meta'>Per-observation plots, one card per SB_REF. Each card is collapsed by default — click a row to expand.
-    Within each card: <b>Stokes</b> and <b>pol. degree</b> animations (MP4/GIF) plus <b>&#8862;&nbsp;all beams</b> grid images for both calibration variants (regular / lcal).
-    The pol. degree cells also include a <b>&#128200;&nbsp;beamwise</b> button opening the channel-averaged leakage statistics plot (x-axis = BeamNum).</p>
-  {spectra_cards_html}
+  {build_summary_table(field_lcal, plots_dir=output_dir / 'plots', media_map=media_map,
+                       paf_overlay_info=paf_overlay_info, paf_movie_info=paf_movie_info)}
 
   <h2>3D Leakage cube (NetCDF4)</h2>
   <p class='meta'>The leakage data is stored as a labelled 3-D <a href='https://www.unidata.ucar.edu/software/netcdf/' target='_blank'>NetCDF4</a> cube

@@ -4,18 +4,26 @@ All notable changes to this project are documented in this file.
 
 ## 3.10 — 2026-03-17
 
-Adds a polarised-source catalog overlay to PAF plots, wires it through the HTML report builder, and hardens all run scripts for symlink-safe execution.
+Adds a polarised-source catalog overlay to PAF plots, wires it through the HTML report builder, hardens all run scripts for symlink-safe execution, and restructures the HTML report layout — inline media pop-downs in summary tables, compact footprint badge links, and a cleaner single-page design.
 
 ### Added
 - `fetch_pol_catalogs.py`: multi-catalog download and local CSV cache — priority chain POSSUM AS203 (CASDA) → Taylor 2009 (VizieR) → ATNF pulsar catalog; CASDA credentials via `CASDA_USER`/`CASDA_PASSWORD` env vars or `~/.netrc`; `--refresh` to force re-download; `--cone-radius` for source selection.
 - `paf_port_layout.py` — `draw_pol_sources()`: overlays polarised sources on PAF diagrams with flux-scaled markers, RM-coloured (RdBu) fill, and optional fractional-polarisation highlight rings (YlOrRd); mplcursors hover tooltips showing source name, flux, RM, and frac-pol.
 - `plot_paf_beam_overlay.py` / `plot_paf_beam_movie.py`: new flags `--pol-sources`, `--highlight-frac-pol <threshold>`, `--catalog-dir`, `--cone-radius`, `--show`.
-- `run_html_report.sh`: canonical local entry point for HTML report generation; all CLI options documented inline; uses `python3` realpath for symlink-safe `SCRIPTS` resolution; activates `.venv`.
+- `run_html_report.sh`: canonical local entry point for HTML report generation; all CLI options documented inline; uses `python3` realpath for symlink-safe `SCRIPTS` resolution; activates `.venv`; `--html-only` quick-rebuild block added.
 
 ### Changed
-- `build_phase3_html_report.py`: `--pol-sources`, `--catalog-dir`, and `--highlight-frac-pol` wired through to per-SB subprocess calls; `assemble_package()` now copies `plots/*.mp4` (PAF beam-scan movies) in addition to PNGs; `--force` flag to regenerate existing plots; `--combine-only` to skip per-SB plots and just rebuild the report.
-- All `run_*.sh` scripts: `SCRIPTS` resolved via `python3 -c 'import os, sys; ...'` for full symlink safety regardless of CWD or invocation path; venv activated only in local scripts (`run_stage-4.sh`, `run_html_report.sh`); HPC slurm-driving scripts (`run_stage-1/2/3.sh`) no longer attempt local venv activation.
-- `scratch/run_*.sh`: replaced plain copies with symlinks to the canonical repo scripts; listed in `scratch/.gitignore`.
+- `build_phase3_html_report.py` — HTML layout restructured:
+  - Per-SB_REF media (▶ IQUV, ⊞ IQUV, ▶ dP, ⊞ dP, 📈 beamwise, 🖼 PAF, ▶ PAF) moved inline into summary tables as compact floating pop-down menus (click trigger, Esc/click-away to dismiss); no page reflow.
+  - `ref_fieldname` cell gains four footprint badges: `dL` / `|dQ|,|dU|` (blue, per-ODC per-variant) and `dL≈` / `|dQ|,|dU|≈` (amber, all-ODC comparison with both variants stacked).
+  - `Footprint heatmaps` section removed; badge legend note added above the summary tables.
+  - `Downloads: GIF animations and combined-beams PDFs` section removed.
+  - Scope docstring updated to reflect indices 14–49 excl. 24–29.
+  - `--html-only` flag: skips all upstream pipeline steps and regenerates only `index.html`.
+  - `--pol-sources`, `--catalog-dir`, and `--highlight-frac-pol` wired through to per-SB subprocess calls; `assemble_package()` now copies `plots/*.mp4`; `--force` flag.
+  - `build_phase1_master_table.py` wired as step 1 of `run_upstream_pipeline()`; `--start-index`, `--end-index`, `--exclude-indices` args propagated end-to-end.
+- All `run_*.sh` scripts: `SCRIPTS` resolved via `python3 -c 'import os, sys; ...'` for full symlink safety; venv activated only in local scripts.
+- `scratch/run_*.sh`: replaced plain copies with symlinks to canonical repo scripts.
 
 ## 3.9 — 2026-03-16
 
