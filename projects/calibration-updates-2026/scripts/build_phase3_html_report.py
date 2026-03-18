@@ -9,6 +9,9 @@ import sys
 from pathlib import Path
 from urllib.parse import quote
 
+sys.path.insert(0, str(Path(__file__).parent))
+from write_gain_calibration_strategy import generate as _write_gain_cal_strategy
+
 
 def read_csv(path: Path):
     with path.open() as f:
@@ -1193,6 +1196,8 @@ def main():
     tables_dir.mkdir(parents=True, exist_ok=True)
     media_dir.mkdir(parents=True, exist_ok=True)
 
+    _write_gain_cal_strategy(output_dir / "gain_calibration_strategy.html")
+
     # ── Locate manifest ──────────────────────────────────────────────────
     manifest_path = None
     if args.manifest:
@@ -1592,6 +1597,10 @@ def main():
      Variables: <code>dL_regular</code>, <code>dL_lcal</code>, <code>p90_regular</code>, <code>p90_lcal</code>, <code>nsb_regular</code>, <code>nsb_lcal</code>.<br>
      Open with <code>xarray.open_dataset('leakage_cube.nc')</code> for programmatic slicing, outlier detection, or further analysis.</p>
   {cube_link_html}
+
+  <h3>Gain Calibration Strategy</h3>
+  <p class='meta'><a href='gain_calibration_strategy.html' target='_blank' rel='noopener'>Open: Gain Calibration Strategy</a>
+  &mdash; derivation of the bandpass correction factors from 1934&minus;638 measurements.</p>
 
   <h3>Run summary</h3>
   <ul><li>phase2_mvp_summary.md:
