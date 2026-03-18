@@ -80,18 +80,18 @@ $$Q^{ic} = XX^{ic} - YY^{ic} = \\tfrac{1}{2}\\bigl(G_x^{ic} - G_y^{ic}\\bigr)\\,
 <hr>
 <h2>4. Solving for $G_x^{ic}$ and $G_y^{ic}$</h2>
 <p>The two equations at the end of &sect;3 have two unknowns. Adding and subtracting them directly:</p>
-$$G_x^{ic} = \frac{I^{ic} + Q^{ic}}{I^\circ} \tag{VI}$$
-$$G_y^{ic} = \frac{I^{ic} - Q^{ic}}{I^\circ} \tag{VII}$$
+$$G_x^{ic} = \\frac{I^{ic} + Q^{ic}}{I^\\circ} \\tag{VI}$$
+$$G_y^{ic} = \\frac{I^{ic} - Q^{ic}}{I^\\circ} \\tag{VII}$$
 <p>This is the exact, assumption-free result. Both gains are fully determined by
 three measurables: $I^{ic}$, $Q^{ic}$ (from 1934&minus;638 after interim calibration),
 and $I^\circ$ (the known true flux of 1934&minus;638).
 Defining $dQ = Q^{ic}/I^{ic}$, these can be written:</p>
-$$G_x^{ic} = \frac{I^{ic}}{I^\circ}\,(1 + dQ), \qquad G_y^{ic} = \frac{I^{ic}}{I^\circ}\,(1 - dQ) \tag{VIII}$$
+$$G_x^{ic} = \\frac{I^{ic}}{I^\\circ}\\,(1 + dQ), \\qquad G_y^{ic} = \\frac{I^{ic}}{I^\\circ}\\,(1 - dQ) \\tag{VIII}$$
 <p>The prefactor $I^{ic}/I^\circ$ is the flux-scale accuracy of the interim calibration.
 If total-intensity has been correctly calibrated so that $I^{ic} = I^\circ$, this
 prefactor is unity and (VIII) simplifies to:</p>
-$$G_x^{ic} = 1 + dQ, \qquad G_y^{ic} = 1 - dQ \qquad \text{(when } I^{ic}/I^\circ = 1\text{)} \tag{IX}$$
-<p>In this case $dQ$ alone determines both gain errors. If $I^{ic}/I^\circ \neq 1$,
+$$G_x^{ic} = 1 + dQ, \\qquad G_y^{ic} = 1 - dQ \\qquad \\text{(when } I^{ic}/I^\\circ = 1\\text{)} \\tag{IX}$$
+<p>In this case $dQ$ alone determines both gain errors. If $I^{ic}/I^\\circ \\neq 1$,
 using (IX) would absorb a flux-scale error into the bandpass table; the full
 form (VIII) must be used instead, requiring an independent measurement of
 $I^\circ$ (e.g. a flux model of 1934&minus;638).</p>
