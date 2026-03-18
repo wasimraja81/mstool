@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented in this file.
 
+## 3.11 — 2026-03-19
+
+Adds per-beam dQ (fractional Stokes-Q leakage) diagnostic plots and a
+self-contained KaTeX document deriving the bandpass gain calibration strategy;
+both are linked from the HTML report.
+
+### Added
+- `plot_dQ_vs_beam.py`: per-field line plots of dQ (and optionally dU) vs beam
+  number per SB_REF; manifest-driven (same `--manifest`, `--start-index`,
+  `--end-index`, `--exclude-indices` pattern as phase-1); `--fields` partial
+  case-insensitive filter; `--variant both|regular|lcal`; smart y-axis —
+  floor ±2.5%, expands to `max(ylim, |data| × 1.1)` if data exceed the floor;
+  output filenames `dQ_vs_beam_<field>_<variant>.png`.
+- `run_dQ_plots.sh`: example run script for `plot_dQ_vs_beam.py`; symlinked
+  from `scratch/`; canonical `SCRIPTS` path resolution.
+- `write_gain_calibration_strategy.py`: self-contained KaTeX HTML document
+  deriving the bandpass gain calibration strategy in five sections
+  (§1 initial measurement, §2 interim calibration, §3 1934−638 analysis,
+  §4 exact solution for $G_x^{ic}$/$G_y^{ic}$ with explicit flux-scale caveat,
+  §5 final voltage-gain table update). Can be run standalone or imported via
+  `generate(path)`.
+
+### Changed
+- `build_phase3_html_report.py`: calls `write_gain_calibration_strategy.generate()`
+  at build time, writing `gain_calibration_strategy.html` alongside `index.html`;
+  adds a *Gain Calibration Strategy* link in the Run summary section.
+
 ## 3.10 — 2026-03-17
 
 Adds a polarised-source catalog overlay to PAF plots, wires it through the HTML report builder, hardens all run scripts for symlink-safe execution, and restructures the HTML report layout — inline media pop-downs in summary tables, compact footprint badge links, and a cleaner single-page design.

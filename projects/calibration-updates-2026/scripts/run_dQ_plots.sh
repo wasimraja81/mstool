@@ -61,18 +61,28 @@ REPO_ROOT="$(cd "${SCRIPTS}/../../.." && pwd)"
 source "${REPO_ROOT}/.venv/bin/activate"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# EXAMPLE A — single field, both variants, dQ only (default ylim ±2.5 %)
+# EXAMPLE A — all fields, both variants, dQ only (default ylim ±2.5 %)
 # ─────────────────────────────────────────────────────────────────────────────
 python3 "${SCRIPTS}"/plot_dQ_vs_beam.py \
     --data-root        "${DATA_ROOT}" \
     --start-index      14 \
     --end-index        49 \
     --exclude-indices  "24-29" \
-    --fields           "1324-28" \
     --variant          both
 
 # ─────────────────────────────────────────────────────────────────────────────
-# EXAMPLE B — all fields, both variants, dQ + dU, wider ylim floor
+# EXAMPLE B — single field, both variants, dQ only
+# ─────────────────────────────────────────────────────────────────────────────
+#python3 "${SCRIPTS}"/plot_dQ_vs_beam.py \
+#    --data-root        "${DATA_ROOT}" \
+#    --start-index      14 \
+#    --end-index        49 \
+#    --exclude-indices  "24-29" \
+#    --fields           "1324-28" \
+#    --variant          both
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EXAMPLE C — all fields, both variants, dQ + dU, wider ylim floor
 # ─────────────────────────────────────────────────────────────────────────────
 #python3 "${SCRIPTS}"/plot_dQ_vs_beam.py \
 #    --data-root        "${DATA_ROOT}" \
@@ -84,7 +94,7 @@ python3 "${SCRIPTS}"/plot_dQ_vs_beam.py \
 #    --ylim             5.0
 
 # ─────────────────────────────────────────────────────────────────────────────
-# EXAMPLE C — two specific fields, regular variant only, auto-scale y-axis
+# EXAMPLE D — two specific fields, regular variant only, auto-scale y-axis
 # ─────────────────────────────────────────────────────────────────────────────
 #python3 "${SCRIPTS}"/plot_dQ_vs_beam.py \
 #    --data-root        "${DATA_ROOT}" \
