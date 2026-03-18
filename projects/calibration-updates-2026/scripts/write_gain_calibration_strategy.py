@@ -79,15 +79,22 @@ $$I^{ic} = XX^{ic} + YY^{ic} = \\tfrac{1}{2}\\bigl(G_x^{ic} + G_y^{ic}\\bigr)\\,
 $$Q^{ic} = XX^{ic} - YY^{ic} = \\tfrac{1}{2}\\bigl(G_x^{ic} - G_y^{ic}\\bigr)\\,I^\\circ$$
 <hr>
 <h2>4. Solving for $G_x^{ic}$ and $G_y^{ic}$</h2>
-<p>We define two observables from the 1934&minus;638 measurements:</p>
-$$\\gamma = \\frac{YY^{ic}}{XX^{ic}} = \\frac{G_y^{ic}}{G_x^{ic}} \\tag{VI}$$
-$$dQ = \\frac{Q^{ic}}{I^\\circ} = \\tfrac{1}{2}\\bigl(G_x^{ic} - G_y^{ic}\\bigr) \\tag{VII}$$
-<p>We have two unknowns ($G_x^{ic}$, $G_y^{ic}$) and two independent equations &mdash;
-the system is uniquely determined. Substituting $G_y^{ic} = \\gamma G_x^{ic}$ from (VI) into (VII):</p>
-$$G_x^{ic}\\,(1-\\gamma) = 2\\,dQ$$
-$$\\boxed{G_x^{ic} = \\frac{2\\,dQ}{1-\\gamma}, \\qquad G_y^{ic} = \\frac{2\\gamma\\,dQ}{1-\\gamma}} \\tag{VIII}$$
-<p>Both gains are fully determined by the two observables $dQ$ and $\\gamma$,
-measured directly from the 1934&minus;638 data after interim calibration.</p>
+<p>The two equations at the end of &sect;3 have two unknowns. Adding and subtracting them directly:</p>
+$$G_x^{ic} = \frac{I^{ic} + Q^{ic}}{I^\circ} \tag{VI}$$
+$$G_y^{ic} = \frac{I^{ic} - Q^{ic}}{I^\circ} \tag{VII}$$
+<p>This is the exact, assumption-free result. Both gains are fully determined by
+three measurables: $I^{ic}$, $Q^{ic}$ (from 1934&minus;638 after interim calibration),
+and $I^\circ$ (the known true flux of 1934&minus;638).
+Defining $dQ = Q^{ic}/I^{ic}$, these can be written:</p>
+$$G_x^{ic} = \frac{I^{ic}}{I^\circ}\,(1 + dQ), \qquad G_y^{ic} = \frac{I^{ic}}{I^\circ}\,(1 - dQ) \tag{VIII}$$
+<p>The prefactor $I^{ic}/I^\circ$ is the flux-scale accuracy of the interim calibration.
+If total-intensity has been correctly calibrated so that $I^{ic} = I^\circ$, this
+prefactor is unity and (VIII) simplifies to:</p>
+$$G_x^{ic} = 1 + dQ, \qquad G_y^{ic} = 1 - dQ \qquad \text{(when } I^{ic}/I^\circ = 1\text{)} \tag{IX}$$
+<p>In this case $dQ$ alone determines both gain errors. If $I^{ic}/I^\circ \neq 1$,
+using (IX) would absorb a flux-scale error into the bandpass table; the full
+form (VIII) must be used instead, requiring an independent measurement of
+$I^\circ$ (e.g. a flux model of 1934&minus;638).</p>
 <hr>
 <h2>5. Final Calibration Table</h2>
 <p>From (III), any raw measurement $XX_{\\rm target}^m$ is related to the true sky by
@@ -96,9 +103,11 @@ $$XX_{\\rm target}^m = G_x^m \\cdot G_x^{ic} \\cdot XX^\\circ$$
 <p>We already hold $g_x^m$ (the voltage gain) in the bandpass table, and we have now
 derived the correction factor $G_x^{ic}$ from the 1934&minus;638 data above.
 The combined voltage gain that removes both factors is:</p>
-$$g_x^f = g_x^m \\cdot \\sqrt{G_x^{ic}} = g_x^m \\cdot \\sqrt{\\frac{2\\,dQ}{1-\\gamma}} \\tag{IX}$$
-$$g_y^f = g_y^m \\cdot \\sqrt{G_y^{ic}} = g_y^m \\cdot \\sqrt{\\frac{2\\gamma\\,dQ}{1-\\gamma}}$$
-<p>The $\\sqrt{\\cdot}$ converts $G_x^{ic}$ from the correlation (power) domain in which
+$$g_x^f = g_x^m \\cdot \\sqrt{G_x^{ic}} = g_x^m \\cdot \\sqrt{\\frac{I^{ic}}{I^\\circ}\\,(1+dQ)} \\tag{X}$$
+$$g_y^f = g_y^m \\cdot \\sqrt{G_y^{ic}} = g_y^m \\cdot \\sqrt{\\frac{I^{ic}}{I^\\circ}\\,(1-dQ)}$$
+<p>When $I^{ic}/I^\\circ = 1$, these simplify to $g_x^f = g_x^m\\sqrt{1+dQ}$,
+$g_y^f = g_y^m\\sqrt{1-dQ}$.
+The $\\sqrt{\\cdot}$ converts $G_x^{ic}$ from the correlation (power) domain in which
 it was derived back to the voltage domain in which bandpass tables operate.
 Applying $g^f$ to any new target data gives:</p>
 $$\\frac{XX_{\\rm target}^m}{|g_x^f|^2} = \\frac{G_x^m \\cdot G_x^{ic} \\cdot XX^\\circ}{G_x^m \\cdot G_x^{ic}} = XX^\\circ$$
