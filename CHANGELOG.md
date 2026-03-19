@@ -5,8 +5,9 @@ All notable changes to this project are documented in this file.
 ## 3.12 — 2026-03-19
 
 Wires dQ/dU vs beam plots directly into the HTML report builder so the report
-is fully self-contained. Clarifies and unifies `--html-only` / `--force` flag
-behaviour across all plot-generation steps.
+is fully self-contained. Unifies `--html-only` / `--force` flag behaviour across
+all plot-generation steps. Adds per-beam mean correction-factor line to plots and
+a human-readable ASCII lookup table.
 
 ### Added
 - `build_phase3_html_report.py` — `generate_dq_beam_plots()`: calls
@@ -15,11 +16,9 @@ behaviour across all plot-generation steps.
   propagated to regenerate all plots.
 - `build_phase3_html_report.py` — `dQ∿` and `dU∿` badges in the
   `ref_fieldname` table cell (badges 5 and 6), linking to
-  `dQ_vs_beam_<field>_<variant>.png` and `dU_vs_beam_<field>_<variant>.png`
-  respectively; `∿` (U+223F sine-wave) chosen as the line-plot symbol.
-- `plot_dQ_vs_beam.py` — `--force` flag: regenerates all PNGs even if they
-  already exist on disk.
-- `plot_dQ_vs_beam.py` — per-file existence check inside the main loop:
+  `dQ_vs_beam_<field>_<  `dQ_vs_beam_<field>_<  `dQ_vs_bead>  `dQ_vs_beam_<field>pectively; `∿` (U+223F sine-wave) c  `dQ_vs_beam_<field>_<  `dQ_vs_ `plo  `dQ_vs_beam_<field>_<  `dQ_vs_beam* on  `dQ_vs_beam_<field>_<  `dQ_vs_beam_<field>_<  `dQ_vser  `dQ_vs_beam_<field>_<  `dQ_vs_bean pe  `dQ_vs_beam_<field>_<  `dQ_vs_beam_d7 ODC rows); labelled “Mean (all obs)” in legend; faint
+  red/blue sha  red/blue sha  red/blue sha  red/blue sha  red/blue sha  red/blue sha  red/bte_c  red/blue sha  red/blue sha  red/blue sha  red/blue sha  red/blue sha  red/blctor  red/blue sha  red/blue sha  red/ Fix  red/bl A  red/blue sha  red/blue sha  red/blue sha  red/blue sha  red/blue sha dU  red/blue sha  red/blue sha  red/blue sha  red/blue sha  red/blue sha  rp, source CSV path, manifest selection and
+  grep example. Blank line between eac  grep example. Blank line betwee_dQ_v  grep example. Blank line between eac  grep example. Blank line betwee_dQ_v  e  grep example. Blank line between eac  grep example. Blstence check inside the main loop:
   reconstructs the output filename and skips `make_figure()` if the PNG is
   already present and `--force` is not set.
 
@@ -27,11 +26,11 @@ behaviour across all plot-generation steps.
 - `build_phase3_html_report.py` — unified `--html-only` / `--force` semantics:
   - `--html-only` now gates **all** plot-generation steps (upstream pipeline,
     PAF overlays, PAF movies, dQ/dU plots). Only HTML is rebuilt; all
-    subprocesses are suppressed. PAF overlay/movie info is still collected
-    via a disk-discovery pass (no subprocesses) to populate report links.
-  - `--force` (without `--html-only`) regenerates every step unconditionally.
-  - `--force` + `--html-only`: `--html-only` wins — no subprocesses run.
-
+    PAF overlays, PAF movies, dQ/dU plots). Only HTML is rebuilt; all
+peline,
+tics:
+xample. Blank line between eac  grep example. Blank line betwee_dQ_v  e  grep example. Blank line between eac  grep example. Blstence check inside the main loop:
+html-only`: `--html-only` wins — no subprocesses run.
 ## 3.11 — 2026-03-19
 
 Adds per-beam dQ (fractional Stokes-Q leakage) diagnostic plots and a
