@@ -21,6 +21,10 @@ a human-readable ASCII lookup table.
   grep example. Blank line between eac  grep example. Blank line betwee_dQ_v  grep example. Blank line between eac  grep example. Blank line betwee_dQ_v  e  grep example. Blank line between eac  grep example. Blstence check inside the main loop:
   reconstructs the output filename and skips `make_figure()` if the PNG is
   already present and `--force` is not set.
+- `mstool/bin/regen_beam_pngs.py` (**new**): standalone + importable per-beam PNG regenerator from `.txt` / `.lcal.txt` channel files; no measurement sets or HPC access required. Functions: `parse_txt_file()`, `lookup_fieldname_from_manifest()`, `generate_pngs_from_txt()`, `apply_plot_header()`. CLI: `inputs` (files or dirs), `--output-dir`, `--overwrite`, `--ylim-pol` (default ±5 %), `--manifest`, `--field-name`.
+- `mstool/bin/combine_beam_outputs.py` — regen integration: new flags `--regen-beam-pngs`, `--regen-overwrite`, `--regen-ylim-pol YMIN YMAX` (default `-5 5`), `--regen-manifest PATH`. Regen pass runs before `create_combined_pdf()`, iterating all `.txt` files in output dir, skipping beams that already have PNGs unless `--regen-overwrite` is set.
+- `mstool/bin/averageMS.py` — writes `# Field Name: <name>` header line to `.txt` output when `--field-name` is set; makes `.txt` files self-contained for later regen without manifest.
+- `projects/calibration-updates-2026/README.md` — documents local-only stage-4 workflow, `regen_beam_pngs.py` CLI/integration, updated stage table and recommended run order.
 
 ### Changed
 - `build_phase3_html_report.py` — unified `--html-only` / `--force` semantics:
