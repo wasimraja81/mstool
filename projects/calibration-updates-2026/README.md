@@ -104,7 +104,7 @@ across beams, reference fields, and ODC weights:
 
 | Script | Purpose |
 |--------|---------|
-| `plot_dQ_vs_beam.py` | Per-field line plots of dQ (and dU with `--dU`) vs beam number per SB_REF; manifest-driven; `--fields` partial filter; smart ylim (floor ±2.5%, auto-expands); `--variant both\|regular\|lcal`; thick mean line (cross-observation mean per beam) overlaid on each plot; writes `dq_du_correction_factors.txt` lookup table (fixed-width ASCII: field, variant, beam, mean\_dQ, std\_dQ, mean\_dU, std\_dU, n\_obs); per-file skip-if-exists; `--force` to regenerate. Called automatically by `build_phase3_html_report.py`. |
+| `plot_dQ_vs_beam.py` | Per-field line plots of dQ (and dU with `--dU`) vs beam number per SB_REF; manifest-driven; `--fields` partial filter; smart ylim (floor ±2.5%, auto-expands); `--variant both\|bpcal\|lcal`; thick mean line (cross-observation mean per beam) overlaid on each plot; writes `dq_du_correction_factors.txt` lookup table (fixed-width ASCII: field, variant, beam, mean\_dQ, std\_dQ, mean\_dU, std\_dU, n\_obs); per-file skip-if-exists; `--force` to regenerate. Called automatically by `build_phase3_html_report.py`. |
 | `run_dQ_plots.sh` | Example run script for `plot_dQ_vs_beam.py`; symlinked from `scratch/` |
 | `write_gain_calibration_strategy.py` | Generates `gain_calibration_strategy.html` — a self-contained KaTeX document with the full bandpass gain calibration derivation (§1–§5). Run standalone or call `generate(path)` from the report builder. |
 
@@ -161,7 +161,7 @@ python -m http.server 8765 -d ~/DATA/reffield-average/phase3
 
 Output artefacts (under `~/DATA/reffield-average/`):
 
-- `phase2/leakage_cube.nc` — 3-D labelled NetCDF4 cube (xarray-compatible); variables: `dL`, `dQ`, `dU`, `p90`, `nsb` × {regular, lcal}
+- `phase2/leakage_cube.nc` — 3-D labelled NetCDF4 cube (xarray-compatible); variables: `dL`, `dQ`, `dU`, `p90`, `nsb` × {bpcal, lcal}
 - `phase3/index.html` — self-contained HTML report
 - `phase3/plots/footprint_dL_*.png` — dL = √(Q²+U²)/I footprint heatmap PNGs (multi-panel and single-panel)
 - `phase3/plots/footprint_QU_*.png` — split-circle Q/U footprint PNGs (multi-panel and per-(ODC, variant))

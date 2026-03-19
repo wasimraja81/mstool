@@ -41,7 +41,7 @@ both are linked from the HTML report.
 - `plot_dQ_vs_beam.py`: per-field line plots of dQ (and optionally dU) vs beam
   number per SB_REF; manifest-driven (same `--manifest`, `--start-index`,
   `--end-index`, `--exclude-indices` pattern as phase-1); `--fields` partial
-  case-insensitive filter; `--variant both|regular|lcal`; smart y-axis —
+  case-insensitive filter; `--variant both|bpcal|lcal`; smart y-axis —
   floor ±2.5%, expands to `max(ylim, |data| × 1.1)` if data exceed the floor;
   output filenames `dQ_vs_beam_<field>_<variant>.png`.
 - `run_dQ_plots.sh`: example run script for `plot_dQ_vs_beam.py`; symlinked
@@ -133,8 +133,8 @@ every layer: isolation tables → cube → footprint plots → HTML report.
 - `build_phase2_isolation_tables.py`: propagate `leak_q_over_i_pct` /
   `leak_u_over_i_pct` into beam×field and field-scores tables
   (`median_q_over_i`, `p90_q_over_i`, beam-level aggregates).
-- `build_leakage_cube.py`: four new cube variables `dQ_regular`, `dQ_lcal`,
-  `dU_regular`, `dU_lcal` (|Q|/I × 100 % and |U|/I × 100 %).
+- `build_leakage_cube.py`: four new cube variables `dQ_bpcal`, `dQ_lcal`,
+  `dU_bpcal`, `dU_lcal` (|Q|/I × 100 % and |U|/I × 100 %).
 - `plot_leakage_footprint.py`: split-circle Q/U footprint plots with 45°
   diagonal split and real `Wedge`-patch legend; single-panel and
   combined-heatmap variants.

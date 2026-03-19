@@ -175,7 +175,7 @@
   the corresponding beam-level aggregates to the field-scores table.
 
 - **`build_leakage_cube.py`** — adds four new cube variables:
-  `dQ_regular`, `dQ_lcal`, `dU_regular`, `dU_lcal`
+  `dQ_bpcal`, `dQ_lcal`, `dU_bpcal`, `dU_lcal`
   (|Q|/I × 100 % and |U|/I × 100 %, median over valid channels).
   Gracefully skips empty variables with a status message.
 
@@ -229,12 +229,12 @@
 - **`build_leakage_cube.py`** — Constructs a labelled 3-D NetCDF4 cube
   (`leakage_cube.nc`) from the Phase-2 beam×field CSV.
   Dimensions: beam (36) × field (N) × odc (M).
-  Variables: `dL_regular`, `dL_lcal`, `p90_regular`, `p90_lcal`,
-  `nsb_regular`, `nsb_lcal`.
+  Variables: `dL_bpcal`, `dL_lcal`, `p90_bpcal`, `p90_lcal`,
+  `nsb_bpcal`, `nsb_lcal`.
 
 - **`plot_leakage_footprint.py`** — Generates beam-layout footprint heatmaps
   from the leakage cube.
-  - Multi-panel plots: 2 rows (regular / lcal) × N_odc columns, one PNG per
+  - Multi-panel plots: 2 rows (bpcal / lcal) × N_odc columns, one PNG per
     reference field.
   - Single-panel plots: one PNG per (field, ODC, variant) combination —
     linked from the summary table rows on the HTML index page.
