@@ -155,6 +155,33 @@ def parse_manifest_rows(manifest_path: Path, start_index: int, end_index: int, e
     return rows
 
 
+def parse_footprint_name(metadata_dir: Path, sb_ref: str) -> str:
+    """Read the footprint name from the schedblock-info file for *sb_ref*.
+
+    Tries ``weights.footprint_name`` first (set by the ODC weight configuration),
+    then falls back to ``common.target.src%d.footprint.name``.
+    Returns an empty string if neither is found.
+    """
+    preferred = metadata_dir / f"schedblock-info-{sb_ref}.txt"
+    candidates = [preferred] if preferred.exists() else []
+    candidates.extend(sorted(metadata_dir.glob("schedblock-info-*.txt")))
+
+    for path in candidates:
+        try:
+            content = path.read_text()
+        except Exception:
+            continue
+        for pattern in [
+            r"weights\.footprint_name\s*=\s*(\S+)",
+            r"common\.target\.src%d\.footprint\.name\s*=\s*(\S+)",
+        ]:
+            match = re.search(pattern, content)
+            if match:
+                return match.group(1).strip()
+
+    return ""
+
+
 def parse_pitch_deg(metadata_dir: Path, sb_ref: str):
     preferred = metadata_dir / f"schedblock-info-{sb_ref}.txt"
     candidates = [preferred] if preferred.exists() else []
@@ -415,6 +442,7 @@ def main():
         metadata_dir = tuple_dir / "metadata"
         assessment_dir = tuple_dir / f"1934-processing-SB-{tuple_info['sb_target_1934']}" / "assessment_results"
 
+        footprint_name = parse_footprint_name(metadata_dir, tuple_info["sb_ref"])
         pitch_deg, pitch_source_file = parse_pitch_deg(metadata_dir, tuple_info["sb_ref"])
         if pitch_deg is not None:
             tuples_with_pitch += 1
@@ -501,6 +529,7 @@ def main():
                         "pitch_spacing_residual_deg": pitch_spacing_residual_deg,
                         "pitch_sanity_tolerance_deg": args.pitch_residual_tolerance_deg,
                         "pitch_sanity_pass": pitch_sanity_pass,
+                        "footprint_name": footprint_name,
                         "footprint_file": str(footprint_file) if footprint_file else "",
                         "leak_q_over_i_pct": metrics["q_over_i_pct"],
                         "leak_u_over_i_pct": metrics["u_over_i_pct"],
@@ -548,6 +577,7 @@ def main():
         "pitch_spacing_residual_deg",
         "pitch_sanity_tolerance_deg",
         "pitch_sanity_pass",
+        "footprint_name",
         "footprint_file",
         "leak_q_over_i_pct",
         "leak_u_over_i_pct",

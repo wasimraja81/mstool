@@ -167,11 +167,13 @@ def write_correction_table(
     lines.append(f"# Selection  : manifest indices {meta['start_index']}–{meta['end_index']},"
                  f" excl {meta['exclude_indices']!r}")
     lines.append(f"# SB_REFs    : {meta['n_sbrefs']} contributing observations")
+    lines.append(f"# Footprint  : {meta.get('footprint_name', 'unknown')}")
     lines.append("#")
     lines.append("# Lookup usage:")
     lines.append("#   grep 'REF_1324-28.*bpcal.*  12 ' dq_du_correction_factors.txt")
     lines.append("#")
     lines.append("# Columns:")
+    lines.append("#   footprint   beam footprint name (from schedblock metadata, e.g. closepack36)")
     lines.append("#   field       reference field name")
     lines.append("#   variant     calibration variant  (bpcal | lcal)")
     lines.append("#   beam        beam index  (0–35)")
@@ -183,12 +185,13 @@ def write_correction_table(
     lines.append("#   n_obs       number of (SB_REF, ODC) data rows for this beam")
     lines.append("#")
 
+    fp_col = meta.get('footprint_name', 'unknown')
     if has_dU:
-        hdr = (f"{'field':<24}  {'variant':<8}  {'beam':>4}  "
+        hdr = (f"{'footprint':<16}  {'field':<24}  {'variant':<8}  {'beam':>4}  "
                f"{'mean_dQ':>9}  {'std_dQ':>8}  "
                f"{'mean_dU':>9}  {'std_dU':>8}  {'n_obs':>5}")
     else:
-        hdr = (f"{'field':<24}  {'variant':<8}  {'beam':>4}  "
+        hdr = (f"{'footprint':<16}  {'field':<24}  {'variant':<8}  {'beam':>4}  "
                f"{'mean_dQ':>9}  {'std_dQ':>8}  {'n_obs':>5}")
     lines.append(hdr)
     lines.append("-" * len(hdr))
@@ -214,11 +217,11 @@ def write_correction_table(
             for beam in sorted(grp.groups.keys()):
                 n = int(n_obs[beam])
                 if has_dU and mean_du is not None:
-                    row = (f"{field:<24}  {v:<8}  {beam:>4}  "
+                    row = (f"{fp_col:<16}  {field:<24}  {v:<8}  {beam:>4}  "
                            f"{mean_dq[beam]:>+9.4f}  {std_dq[beam]:>8.4f}  "
                            f"{mean_du[beam]:>+9.4f}  {std_du[beam]:>8.4f}  {n:>5}")
                 else:
-                    row = (f"{field:<24}  {v:<8}  {beam:>4}  "
+                    row = (f"{fp_col:<16}  {field:<24}  {v:<8}  {beam:>4}  "
                            f"{mean_dq[beam]:>+9.4f}  {std_dq[beam]:>8.4f}  {n:>5}")
                 lines.append(row)
             lines.append("")  # blank line between (field, variant) blocks
@@ -231,7 +234,7 @@ def write_correction_table(
     # Usage:
     #   df = pd.read_csv("dq_du_correction_factors.csv")
     #   dq = df.loc[(df.field=="REF_1324-28") & (df.variant=="bpcal") & (df.beam==0), "mean_dQ"].values[0]
-    csv_cols = ["field", "variant", "beam", "mean_dQ", "std_dQ"]
+    csv_cols = ["footprint", "field", "variant", "beam", "mean_dQ", "std_dQ"]
     if has_dU:
         csv_cols += ["mean_dU", "std_dU"]
     csv_cols.append("n_obs")
@@ -255,7 +258,8 @@ def write_correction_table(
             else:
                 mean_du = std_du = None
             for beam in sorted(grp.groups.keys()):
-                rec = {"field": field, "variant": v, "beam": int(beam),
+                rec = {"footprint": meta.get('footprint_name', 'unknown'),
+                       "field": field, "variant": v, "beam": int(beam),
                        "mean_dQ": round(mean_dq[beam], 6),
                        "std_dQ":  round(std_dq[beam],  6),
                        "n_obs":   int(n_obs[beam])}
@@ -275,10 +279,14 @@ def write_correction_table(
         fh.write(f"# Selection  : manifest indices {meta['start_index']}\u2013{meta['end_index']},"
                  f" excl {meta['exclude_indices']!r}\n")
         fh.write(f"# SB_REFs    : {meta['n_sbrefs']} contributing observations\n")
+        fh.write(f"# Footprint  : {meta.get('footprint_name', 'unknown')}\n")
         fh.write("#\n")
         fh.write("# Columns:\n")
-        fh.write("#   field     reference field name (e.g. REF_1324-28)\n")
-        fh.write("#   variant   calibration variant: 'bpcal' (bandpass cal) or 'lcal' (leakage cal)\n")
+        fh.write("#   footprint   beam footprint name (from schedblock metadata, e.g. closepack36)\n")
+        fh.write("#   field       reference field name (e.g. REF_1324-28)\n")
+        fh.write("#   variant   calibration variant: 'bpcal' (bandpass cal) or 'lcal' (leakage cal)\n"
+                 "#             note: footprint is constant across all rows in a single-manifest run;\n"
+                 "#             rows from different footprints (different manifests) can be safely appended\n")
         fh.write("#   beam      ASKAP beam index, 0-based (0-35 for closepack36)\n")
         fh.write("#   mean_dQ   mean fractional Stokes-Q leakage dQ/I (%), signed, averaged\n")
         fh.write("#             across all SB_REF x ODC observations for this field/variant/beam\n")
@@ -298,13 +306,15 @@ def write_correction_table(
         fh.write("# Usage (pandas) -- the comment='#' argument skips these header lines:\n")
         fh.write("#   import pandas as pd\n")
         fh.write("#   df = pd.read_csv('dq_du_correction_factors.csv', comment='#')\n")
-        fh.write("#   row = df[(df.field == 'REF_1324-28') & (df.variant == 'bpcal') & (df.beam == 12)].iloc[0]\n")
+        fh.write("#   row = df[(df.footprint == 'closepack36') & (df.field == 'REF_1324-28')\n")
+        fh.write("#            & (df.variant == 'bpcal') & (df.beam == 12)].iloc[0]\n")
         fh.write("#   dq, dq_std = row.mean_dQ, row.std_dQ\n")
         if has_dU:
             fh.write("#   du, du_std = row.mean_dU, row.std_dU\n")
         fh.write("#\n")
-        fh.write("# To get all 36 beams for a field/variant as a numpy array:\n")
-        fh.write("#   sub = df[(df.field == 'REF_1324-28') & (df.variant == 'bpcal')].sort_values('beam')\n")
+        fh.write("# To get all 36 beams for a footprint/field/variant as a numpy array:\n")
+        fh.write("#   sub = df[(df.footprint == 'closepack36') & (df.field == 'REF_1324-28')\n")
+        fh.write("#            & (df.variant == 'bpcal')].sort_values('beam')\n")
         fh.write("#   dq_array = sub.mean_dQ.to_numpy()   # shape (36,), index = beam number\n")
         fh.write("#\n")
         fh.write("# See also: dq_du_correction_factors.txt  (fixed-width ASCII, greppable)\n")
@@ -556,16 +566,26 @@ def main():
                             mean_per_beam=mean_per_beam)
 
     # ── ASCII correction-factor lookup table ────────────────────────────────
+    # Derive footprint_name from the master CSV — all rows in a single manifest
+    # share the same footprint, so take the first non-empty value.
+    if "footprint_name" in df.columns:
+        _fp_values = df["footprint_name"].dropna()
+        _fp_values = _fp_values[_fp_values.astype(str).str.strip() != ""]
+        footprint_name = str(_fp_values.iloc[0]) if not _fp_values.empty else "unknown"
+    else:
+        footprint_name = "unknown"
+
     write_correction_table(
         df, fields_to_plot, variants,
         has_dU=args.dU,
         output_dir=output_dir,
         meta={
-            "csv_path":       str(csv_path),
-            "start_index":    args.start_index,
-            "end_index":      args.end_index,
+            "csv_path":        str(csv_path),
+            "start_index":     args.start_index,
+            "end_index":       args.end_index,
             "exclude_indices": args.exclude_indices,
-            "n_sbrefs":       df["sb_ref"].nunique(),
+            "n_sbrefs":        df["sb_ref"].nunique(),
+            "footprint_name":  footprint_name,
         },
     )
 
