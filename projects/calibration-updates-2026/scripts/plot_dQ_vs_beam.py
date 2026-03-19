@@ -33,6 +33,7 @@ Usage
 """
 
 import argparse
+import datetime
 import sys
 from pathlib import Path
 from typing import Optional
@@ -59,7 +60,8 @@ MANIFEST_DEFAULT = "projects/calibration-updates-2026/manifests/sb_manifest_reff
 
 
 def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
-                ylabel: str, output_dir: Path, show: bool, ylim: Optional[float] = 5.0):
+                ylabel: str, output_dir: Path, show: bool, ylim: Optional[float] = 5.0,
+                mean_per_beam: Optional[pd.Series] = None):
     """Generate one figure (single axes) for a single ref_fieldname."""
     odcs = sorted(df_field["odc_weight"].unique())
     odc_colours = {odc: cm.tab10(i / max(len(odcs) - 1, 1)) for i, odc in enumerate(odcs)}
@@ -85,8 +87,20 @@ def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
                 marker=sb_markers[sb],
                 markersize=5,
                 linewidth=1.2,
-                alpha=0.85,
+                alpha=0.65,
             )
+
+    # ── Mean line across all observations ──────────────────────────────────
+    if mean_per_beam is not None and not mean_per_beam.empty:
+        mx = mean_per_beam.sort_index()
+        ax.plot(mx.index, mx.values,
+                color="black", linewidth=2.8, linestyle="-",
+                marker="o", markersize=5, zorder=6)
+        # Zero-crossing annotation on the mean line
+        ax.fill_between(mx.index, mx.values, 0,
+                        where=(mx.values >= 0), alpha=0.08, color="tomato", zorder=3)
+        ax.fill_between(mx.index, mx.values, 0,
+                        where=(mx.values < 0),  alpha=0.08, color="steelblue", zorder=3)
 
     ax.axhline(0, color="black", linewidth=0.6, linestyle="--", alpha=0.4)
     if ylim is not None:
@@ -109,7 +123,12 @@ def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
                       marker=sb_markers[sb], markersize=6, linewidth=0, label=f"SB {sb}")
         for sb in sbs
     ]
-    ax.legend(handles=odc_handles + sb_handles, title="ODC / SB_REF",
+    mean_handle = (
+        [mlines.Line2D([], [], color="black", linewidth=2.8, linestyle="-",
+                       marker="o", markersize=5, label="Mean (all obs)")]
+        if mean_per_beam is not None and not mean_per_beam.empty else []
+    )
+    ax.legend(handles=mean_handle + odc_handles + sb_handles, title="ODC / SB_REF",
               title_fontsize=8, fontsize=7, framealpha=0.8,
               loc="upper right", ncol=2)
 
@@ -122,6 +141,91 @@ def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
     if show:
         plt.show()
     plt.close(fig)
+
+
+def write_correction_table(
+        df: pd.DataFrame,
+        fields: list,
+        variants: list,
+        has_dU: bool,
+        output_dir: Path,
+        meta: dict,
+) -> None:
+    """Write a human-readable ASCII lookup table of mean dQ/dU correction
+    factors per beam, per variant, per reference field.
+
+    The file is written to <output_dir>/dq_du_correction_factors.txt.
+    Columns are fixed-width so the file reads cleanly with column(1) or grep.
+    """
+    dq_col = "leak_q_over_i_signed_pct"
+    du_col = "leak_u_over_i_signed_pct"
+
+    lines = []
+    lines.append("# dQ/dU per-beam mean correction factors")
+    lines.append(f"# Generated  : {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    lines.append(f"# Source CSV : {meta['csv_path']}")
+    lines.append(f"# Selection  : manifest indices {meta['start_index']}–{meta['end_index']},"
+                 f" excl {meta['exclude_indices']!r}")
+    lines.append(f"# SB_REFs    : {meta['n_sbrefs']} contributing observations")
+    lines.append("#")
+    lines.append("# Lookup usage:")
+    lines.append("#   grep 'REF_1324-28.*regular.*  12 ' dq_du_correction_factors.txt")
+    lines.append("#")
+    lines.append("# Columns:")
+    lines.append("#   field       reference field name")
+    lines.append("#   variant     calibration variant  (regular | lcal)")
+    lines.append("#   beam        beam index  (0–35)")
+    lines.append("#   mean_dQ     mean signed dQ/I (%) across all SB_REF × ODC observations")
+    lines.append("#   std_dQ      standard deviation of dQ/I (%)")
+    if has_dU:
+        lines.append("#   mean_dU     mean signed dU/I (%) across all SB_REF × ODC observations")
+        lines.append("#   std_dU      standard deviation of dU/I (%)")
+    lines.append("#   n_obs       number of (SB_REF, ODC) data rows for this beam")
+    lines.append("#")
+
+    if has_dU:
+        hdr = (f"{'field':<24}  {'variant':<8}  {'beam':>4}  "
+               f"{'mean_dQ':>9}  {'std_dQ':>8}  "
+               f"{'mean_dU':>9}  {'std_dU':>8}  {'n_obs':>5}")
+    else:
+        hdr = (f"{'field':<24}  {'variant':<8}  {'beam':>4}  "
+               f"{'mean_dQ':>9}  {'std_dQ':>8}  {'n_obs':>5}")
+    lines.append(hdr)
+    lines.append("-" * len(hdr))
+
+    for field in fields:
+        df_f = df[df["ref_fieldname"] == field]
+        if df_f.empty:
+            continue
+        for v in variants:
+            sub = df_f[df_f["variant"] == v]
+            if sub.empty:
+                continue
+            grp      = sub.groupby("beam")
+            mean_dq  = grp[dq_col].mean()
+            std_dq   = grp[dq_col].std().fillna(0.0)
+            n_obs    = grp[dq_col].count()
+            if has_dU and du_col in sub.columns:
+                mean_du = grp[du_col].mean()
+                std_du  = grp[du_col].std().fillna(0.0)
+            else:
+                mean_du = std_du = None
+
+            for beam in sorted(grp.groups.keys()):
+                n = int(n_obs[beam])
+                if has_dU and mean_du is not None:
+                    row = (f"{field:<24}  {v:<8}  {beam:>4}  "
+                           f"{mean_dq[beam]:>+9.4f}  {std_dq[beam]:>8.4f}  "
+                           f"{mean_du[beam]:>+9.4f}  {std_du[beam]:>8.4f}  {n:>5}")
+                else:
+                    row = (f"{field:<24}  {v:<8}  {beam:>4}  "
+                           f"{mean_dq[beam]:>+9.4f}  {std_dq[beam]:>8.4f}  {n:>5}")
+                lines.append(row)
+            lines.append("")  # blank line between (field, variant) blocks
+
+    out_path = output_dir / "dq_du_correction_factors.txt"
+    out_path.write_text("\n".join(lines) + "\n")
+    print(f"Saved correction table: {out_path}")
 
 
 def main():
@@ -268,8 +372,25 @@ def main():
                 if out_path.exists() and not args.force:
                     print(f"  Skip (exists): {out_path.name}")
                     continue
+                # Mean across all (odc, sb_ref) for this beam position
+                mean_per_beam = sub.groupby("beam")[col].mean()
                 make_figure(sub, field, v, col, label, output_dir, args.show,
-                            ylim=args.ylim if args.ylim > 0 else None)
+                            ylim=args.ylim if args.ylim > 0 else None,
+                            mean_per_beam=mean_per_beam)
+
+    # ── ASCII correction-factor lookup table ────────────────────────────────
+    write_correction_table(
+        df, fields_to_plot, variants,
+        has_dU=args.dU,
+        output_dir=output_dir,
+        meta={
+            "csv_path":       str(csv_path),
+            "start_index":    args.start_index,
+            "end_index":      args.end_index,
+            "exclude_indices": args.exclude_indices,
+            "n_sbrefs":       df["sb_ref"].nunique(),
+        },
+    )
 
 
 if __name__ == "__main__":
