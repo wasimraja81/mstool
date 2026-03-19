@@ -195,7 +195,7 @@ def plot_single_panel(ds, offsets, field_name, odc_val, var_name, var_label,
     fig.tight_layout()
 
     safe_field = field_name.replace("/", "_")
-    # variant short tag: "regular" or "lcal"
+    # variant short tag: "bpcal" or "lcal"
     vtag = var_name.replace("dL_", "")
     out_path = output_dir / f"footprint_dL_{safe_field}_odc{odc_val}_{vtag}.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
@@ -312,7 +312,7 @@ def plot_single_panel_qu(ds, offsets, field_name, odc_val, vtag,
     cb = fig.colorbar(sm, ax=ax, fraction=0.046, pad=0.04, shrink=0.5)
     cb.set_label("|Q|/I  or  |U|/I  (%)")
 
-    var_label = "Bandpass calibrated" if vtag == "regular" else "Bandpass + Leakage (on-axis) calibrated"
+    var_label = "Bandpass calibrated" if vtag == "bpcal" else "Bandpass + Leakage (on-axis) calibrated"
     ax.set_title(f"{field_name}  |  ODC {odc_val}  |  {var_label}", fontsize=10, fontweight="bold")
 
     # Legend: split-circle in top-left
@@ -348,7 +348,7 @@ def plot_field_qu(ds, offsets, field_name, output_dir, vmin=0, vmax=1.5):
     """
     Split-circle Q/U footprint plot for one reference field.
 
-    Layout: 2 rows (regular, lcal) × N_odc columns.
+    Layout: 2 rows (bpcal, lcal) × N_odc columns.
     Each beam drawn as two wedges: visual left half = |Q|/I, visual right half = |U|/I.
     Note: ax.invert_xaxis() is applied (RA increases left), so the data-right wedge
     (270°→90°) becomes the visual-left half carrying Q, and the data-left wedge (90°→270°)
@@ -356,7 +356,7 @@ def plot_field_qu(ds, offsets, field_name, output_dir, vmin=0, vmax=1.5):
     Shared colormap and scale across both Stokes.
     """
     variants = [
-        ("dQ_regular", "dU_regular", "Bandpass calibrated"),
+        ("dQ_bpcal", "dU_bpcal", "Bandpass calibrated"),
         ("dQ_lcal",    "dU_lcal",    "Bandpass + Leakage (on-axis) calibrated"),
     ]
     odcs = ds.odc.values
@@ -529,7 +529,7 @@ def plot_field(ds, offsets, field_name, output_dir, vmin=None, vmax=None):
     Layout: 2 rows (Bandpass calibrated, Bandpass+Lcal) × N_odc columns.
     """
     variants = [
-        ("dL_regular", "Bandpass calibrated"),
+        ("dL_bpcal", "Bandpass calibrated"),
         ("dL_lcal", "Bandpass + Leakage (on-axis) calibrated"),
     ]
     odcs = ds.odc.values
@@ -698,7 +698,7 @@ def main():
 
     # ── Plot ────────────────────────────────────────────────────────────
     variants_single = [
-        ("dL_regular", "Bandpass calibrated"),
+        ("dL_bpcal", "Bandpass calibrated"),
         ("dL_lcal", "Bandpass + Leakage (on-axis) calibrated"),
     ]
     fields = [args.field] if args.field else list(ds.field.values)

@@ -72,7 +72,7 @@ def parse_manifest(path: Path) -> list:
 # ---------------------------------------------------------------------------
 
 #: (filename_template, kind, variant_tag)
-#: variant_tag: "" = regular, ".lcal" = lcal
+#: variant_tag: "" = bpcal, ".lcal" = lcal
 _MEDIA_FILE_SPECS = [
     ("{stem}.combined_beams.pdf",        "pdf",         ""),
     ("{stem}.combined_beams.lcal.pdf",   "pdf",         ".lcal"),
@@ -174,7 +174,7 @@ def convert_pdfs_to_pngs(media_info: dict, media_dir: Path, dpi: int = 150) -> N
                 if png_path.exists():
                     present.add(png_fname)  # already done
                     continue
-                print(f"  [{sb_ref}] PDF→PNG page {page_num} [{vtag or 'regular'}] … ", end="", flush=True)
+                print(f"  [{sb_ref}] PDF→PNG page {page_num} [{vtag or 'bpcal'}] … ", end="", flush=True)
                 subprocess.run(
                     [
                         gs_bin, "-q", "-dBATCH", "-dNOPAUSE", "-dSAFER",
@@ -420,7 +420,7 @@ def build_spectra_cards(manifest_rows: list, media_info: dict,
 
     One <details id='sbref-{r}'> card per SB_REF, sorted by ODC then field.
     Each card contains GIF animation buttons and combined_beams PDF/PNG links
-    for both calibration variants (regular / lcal).  MP4s, all-beams PNGs,
+    for both calibration variants (bpcal / lcal).  MP4s, all-beams PNGs,
     beamwise stats, and PAF plots are now shown inline in the summary tables.
     """
     ordered = sorted(
@@ -443,7 +443,7 @@ def build_spectra_cards(manifest_rows: list, media_info: dict,
 
         # ── GIFs + combined_beams PDF/PNG per variant ──────────────────
         variant_sections = []
-        for variant_label, vtag in [("regular", ""), ("lcal", ".lcal")]:
+        for variant_label, vtag in [("bpcal", ""), ("lcal", ".lcal")]:
             btns = []
             for plot_stem, plot_label in [
                 ("beams_stokes",     "Stokes"),
@@ -649,7 +649,7 @@ def build_summary_table(rows, plots_dir=None, media_map=None, paf_overlay_info=N
             if h == "ref_fieldname" and plots_dir is not None:
                 field_safe = str(v).replace("/", "_")
                 odc = row.get("odc_weight", "")
-                vtag = str(row.get("variant", ""))  # "regular" or "lcal"
+                vtag = str(row.get("variant", ""))  # "bpcal" or "lcal"
                 # Badge 1: per-(odc, variant) dL footprint
                 dl_png = f"footprint_dL_{field_safe}_odc{odc}_{vtag}.png"
                 if (plots_dir / dl_png).exists():
@@ -676,7 +676,7 @@ def build_summary_table(rows, plots_dir=None, media_map=None, paf_overlay_info=N
                     cmp_dl_badge = (
                         f" <a href='plots/{quote(cmp_dl_png)}'"
                         f" onclick=\"openModal(this.href,'img');return false;\""
-                        f" class='plot-badge plot-badge--cmp' title='All-ODC comparison (regular + lcal)'>dL&#x2248;</a>"
+                        f" class='plot-badge plot-badge--cmp' title='All-ODC comparison (bpcal + lcal)'>dL&#x2248;</a>"
                     )
                 else:
                     cmp_dl_badge = ""
@@ -686,7 +686,7 @@ def build_summary_table(rows, plots_dir=None, media_map=None, paf_overlay_info=N
                     cmp_qu_badge = (
                         f" <a href='plots/{quote(cmp_qu_png)}'"
                         f" onclick=\"openModal(this.href,'img');return false;\""
-                        f" class='plot-badge plot-badge--cmp' title='All-ODC comparison (regular + lcal)'>|dQ|,|dU|&#x2248;</a>"
+                        f" class='plot-badge plot-badge--cmp' title='All-ODC comparison (bpcal + lcal)'>|dQ|,|dU|&#x2248;</a>"
                     )
                 else:
                     cmp_qu_badge = ""
@@ -713,7 +713,7 @@ def build_summary_table(rows, plots_dir=None, media_map=None, paf_overlay_info=N
                     du_beam_badge = ""
                 cells.append(f"<td>{html.escape(str(v))}{dl_badge}{qu_badge}{cmp_dl_badge}{cmp_qu_badge}{dq_beam_badge}{du_beam_badge}</td>")
             elif h == "sb_ref_values":
-                variant = row.get("variant", "regular")
+                variant = row.get("variant", "bpcal")
                 vtag = ".lcal" if variant == "lcal" else ""
                 parts = [p.strip() for p in str(v).split(";") if p.strip()]
                 badge_parts = []
@@ -796,7 +796,7 @@ def write_csv_viewer(output_dir: Path, csv_filename: str, title: str, column_hel
             is_field_mode = "field_effect_scores" in csv_filename
             if is_field_mode:
                 mode_label = "field effects at fixed ODC"
-                comparison_group = "fixed ODC weight + variant (regular or lcal)"
+                comparison_group = "fixed ODC weight + variant (bpcal or lcal)"
                 candidate_axis = "reference fields"
                 fixed_axis_note = "On this page we do not compare across ODCs; ODC is fixed within each group."
                 delta_header_label = "ΔL_f"
@@ -809,7 +809,7 @@ def write_csv_viewer(output_dir: Path, csv_filename: str, title: str, column_hel
                 fixed_label = "ODC weight"
             else:
                 mode_label = "ODC effects at fixed field"
-                comparison_group = "fixed reference field + variant (regular or lcal)"
+                comparison_group = "fixed reference field + variant (bpcal or lcal)"
                 candidate_axis = "ODC weights"
                 fixed_axis_note = "On this page we do not compare across fields; reference field is fixed within each group."
                 delta_header_label = "ΔL_o"
@@ -1361,12 +1361,12 @@ def main():
         if not rows:
             continue
         fieldnames = list(rows[0].keys())
-        for variant in ["regular", "lcal"]:
+        for variant in ["bpcal", "lcal"]:
             filtered = [r for r in rows if r.get("variant") == variant]
             write_csv(tables_dir / f"{stem}.{variant}.csv", filtered, fieldnames)
 
-    # ── Inline summary tables (regular / lcal) ─────────────────────────
-    field_regular = [r for r in field_scores if r.get("variant") == "regular"]
+    # ── Inline summary tables (bpcal / lcal) ─────────────────────────
+    field_bpcal = [r for r in field_scores if r.get("variant") == "bpcal"]
     field_lcal = [r for r in field_scores if r.get("variant") == "lcal"]
 
     # ── Footprint heatmap links (one PNG per unique field) ──────────────
@@ -1405,11 +1405,11 @@ def main():
 
     # ── Build beam-level CSV viewer pages ───────────────────────────────
     beam_viewer_specs = {
-        "beam_x_field_at_fixed_odc.regular.csv": (
-            "Beam-by-field table at fixed ODC (regular)",
+        "beam_x_field_at_fixed_odc.bpcal.csv": (
+            "Beam-by-field table at fixed ODC (bpcal)",
             [
                 ("odc_weight", "ODC setting"),
-                ("variant", "regular or lcal"),
+                ("variant", "bpcal or lcal"),
                 ("beam", "beam index 0-35"),
                 ("ref_fieldname", "reference calibration field"),
                 ("median_l_over_i", "median L/I [%]"),
@@ -1422,7 +1422,7 @@ def main():
             "Beam-by-field table at fixed ODC (lcal)",
             [
                 ("odc_weight", "ODC setting"),
-                ("variant", "regular or lcal"),
+                ("variant", "bpcal or lcal"),
                 ("beam", "beam index 0-35"),
                 ("ref_fieldname", "reference calibration field"),
                 ("median_l_over_i", "median L/I [%]"),
@@ -1431,11 +1431,11 @@ def main():
                 ("count_samples", "total sample count"),
             ],
         ),
-        "beam_x_odc_at_fixed_field.regular.csv": (
-            "Beam-by-ODC table at fixed field (regular)",
+        "beam_x_odc_at_fixed_field.bpcal.csv": (
+            "Beam-by-ODC table at fixed field (bpcal)",
             [
                 ("ref_fieldname", "reference calibration field"),
-                ("variant", "regular or lcal"),
+                ("variant", "bpcal or lcal"),
                 ("beam", "beam index 0-35"),
                 ("odc_weight", "ODC setting"),
                 ("median_l_over_i", "median L/I [%]"),
@@ -1448,7 +1448,7 @@ def main():
             "Beam-by-ODC table at fixed field (lcal)",
             [
                 ("ref_fieldname", "reference calibration field"),
-                ("variant", "regular or lcal"),
+                ("variant", "bpcal or lcal"),
                 ("beam", "beam index 0-35"),
                 ("odc_weight", "ODC setting"),
                 ("median_l_over_i", "median L/I [%]"),
@@ -1461,9 +1461,9 @@ def main():
 
     beam_links = []
     for csv_name in [
-        "beam_x_field_at_fixed_odc.regular.csv",
+        "beam_x_field_at_fixed_odc.bpcal.csv",
         "beam_x_field_at_fixed_odc.lcal.csv",
-        "beam_x_odc_at_fixed_field.regular.csv",
+        "beam_x_odc_at_fixed_field.bpcal.csv",
         "beam_x_odc_at_fixed_field.lcal.csv",
     ]:
         if not (tables_dir / csv_name).exists():
@@ -1658,7 +1658,7 @@ def main():
   <h1>Summary of Residual On-axis Leakage</h1>
   <p class='meta'><b>Scope:</b> manifest indices 14&ndash;49, excluding 24&ndash;29 (ODC-5241 era; ODC-3611 legacy fields not included).<br>
      Each table row is one (ODC weight, calibration variant, reference field) combination, aggregated over all SB_REF observations of that field.<br>
-     <b>Bandpass calibrated</b> (regular) and <b>Bandpass + Leakage on-axis calibrated</b> (lcal) variants are shown in separate tables.<br>
+     <b>Bandpass calibrated</b> (bpcal) and <b>Bandpass + Leakage on-axis calibrated</b> (lcal) variants are shown in separate tables.<br>
      Plot badges on the <i>Reference field</i> column link to per-ODC and all-ODC footprint heatmaps (see legend below).
      SB_REF media (Stokes/pol.degree MP4, combined-beams PNG, beamwise stats, PAF overlay and movie) are accessible
      via the drop-down trigger on each SB_REF ID in the <i>Observed SB_REF IDs</i> column.</p>
@@ -1671,7 +1671,7 @@ def main():
     <thead><tr><th>Column</th><th>Meaning</th></tr></thead>
     <tbody>
       <tr><td>ODC weight</td><td>ODC WEIGHTS ID</td></tr>
-      <tr><td>Variant</td><td>Bandpass calibrated (regular) or Bandpass + Leakage on-axis calibrated (lcal)</td></tr>
+      <tr><td>Variant</td><td>Bandpass calibrated (bpcal) or Bandpass + Leakage on-axis calibrated (lcal)</td></tr>
       <tr><td>Reference field</td><td>Name (with skyPos) of the field used for calibration</td></tr>
       <tr><td>n_obs(f)</td><td>Number of independent observations for this field (per ODC weight)</td></tr>
       <tr><td>Observed SB_REF IDs</td><td>Links to the leakage statistics card for each individual SB_REF observation</td></tr>
@@ -1685,12 +1685,12 @@ def main():
      \\(dL = 100 \\times L/I\\), where \\(L\\) is the linear polarisation intensity and \\(I\\) is the Stokes&nbsp;I total intensity.</p>
   <p class='meta'><b>Plot badges on Reference field column:</b><br>
      <b>dL</b> / <b>|dQ|,|dU|</b> (blue) &mdash; per-ODC footprint for that row&apos;s variant;<br>
-     <b style='color:#b07d00'>dL&#x2248;</b> / <b style='color:#b07d00'>|dQ|,|dU|&#x2248;</b> &mdash; all-ODC comparison footprint (regular&nbsp;+&nbsp;lcal stacked).<br>
+     <b style='color:#b07d00'>dL&#x2248;</b> / <b style='color:#b07d00'>|dQ|,|dU|&#x2248;</b> &mdash; all-ODC comparison footprint (bpcal&nbsp;+&nbsp;lcal stacked).<br>
      <b>dL</b> = residual leakage (dL&nbsp;=&nbsp;&radic;(Q&sup2;+U&sup2;)/I&nbsp;(%)), faceted by ODC weight and calibration variant.<br>
      <b>|dQ|,|dU|</b> = split-circle plots of |Q|/I (top-left) and |U|/I (bottom-right).</p>
 
   <h2>Bandpass calibrated</h2>
-  {build_summary_table(field_regular, plots_dir=output_dir / 'plots', media_map=media_map,
+  {build_summary_table(field_bpcal, plots_dir=output_dir / 'plots', media_map=media_map,
                        paf_overlay_info=paf_overlay_info, paf_movie_info=paf_movie_info)}
 
   <h2>Bandpass + Leakage (on-axis) calibrated</h2>
@@ -1700,7 +1700,7 @@ def main():
   <h2>3D Leakage cube (NetCDF4)</h2>
   <p class='meta'>The leakage data is stored as a labelled 3-D <a href='https://www.unidata.ucar.edu/software/netcdf/' target='_blank'>NetCDF4</a> cube
      with dimensions <b>beam</b>&nbsp;(36) &times; <b>field</b>&nbsp;(N) &times; <b>odc</b>&nbsp;(M).<br>
-     Variables: <code>dL_regular</code>, <code>dL_lcal</code>, <code>p90_regular</code>, <code>p90_lcal</code>, <code>nsb_regular</code>, <code>nsb_lcal</code>.<br>
+     Variables: <code>dL_bpcal</code>, <code>dL_lcal</code>, <code>p90_bpcal</code>, <code>p90_lcal</code>, <code>nsb_bpcal</code>, <code>nsb_lcal</code>.<br>
      Open with <code>xarray.open_dataset('leakage_cube.nc')</code> for programmatic slicing, outlier detection, or further analysis.</p>
   {cube_link_html}
 
