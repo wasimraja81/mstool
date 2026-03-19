@@ -172,13 +172,7 @@ correlation (power) domain back to the voltage domain required by the bandpass
 table.</p>
 <p>The <code>std_dQ</code> and <code>n_obs</code> columns allow a downstream script to propagate
 uncertainty or to apply a beam-quality threshold (e.g. reject beams with
-$\sigma_{dQ} &gt; 1\%$ or $n_{\rm obs} &lt; 3$) before applying the correction.</p>
-<p>The reference field to use is determined by the scheduling block that
-produced the bandpass table being corrected: the interim bandpass was derived
-from a specific reference-field observation, so the correction factors for
-that same <code>field</code> value are the ones that must be applied.  Look up the
-<code>REF_FIELDNAME</code> for the relevant scheduling block in the manifest to identify
-the correct row.</p>
+$\\sigma_{dQ} \\gt 1\\%$ or $n_{\\mathrm{obs}} \\lt 3$) before applying the correction.</p>
 </body>
 </html>
 """
