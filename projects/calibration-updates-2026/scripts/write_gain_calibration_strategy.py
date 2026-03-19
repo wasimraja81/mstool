@@ -113,6 +113,70 @@ Applying $g^f$ to any new target data gives:</p>
 $$\\frac{XX_{\\rm target}^m}{|g_x^f|^2} = \\frac{G_x^m \\cdot G_x^{ic} \\cdot XX^\\circ}{G_x^m \\cdot G_x^{ic}} = XX^\\circ$$
 <p>The updated table $g^f$ replaces the interim bandpass table and is applied directly
 to uncalibrated data &mdash; no intermediate calibration step is required.</p>
+<hr>
+<h2>6. Accessing the correction factors</h2>
+<p>The pipeline produces two files alongside the per-field line plots in
+<code>&lt;data-root&gt;/phase3/plots/</code>:</p>
+<ul>
+  <li><code>dq_du_correction_factors.csv</code> &mdash; machine-readable, one row per
+      (field, variant, beam) triple; suitable for pandas/numpy consumption by
+      downstream processing scripts.</li>
+  <li><code>dq_du_correction_factors.txt</code> &mdash; fixed-width ASCII companion;
+      human-readable and greppable without Python.</li>
+</ul>
+<h3>6.1 Column schema</h3>
+<table>
+  <thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>field</code></td><td>str</td><td>Reference field name, e.g. <code>REF_1324-28</code></td></tr>
+    <tr><td><code>variant</code></td><td>str</td><td><code>bpcal</code> (bandpass-cal measurement) or <code>lcal</code> (leakage-cal measurement)</td></tr>
+    <tr><td><code>beam</code></td><td>int</td><td>ASKAP beam index, 0-based (0&ndash;35 for closepack36)</td></tr>
+    <tr><td><code>mean_dQ</code></td><td>float, %</td><td>Mean signed $dQ/I$ leakage averaged across all SB_REF &times; ODC observations</td></tr>
+    <tr><td><code>std_dQ</code></td><td>float, %</td><td>Standard deviation of $dQ/I$ across observations &mdash; indicates repeatability</td></tr>
+    <tr><td><code>mean_dU</code></td><td>float, %</td><td>Mean signed $dU/I$ (present when <code>--dU</code> was passed to <code>plot_dQ_vs_beam.py</code>)</td></tr>
+    <tr><td><code>std_dU</code></td><td>float, %</td><td>Standard deviation of $dU/I$</td></tr>
+    <tr><td><code>n_obs</code></td><td>int</td><td>Number of (SB_REF, ODC) rows averaged for this beam</td></tr>
+  </tbody>
+</table>
+<p>The CSV begins with <code>#</code>-prefixed comment lines that document the schema and
+usage pattern; these are skipped automatically by pandas when
+<code>comment='#'</code> is passed.</p>
+<h3>6.2 Reading the table</h3>
+<pre><code class="language-python">import pandas as pd
+
+df = pd.read_csv("phase3/plots/dq_du_correction_factors.csv", comment="#")
+
+# Per-beam lookup for a specific field, variant and beam
+row = df[
+    (df.field   == "REF_1324-28") &
+    (df.variant == "bpcal") &
+    (df.beam    == 12)
+].iloc[0]
+dq, dq_std = row.mean_dQ, row.std_dQ   # fractional Stokes-Q leakage, %
+du, du_std = row.mean_dU, row.std_dU   # fractional Stokes-U leakage, %
+
+# All 36 beams as a numpy array (for vectorised correction)
+sub = df[
+    (df.field   == "REF_1324-28") &
+    (df.variant == "bpcal")
+].sort_values("beam")
+dq_array = sub.mean_dQ.to_numpy()   # shape (36,)
+</code></pre>
+<h3>6.3 Applying the correction</h3>
+<p>From equation&nbsp;(X), the corrected bandpass voltage gain for beam $b$ is:</p>
+$$g_x^f[b] = g_x^m[b]\,\sqrt{1 + dQ[b]/100}$$
+$$g_y^f[b] = g_y^m[b]\,\sqrt{1 - dQ[b]/100}$$
+<p>where $dQ[b]$ is <code>mean_dQ</code> for that beam (in percent, so the division by 100
+converts to a fractional correction).  The $\sqrt{\cdot}$ converts from the
+correlation (power) domain back to the voltage domain required by the bandpass
+table.</p>
+<p>The <code>std_dQ</code> and <code>n_obs</code> columns allow a downstream script to propagate
+uncertainty or to apply a beam-quality threshold (e.g. reject beams with
+$\sigma_{dQ} &gt; 1\%$ or $n_{\rm obs} &lt; 3$) before applying the correction.</p>
+<p>If only a single reference field is available for a given scheduling block,
+use the row with the matching <code>field</code> value.  If multiple fields overlap the
+observation, the correction from the closest reference field (in LST or sky
+position) is the most reliable choice.</p>
 </body>
 </html>
 """
