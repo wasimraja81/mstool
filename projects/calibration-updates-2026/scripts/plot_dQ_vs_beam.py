@@ -11,7 +11,7 @@ Layout
   • One subplot per ref_fieldname (drawn from the manifest-selected rows)
   • Lines coloured by ODC weight
   • Marker shape cycles over SB_REF observations of the same field
-  • Separate figures for 'regular' and 'lcal' variants, or both
+  • Separate figures for 'bpcal' and 'lcal' variants, or both
 
 CLI options deliberately mirror build_phase1_master_table.py so that the same
 manifest selection (--start-index, --end-index, --exclude-indices) controls
@@ -22,8 +22,8 @@ Usage
   # Default: indices 14-49, excl 24-29 (same as build_phase1_master_table.py)
   python plot_dQ_vs_beam.py
 
-  # Regular variant only, interactive display
-  python plot_dQ_vs_beam.py --variant regular --show
+  # bpcal variant only, interactive display
+  python plot_dQ_vs_beam.py --variant bpcal --show
 
   # Also plot dU alongside dQ
   python plot_dQ_vs_beam.py --dU
@@ -85,22 +85,22 @@ def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
                 row[quantity],
                 color=colour,
                 marker=sb_markers[sb],
-                markersize=5,
-                linewidth=1.2,
-                alpha=0.65,
+                markersize=4,
+                linewidth=0.9,
+                alpha=0.75,
+                zorder=2,
             )
 
-    # ── Mean line across all observations ──────────────────────────────────
+    # ── Mean line across all observations (drawn on top of individual lines) ─
     if mean_per_beam is not None and not mean_per_beam.empty:
         mx = mean_per_beam.sort_index()
+        ax.fill_between(mx.index, mx.values, 0,
+                        where=(mx.values >= 0), alpha=0.07, color="tomato", zorder=3)
+        ax.fill_between(mx.index, mx.values, 0,
+                        where=(mx.values < 0),  alpha=0.07, color="steelblue", zorder=3)
         ax.plot(mx.index, mx.values,
-                color="black", linewidth=2.8, linestyle="-",
-                marker="o", markersize=5, zorder=6)
-        # Zero-crossing annotation on the mean line
-        ax.fill_between(mx.index, mx.values, 0,
-                        where=(mx.values >= 0), alpha=0.08, color="tomato", zorder=3)
-        ax.fill_between(mx.index, mx.values, 0,
-                        where=(mx.values < 0),  alpha=0.08, color="steelblue", zorder=3)
+                color="black", linewidth=2.0, linestyle="-",
+                marker="o", markersize=4, zorder=5)
 
     ax.axhline(0, color="black", linewidth=0.6, linestyle="--", alpha=0.4)
     if ylim is not None:
@@ -124,8 +124,8 @@ def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
         for sb in sbs
     ]
     mean_handle = (
-        [mlines.Line2D([], [], color="black", linewidth=2.8, linestyle="-",
-                       marker="o", markersize=5, label="Mean (all obs)")]
+        [mlines.Line2D([], [], color="black", linewidth=2.0, linestyle="-",
+                       marker="o", markersize=4, label="Mean (all obs)")]
         if mean_per_beam is not None and not mean_per_beam.empty else []
     )
     ax.legend(handles=mean_handle + odc_handles + sb_handles, title="ODC / SB_REF",
@@ -169,11 +169,11 @@ def write_correction_table(
     lines.append(f"# SB_REFs    : {meta['n_sbrefs']} contributing observations")
     lines.append("#")
     lines.append("# Lookup usage:")
-    lines.append("#   grep 'REF_1324-28.*regular.*  12 ' dq_du_correction_factors.txt")
+    lines.append("#   grep 'REF_1324-28.*bpcal.*  12 ' dq_du_correction_factors.txt")
     lines.append("#")
     lines.append("# Columns:")
     lines.append("#   field       reference field name")
-    lines.append("#   variant     calibration variant  (regular | lcal)")
+    lines.append("#   variant     calibration variant  (bpcal | lcal)")
     lines.append("#   beam        beam index  (0–35)")
     lines.append("#   mean_dQ     mean signed dQ/I (%) across all SB_REF × ODC observations")
     lines.append("#   std_dQ      standard deviation of dQ/I (%)")
@@ -227,6 +227,141 @@ def write_correction_table(
     out_path.write_text("\n".join(lines) + "\n")
     print(f"Saved correction table: {out_path}")
 
+    # ── companion CSV for easy Python/pandas querying ────────────────────────
+    # Usage:
+    #   df = pd.read_csv("dq_du_correction_factors.csv")
+    #   dq = df.loc[(df.field=="REF_1324-28") & (df.variant=="bpcal") & (df.beam==0), "mean_dQ"].values[0]
+    csv_cols = ["field", "variant", "beam", "mean_dQ", "std_dQ"]
+    if has_dU:
+        csv_cols += ["mean_dU", "std_dU"]
+    csv_cols.append("n_obs")
+
+    csv_rows = []
+    for field in fields:
+        df_f = df[df["ref_fieldname"] == field]
+        if df_f.empty:
+            continue
+        for v in variants:
+            sub = df_f[df_f["variant"] == v]
+            if sub.empty:
+                continue
+            grp     = sub.groupby("beam")
+            mean_dq = grp[dq_col].mean()
+            std_dq  = grp[dq_col].std().fillna(0.0)
+            n_obs   = grp[dq_col].count()
+            if has_dU and du_col in sub.columns:
+                mean_du = grp[du_col].mean()
+                std_du  = grp[du_col].std().fillna(0.0)
+            else:
+                mean_du = std_du = None
+            for beam in sorted(grp.groups.keys()):
+                rec = {"field": field, "variant": v, "beam": int(beam),
+                       "mean_dQ": round(mean_dq[beam], 6),
+                       "std_dQ":  round(std_dq[beam],  6),
+                       "n_obs":   int(n_obs[beam])}
+                if has_dU and mean_du is not None:
+                    rec["mean_dU"] = round(mean_du[beam], 6)
+                    rec["std_dU"]  = round(std_du[beam],  6)
+                csv_rows.append(rec)
+
+    import csv as _csv
+    csv_path_out = output_dir / "dq_du_correction_factors.csv"
+    with csv_path_out.open("w", newline="") as fh:
+        writer = _csv.DictWriter(fh, fieldnames=csv_cols)
+        writer.writeheader()
+        writer.writerows(csv_rows)
+    print(f"Saved correction CSV:   {csv_path_out}")
+
+
+# ── Portable query helper ─────────────────────────────────────────────────────
+
+def lookup_correction(csv_path, field, variant, beam):
+    """Return dQ/dU correction factors for a given reference field, variant and beam.
+
+    This function is importable so other scripts can query the correction table
+    without re-running the full plot pipeline.
+
+    Parameters
+    ----------
+    csv_path : str or pathlib.Path
+        Path to ``dq_du_correction_factors.csv`` produced by this script.
+    field : str
+        Reference field name, e.g. ``"REF_1324-28"``.
+    variant : str
+        Calibration variant: ``"bpcal"`` or ``"lcal"``.
+    beam : int
+        Beam index (0–35).
+
+    Returns
+    -------
+    dict
+        Keys: ``mean_dQ``, ``std_dQ``, ``n_obs``, and (when present in the
+        CSV) ``mean_dU``, ``std_dU``.  All numeric values are native Python
+        floats/ints so the dict is directly JSON-serialisable.
+
+    Raises
+    ------
+    FileNotFoundError
+        If *csv_path* does not exist.
+    KeyError
+        If no row matches the requested ``(field, variant, beam)``
+        combination.  The error message lists available values.
+
+    Examples
+    --------
+    Minimal usage::
+
+        from plot_dQ_vs_beam import lookup_correction
+        r = lookup_correction("dq_du_correction_factors.csv",
+                              "REF_1324-28", "bpcal", 12)
+        print(f"dQ = {r['mean_dQ']:+.4f} ± {r['std_dQ']:.4f} %")
+        if "mean_dU" in r:
+            print(f"dU = {r['mean_dU']:+.4f} ± {r['std_dU']:.4f} %")
+
+    Bulk lookup with pandas::
+
+        import pandas as pd
+        df = pd.read_csv("dq_du_correction_factors.csv")
+        sub = df[(df.field == "REF_1324-28") & (df.variant == "bpcal")]
+        # sub now has one row per beam for that field/variant
+    """
+    import pandas as _pd
+
+    csv_path = Path(csv_path)
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Correction CSV not found: {csv_path}")
+
+    df = _pd.read_csv(csv_path)
+
+    mask = (
+        (df["field"]   == str(field))
+        & (df["variant"] == str(variant))
+        & (df["beam"]    == int(beam))
+    )
+    row = df.loc[mask]
+
+    if row.empty:
+        available_fields   = sorted(df["field"].unique().tolist())
+        available_variants = sorted(df["variant"].unique().tolist())
+        available_beams    = sorted(int(b) for b in df["beam"].unique())
+        raise KeyError(
+            f"No entry for (field={field!r}, variant={variant!r}, beam={beam}).\n"
+            f"  Available fields  : {available_fields}\n"
+            f"  Available variants: {available_variants}\n"
+            f"  Available beams   : {available_beams}"
+        )
+
+    r = row.iloc[0]
+    result = {
+        "mean_dQ": float(r["mean_dQ"]),
+        "std_dQ":  float(r["std_dQ"]),
+        "n_obs":   int(r["n_obs"]),
+    }
+    if "mean_dU" in r.index and not _pd.isna(r["mean_dU"]):
+        result["mean_dU"] = float(r["mean_dU"])
+        result["std_dU"]  = float(r["std_dU"])
+    return result
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -267,7 +402,7 @@ def main():
 
     # ── Plot options ──────────────────────────────────────────────────────────
     parser.add_argument(
-        "--variant", choices=["regular", "lcal", "both"], default="both",
+        "--variant", choices=["bpcal", "lcal", "both"], default="both",
         help="Calibration variant(s) to plot.",
     )
     parser.add_argument(
@@ -349,7 +484,7 @@ def main():
         print("No matching fields — nothing to plot.")
         return
 
-    variants  = ["regular", "lcal"] if args.variant == "both" else [args.variant]
+    variants  = ["bpcal", "lcal"] if args.variant == "both" else [args.variant]
     quantities = [("leak_q_over_i_signed_pct", "dQ")]
     if args.dU:
         quantities.append(("leak_u_over_i_signed_pct", "dU"))

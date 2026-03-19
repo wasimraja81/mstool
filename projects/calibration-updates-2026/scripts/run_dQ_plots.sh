@@ -15,7 +15,7 @@
 #  • Reads leakage_master_table.csv (built by build_phase1_master_table.py).
 #  • Filters to the manifest-selected SB_REFs (default: indices 14–49,
 #    excl 24–29) and derives the unique reference-field list from those rows.
-#  • Generates one PNG per field per variant (regular / lcal) for dQ, and
+#  • Generates one PNG per field per variant (bpcal / lcal) for dQ, and
 #    optionally dU (--dU flag).
 #  • Y-axis: symmetric floor at --ylim (default ±2.5 %); automatically
 #    expands to accommodate any outliers beyond that bound.
@@ -38,7 +38,7 @@
 #                      Omit to plot all unique fields from the manifest
 #
 #  ── Variants ────────────────────────────────────────────────────────────────
-#  --variant           regular | lcal | both  (default: both)
+#  --variant           bpcal | lcal | both  (default: both)
 #
 #  ── Quantities ──────────────────────────────────────────────────────────────
 #  --dU                Also generate dU signed (%) figures
@@ -94,7 +94,7 @@ python3 "${SCRIPTS}"/plot_dQ_vs_beam.py \
 #    --ylim             5.0
 
 # ─────────────────────────────────────────────────────────────────────────────
-# EXAMPLE D — two specific fields, regular variant only, auto-scale y-axis
+# EXAMPLE D — two specific fields, bpcal variant only, auto-scale y-axis
 # ─────────────────────────────────────────────────────────────────────────────
 #python3 "${SCRIPTS}"/plot_dQ_vs_beam.py \
 #    --data-root        "${DATA_ROOT}" \
@@ -102,5 +102,5 @@ python3 "${SCRIPTS}"/plot_dQ_vs_beam.py \
 #    --end-index        49 \
 #    --exclude-indices  "24-29" \
 #    --fields           "1324-28,0324-28" \
-#    --variant          regular \
+#    --variant          bpcal \
 #    --ylim             0

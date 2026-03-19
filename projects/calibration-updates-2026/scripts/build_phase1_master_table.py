@@ -343,7 +343,7 @@ def find_footprint_file(metadata_dir: Path, sb_ref: str):
 
 def find_assessment_file(assessment_dir: Path, beam: int, variant: str):
     beam_tag = f"beam{beam:02d}"
-    if variant == "regular":
+    if variant == "bpcal":
         candidates = sorted(
             path
             for path in assessment_dir.glob(f"*.{beam_tag}.txt")
@@ -447,7 +447,7 @@ def main():
                 },
             )
 
-            for variant in ["regular", "lcal"]:
+            for variant in ["bpcal", "lcal"]:
                 assessment_file = find_assessment_file(assessment_dir, beam, variant)
 
                 if assessment_file is None:

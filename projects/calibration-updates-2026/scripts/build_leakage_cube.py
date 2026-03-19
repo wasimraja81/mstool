@@ -10,15 +10,15 @@ odc      : int    (ODC WEIGHTS ID, e.g. 5229)
 
 Variables (per variant)
 -----------------------
-dL_regular   : median_l_over_i for variant=regular   [beam, field, odc]
+dL_bpcal     : median_l_over_i for variant=bpcal   [beam, field, odc]
 dL_lcal      : median_l_over_i for variant=lcal      [beam, field, odc]
-p90_regular  : p90_l_over_i    for variant=regular    [beam, field, odc]
+p90_bpcal    : p90_l_over_i    for variant=bpcal     [beam, field, odc]
 p90_lcal     : p90_l_over_i    for variant=lcal       [beam, field, odc]
-dQ_regular   : median_q_over_i for variant=regular   [beam, field, odc]
+dQ_bpcal     : median_q_over_i for variant=bpcal   [beam, field, odc]
 dQ_lcal      : median_q_over_i for variant=lcal      [beam, field, odc]
-dU_regular   : median_u_over_i for variant=regular   [beam, field, odc]
+dU_bpcal     : median_u_over_i for variant=bpcal   [beam, field, odc]
 dU_lcal      : median_u_over_i for variant=lcal      [beam, field, odc]
-nsb_regular  : count_sb_ref    for variant=regular    [beam, field, odc]
+nsb_bpcal    : count_sb_ref    for variant=bpcal     [beam, field, odc]
 nsb_lcal     : count_sb_ref    for variant=lcal       [beam, field, odc]
 
 Input
@@ -66,7 +66,7 @@ def main():
     beams = np.sort(df["beam"].unique())
     fields = np.sort(df["ref_fieldname"].unique())
     odcs = np.sort(df["odc_weight"].unique())
-    variants = ["regular", "lcal"]
+    variants = ["bpcal", "lcal"]
 
     nb, nf, no = len(beams), len(fields), len(odcs)
     print(f"Cube shape: beam={nb} × field={nf} × odc={no} × variant={len(variants)}")
@@ -123,12 +123,12 @@ def main():
     }
     units = {"dL": "%", "p90": "%", "dQ": "%", "dU": "%", "nsb": "count"}
     variant_labels = {
-        "regular": "Bandpass calibrated",
+        "bpcal": "Bandpass calibrated",
         "lcal": "Bandpass + Leakage (on-axis) calibrated",
     }
 
     for key, arr in arrays.items():
-        # key is e.g. "dL_regular"
+        # key is e.g. "dL_bpcal"
         base, var = key.rsplit("_", 1)
         attrs = {
             "long_name": f"{long_names[base]} [{variant_labels[var]}]",
