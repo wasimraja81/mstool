@@ -101,7 +101,6 @@ source "${REPO_ROOT}/.venv/bin/activate"
      --exclude-indices    "24-29" \
      --pol-sources \
      --highlight-frac-pol 0.10 \
-     --html-only \
      --package           "${DATA_ROOT}/final_mvp_share" \
 
 # ─────────────────────────────────────────────────────────────────────────────

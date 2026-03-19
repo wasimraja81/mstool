@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented in this file.
 
+## 3.12 — 2026-03-19
+
+Wires dQ/dU vs beam plots directly into the HTML report builder so the report
+is fully self-contained. Clarifies and unifies `--html-only` / `--force` flag
+behaviour across all plot-generation steps.
+
+### Added
+- `build_phase3_html_report.py` — `generate_dq_beam_plots()`: calls
+  `plot_dQ_vs_beam.py --variant both --dU` as a subprocess at report build
+  time; per-file skip-if-exists (delegates to `plot_dQ_vs_beam.py`); `--force`
+  propagated to regenerate all plots.
+- `build_phase3_html_report.py` — `dQ∿` and `dU∿` badges in the
+  `ref_fieldname` table cell (badges 5 and 6), linking to
+  `dQ_vs_beam_<field>_<variant>.png` and `dU_vs_beam_<field>_<variant>.png`
+  respectively; `∿` (U+223F sine-wave) chosen as the line-plot symbol.
+- `plot_dQ_vs_beam.py` — `--force` flag: regenerates all PNGs even if they
+  already exist on disk.
+- `plot_dQ_vs_beam.py` — per-file existence check inside the main loop:
+  reconstructs the output filename and skips `make_figure()` if the PNG is
+  already present and `--force` is not set.
+
+### Changed
+- `build_phase3_html_report.py` — unified `--html-only` / `--force` semantics:
+  - `--html-only` now gates **all** plot-generation steps (upstream pipeline,
+    PAF overlays, PAF movies, dQ/dU plots). Only HTML is rebuilt; all
+    subprocesses are suppressed. PAF overlay/movie info is still collected
+    via a disk-discovery pass (no subprocesses) to populate report links.
+  - `--force` (without `--html-only`) regenerates every step unconditionally.
+  - `--force` + `--html-only`: `--html-only` wins — no subprocesses run.
+
 ## 3.11 — 2026-03-19
 
 Adds per-beam dQ (fractional Stokes-Q leakage) diagnostic plots and a

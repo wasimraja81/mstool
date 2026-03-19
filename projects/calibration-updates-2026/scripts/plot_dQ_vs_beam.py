@@ -183,6 +183,8 @@ def main():
     )
     parser.add_argument("--show", action="store_true",
                         help="Display plots interactively after saving.")
+    parser.add_argument("--force", action="store_true",
+                        help="Regenerate PNGs even if they already exist on disk.")
 
     args = parser.parse_args()
 
@@ -259,6 +261,13 @@ def main():
                 print(f"  No rows for {field} / variant={v}, skipping.")
                 continue
             for col, label in quantities:
+                # Reconstruct the output path the same way make_figure() does
+                qty_tag   = "d" + col.replace("leak_", "").replace("_over_i_signed_pct", "").upper()
+                field_tag = field.replace("/", "-")
+                out_path  = output_dir / f"{qty_tag}_vs_beam_{field_tag}_{v}.png"
+                if out_path.exists() and not args.force:
+                    print(f"  Skip (exists): {out_path.name}")
+                    continue
                 make_figure(sub, field, v, col, label, output_dir, args.show,
                             ylim=args.ylim if args.ylim > 0 else None)
 
