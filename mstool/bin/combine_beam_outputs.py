@@ -12,6 +12,14 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from matplotlib.backends.backend_pdf import PdfPages
 
+# Import per-beam PNG regeneration function (from same package directory)
+try:
+    from regen_beam_pngs import generate_pngs_from_txt
+except ImportError:
+    _regen_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, _regen_dir)
+    from regen_beam_pngs import generate_pngs_from_txt
+
 plt.rcParams['pdf.compression'] = 0
 
 """
@@ -94,6 +102,34 @@ def parse_args():
         dest="field_name",
         default=None,
         help="Optional SB_REF field name to show as a third header row on plots",
+    )
+    # -----------------------------------------------------------------------
+    # Per-beam PNG regeneration options
+    # -----------------------------------------------------------------------
+    parser.add_argument(
+        "--regen-beam-pngs",
+        action="store_true",
+        dest="regen_beam_pngs",
+        help=(
+            "Before combining, regenerate any missing per-beam spectrum PNGs "
+            "(_stokes.png, _pol-degree.png) directly from the .txt files on disk. "
+            "This removes the need to return to the HPC / original measurement sets."
+        ),
+    )
+    parser.add_argument(
+        "--regen-overwrite",
+        action="store_true",
+        dest="regen_overwrite",
+        help="When --regen-beam-pngs is set, overwrite PNGs even if they already exist.",
+    )
+    parser.add_argument(
+        "--regen-ylim-pol",
+        dest="regen_ylim_pol",
+        nargs=2,
+        type=float,
+        default=None,
+        metavar=("YMIN", "YMAX"),
+        help="Y-axis limits in percent for pol-degree panels regenerated from .txt files (default: auto).",
     )
     return parser.parse_args()
 
@@ -685,7 +721,7 @@ def main():
         print("DRY RUN: PLANNED OUTPUTS")
         print("="*60)
 
-        for variant, label in [('', 'REGULAR'), ('.lcal', 'LEAKAGE CALIBRATED')]:
+        for variant, label in [('', 'BPCAL'), ('.lcal', 'LEAKAGE CALIBRATED')]:
             stokes_files, poldeg_files, txt_files = summarize_variant_inputs(output_dir, variant)
             has_plot_inputs = len(stokes_files) > 0 and len(poldeg_files) > 0
             has_txt_inputs = len(txt_files) > 0
@@ -725,9 +761,55 @@ def main():
             else:
                 print("  SKIP leakage stats plot (no matching text inputs)")
 
+        # Regen dry-run summary
+        if args.regen_beam_pngs:
+            all_txt = sorted(glob.glob(os.path.join(output_dir, '*.txt')))
+            print(f"\n[REGEN] --regen-beam-pngs is set: would process {len(all_txt)} .txt file(s)")
+            overwrite_str = '(overwrite=True)' if args.regen_overwrite else '(skip existing)'
+            print(f"  Mode: {overwrite_str}")
+            if args.regen_ylim_pol:
+                print(f"  ylim-pol: {args.regen_ylim_pol}")
+        else:
+            print("\n[REGEN] --regen-beam-pngs NOT set: per-beam PNGs will NOT be regenerated.")
+
         print("\nNo files were written (dry-run mode).")
         sys.exit(0)
     
+    # ------------------------------------------------------------------
+    # Optional: regenerate missing per-beam PNGs from .txt files
+    # ------------------------------------------------------------------
+    if args.regen_beam_pngs:
+        print("\n" + "="*60)
+        print("REGENERATING PER-BEAM PNGs FROM .txt FILES")
+        print("="*60)
+
+        txt_files = sorted(glob.glob(os.path.join(output_dir, "*.txt")))
+        if not txt_files:
+            print("  WARNING: no .txt files found in output directory — skipping regen.")
+        else:
+            print(f"  Found {len(txt_files)} .txt file(s).")
+            total_written = 0
+            total_skipped = 0
+            total_errors  = 0
+            for txt_file in txt_files:
+                print(f"  Processing: {os.path.basename(txt_file)}")
+                try:
+                    written = generate_pngs_from_txt(
+                        txt_file,
+                        output_dir=output_dir,
+                        overwrite=args.regen_overwrite,
+                        ylim_pol=args.regen_ylim_pol,
+                        field_name=field_name,
+                        verbose=True,
+                    )
+                    total_written += len(written)
+                    if not written:
+                        total_skipped += 1
+                except Exception as e:
+                    print(f"    ERROR regenerating {os.path.basename(txt_file)}: {e}")
+                    total_errors += 1
+            print(f"\n  Regen complete — written: {total_written}, skipped: {total_skipped}, errors: {total_errors}")
+
     # Process bpcal variant
     print("\n" + "="*60)
     print("BPCAL VARIANT")
