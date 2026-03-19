@@ -1,6 +1,6 @@
 # Calibration updates (reference fields) — 2026
 
-> **Current release: tag `3.9`** — PAF plots: transform fix, E-left astronomical sky-view, shared `draw_info_box()` helper, footprint name and all parameters read from schedblock metadata (no hardcoded values except MkII PAF physical layout).
+> **Current release: tag `3.12`** — Per-beam PNG regeneration (`regen_beam_pngs.py`): stage 4 onwards now runs fully locally from `.txt`/`.lcal.txt` files — no HPC access or measurement sets required. `combine_beam_outputs.py` gains `--regen-beam-pngs`/`--regen-manifest` flags. `averageMS.py` writes `# Field Name:` header. Plot fixes: field label, ylim ±5 %, legend `upper right`.
 
 This project measures and analyses on-axis polarisation leakage across ASKAP
 beams, reference fields, and ODC calibration-weight configurations.  It drives
@@ -28,8 +28,8 @@ Run order is strict.  All stages accept `--manifest FILE --start-index N --end-i
 |-------|-------|--------|---------|
 | 1 — refField | HPC | `slurm/start_refField.slurm` / `run_stage-1.sh` | Generate bandpass + leakage tables from reference-field observations |
 | 2 — 1934 | HPC | `slurm/start_1934s.slurm` / `run_stage-2.sh` | Apply tables to 1934 data; quality-check on-axis calibration |
-| 3 — assessment | HPC | `assess_possum_1934s.sh` / `run_stage-3.sh` | Run `averageMS.py` assessment; produce per-beam products for stage 4 |
-| 4 — copy + combine | Local | `copy_and_combine_assessment_results.sh` / `run_stage-4.sh` | Copy HPC outputs locally; invoke `combine_beam_outputs.py`; copy metadata |
+| 3 — assessment | HPC | `assess_possum_1934s.sh` / `run_stage-3.sh` | Run `averageMS.py` assessment; produce per-beam `.txt` / `.lcal.txt` channel files and PNG plots |
+| 4 — copy + combine | Local | `copy_and_combine_assessment_results.sh` / `run_stage-4.sh` | Copy HPC outputs locally; invoke `combine_beam_outputs.py`; copy metadata. If only `.txt`/`.lcal.txt` files are available (PNGs not copied), pass `--regen-beam-pngs` to regenerate PNGs locally before combining — **no HPC access or measurement sets needed** |
 
 ### Quick start
 
@@ -210,6 +210,72 @@ cd ~/mstool/scratch
 3. If multiple targets are present, set field label to `Multi` and print a warning.
 4. If unresolved, keep a blank third header row on plots.
 
+## Per-beam PNG regeneration (`regen_beam_pngs.py`)
+
+`mstool/bin/regen_beam_pngs.py` is a **standalone** and **importable** tool that regenerates the per-beam Stokes and polarisation-degree PNG plots from the `.txt` / `.lcal.txt` channel files produced by `averageMS.py` — **no measurement sets or HPC access required**.
+
+This means the full stage-4 workflow (combining outputs, generating the PDF report, leakage diagnostics) can run on a local machine as long as the `.txt` and `.lcal.txt` files are available locally.
+
+### How field names are resolved
+
+`averageMS.py` now writes `# Field Name: <name>` in the `.txt` file header whenever `--field-name` is passed (i.e. for all files produced by `assess_possum_1934s.sh`). For older files that pre-date this change, `regen_beam_pngs.py` falls back to a manifest lookup using the `REF_FIELDNAME=` token on the matching row.
+
+### CLI usage
+
+```bash
+# Regenerate from a single file (auto-detects output dir = same dir as input)
+python mstool/bin/regen_beam_pngs.py path/to/scienceData...beam08.txt
+
+# Regenerate all beams in a directory, write PNGs to a specific output dir
+python mstool/bin/regen_beam_pngs.py ~/DATA/reffield-average/SB_REF-81084.../assessment_results/ \
+  --output-dir /tmp/regen_pngs/
+
+# Specify manifest for field-name lookup on older .txt files
+python mstool/bin/regen_beam_pngs.py path/to/assessment_results/ \
+  --manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
+
+# Overwrite existing PNGs (default is skip-if-exists)
+python mstool/bin/regen_beam_pngs.py path/to/ --overwrite
+
+# Override ylim for the pol-degree panel (default ±5 %, matching the HPC pipeline)
+python mstool/bin/regen_beam_pngs.py path/to/ --ylim-pol -3 3
+```
+
+### Integration with `combine_beam_outputs.py`
+
+`combine_beam_outputs.py` supports an integrated regen pass via:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--regen-beam-pngs` | off | Regenerate missing per-beam PNGs from `.txt` files before combining |
+| `--regen-overwrite` | off | Also overwrite existing PNGs during regen |
+| `--regen-ylim-pol YMIN YMAX` | `-5 5` | ylim for pol-degree panel (matches HPC pipeline) |
+| `--regen-manifest PATH` | — | Manifest path for field-name lookup on older files |
+
+Example (stage-4 invocation with regen enabled):
+
+```bash
+python mstool/bin/combine_beam_outputs.py \
+  --output-dir ~/DATA/reffield-average/SB_REF-81084.../assessment_results/ \
+  --regen-beam-pngs \
+  --regen-manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
+```
+
+### Running stage 4 locally from `.txt` files only
+
+If you copied only the `.txt` and `.lcal.txt` files from HPC (not the PNGs), this is the recommended stage-4 invocation via the wrapper script:
+
+```bash
+cd ~/mstool/scratch
+../projects/calibration-updates-2026/scripts/run_stage-4.sh \
+  --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --start-index 16 --end-index 16 \
+  --regen-beam-pngs \
+  --regen-manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
+```
+
+The regen step runs once per `.txt` file, skips beams that already have PNGs, and is effectively a no-op if all PNGs are present.
+
 ## Manifest-driven SLURM processing
 
 Both SLURM scripts now read the same tuple manifest used by the copy/combine helper.
@@ -282,10 +348,10 @@ bash start_1934s.slurm --dry-run-parse --start-index 36 --end-index 49
 
 Recommended run order:
 
-1. Reference-field processing (generate bandpass/leakage tables)
-2. 1934 processing (consumes the generated tables)
-3. Run assessment script (generate per-beam assessment plots/txt on HPC)
-4. Copy + combine assessment outputs (can be run locally once steps 1-3 are done)
+1. Reference-field processing (generate bandpass/leakage tables) — **HPC**
+2. 1934 processing (consumes the generated tables) — **HPC**
+3. Run assessment script — produces per-beam `.txt` / `.lcal.txt` channel files and PNG plots on **HPC**
+4. Copy + combine assessment outputs — **local** once steps 1–3 are done.  If only `.txt`/`.lcal.txt` files were copied (no PNGs), pass `--regen-beam-pngs` to regenerate PNGs locally before combining (see [Per-beam PNG regeneration](#per-beam-png-regeneration-regen_beam_pngspy))
 
 Example sequence:
 
@@ -301,8 +367,15 @@ sbatch ../projects/calibration-updates-2026/slurm/start_1934s.slurm \
 ../projects/calibration-updates-2026/scripts/assess_possum_1934s.sh \
   --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
 
+# Standard: copy everything (PNGs + txt) then combine
 ../projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
   --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
+
+# Alternative: copy only .txt/.lcal.txt files, regenerate PNGs locally
+../projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
+  --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --regen-beam-pngs \
+  --regen-manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
 ```
 
 Or use the submit helper (recommended on HPC clone):
@@ -370,6 +443,16 @@ cd ~/mstool/scratch
 ../projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
   --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
   --start-index 2 --end-index 2
+```
+
+**Local-only variant** — if you copied only the `.txt` / `.lcal.txt` channel files (not the PNGs), add `--regen-beam-pngs` to regenerate PNGs locally from the channel files before combining:
+
+```bash
+../projects/calibration-updates-2026/scripts/copy_and_combine_assessment_results.sh \
+  --manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+  --start-index 2 --end-index 2 \
+  --regen-beam-pngs \
+  --regen-manifest ../projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
 ```
 
 You can also exclude selected indices in stage-4:

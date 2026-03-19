@@ -1,4 +1,31 @@
 # Changelog — calibration-u
+## 3.12 — 2026-03-19
+
+### Per-beam PNG regeneration: fully local stage-4 workflow
+
+Stage 4 (combine assessment outputs) can now run entirely on a local machine
+from `.txt` / `.lcal.txt` channel files alone — no PNGs, no measurement sets,
+and no HPC access required.
+
+#### Added
+- `mstool/bin/regen_beam_pngs.py` (**new tool**): standalone CLI + importable library that regenerates per-beam Stokes (`_stokes.png`) and polarisation-degree (`_pol-degree.png`) plots from the `.txt` / `.lcal.txt` files produced by `averageMS.py`.
+  - `parse_txt_file(txt_file)` — parses header (refFreq, chanWidth, polMode, SB tags, `# Field Name:`) and body (complex channel data).
+  - `lookup_fieldname_from_manifest(sb_ref_num, manifest_path)` — fallback field-name lookup via `REF_FIELDNAME=` token in the manifest for pre-existing files.
+  - `generate_pngs_from_txt(...)` — core function; importable by `combine_beam_outputs.py`.
+  - CLI defaults: `--ylim-pol -5 5` (matches HPC pipeline), skip-if-exists by default, `--overwrite` to force.
+- `mstool/bin/combine_beam_outputs.py` — four new flags: `--regen-beam-pngs`, `--regen-overwrite`, `--regen-ylim-pol YMIN YMAX` (default `-5 5`), `--regen-manifest PATH`.
+- `mstool/bin/averageMS.py` — now writes `# Field Name: <name>` in the `.txt` header when `--field-name` is provided, making future `.txt` files self-contained for regen without a manifest.
+
+#### Plot fixes (matching HTML report output exactly)
+- Field name label: read from `# Field Name:` header (new files) or manifest lookup (old files); previously missing on regen.
+- ylim for pol-degree panel: default changed to `[-5, +5]` % (was `None` / auto) — matches the `--ylim-pol -5 +5` always passed by `assess_possum_1934s.sh`.
+- Legend location: `upper right` (was `best`, which matplotlib placed in the centre of some plots).
+
+#### Documentation
+- New `## Per-beam PNG regeneration` section in project README with CLI usage, flag table, and local-only stage-4 workflow example.
+- Stage table updated: stage 3 notes `.txt`/`.lcal.txt` output; stage 4 notes `--regen-beam-pngs` option.
+- Recommended run order and end-to-end `idx=2` example updated with local-only variant.
+
 ## 3.9 — 2026-03-16
 
 ### PAF plots: transform fix, astronomical sky-view, shared helpers, metadata-driven annotations
