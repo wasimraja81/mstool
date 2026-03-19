@@ -352,6 +352,66 @@ def generate_paf_movies(
     return result
 
 
+def generate_dq_beam_plots(
+    data_root: Path,
+    plots_dir: Path,
+    manifest_path,
+    start_index: int = 0,
+    end_index: int = 999,
+    exclude_indices: str = None,
+    dU: bool = True,
+    force: bool = False,
+) -> None:
+    """Run plot_dQ_vs_beam.py to produce per-field dQ (and optionally dU) vs beam PNGs.
+
+    Uses the same Python interpreter and scripts directory as the report builder so
+    the report is fully self-contained.  Skips quietly if the script is not found.
+    With *force=False* (default), skips the run entirely if any dQ PNG already exists
+    in plots_dir — set *force=True* to always regenerate.
+    """
+    scripts_dir = Path(__file__).resolve().parent
+    dq_script   = scripts_dir / "plot_dQ_vs_beam.py"
+    if not dq_script.exists():
+        print(f"WARNING: {dq_script} not found – skipping dQ vs beam plots.")
+        return
+
+    plots_dir.mkdir(parents=True, exist_ok=True)
+
+    # Per-file skip logic is handled inside plot_dQ_vs_beam.py itself (checks
+    # each PNG before calling make_figure; honours --force to regenerate).
+    # No global fast-path here — always invoke so any missing files are filled in.
+    cmd = [
+        sys.executable, str(dq_script),
+        "--data-root",   str(data_root),
+        "--output-dir",  str(plots_dir),
+        "--variant",     "both",
+        "--start-index", str(start_index),
+        "--end-index",   str(end_index),
+    ]
+    if exclude_indices:
+        cmd += ["--exclude-indices", exclude_indices]
+    if manifest_path is not None:
+        cmd += ["--manifest", str(manifest_path)]
+    if dU:
+        cmd.append("--dU")
+    if force:
+        cmd.append("--force")
+
+    print("  Running plot_dQ_vs_beam.py … ", end="", flush=True)
+    try:
+        result = subprocess.run(cmd, text=True, capture_output=True)
+        if result.returncode != 0:
+            print(f"FAILED (code {result.returncode})")
+            if result.stderr:
+                print(result.stderr[-500:])
+        else:
+            n_dq = len(list(plots_dir.glob("dQ_vs_beam_*.png")))
+            n_du = len(list(plots_dir.glob("dU_vs_beam_*.png")))
+            print(f"{n_dq} dQ + {n_du} dU PNG(s) ready")
+    except Exception as exc:
+        print(f"ERROR: {exc}")
+
+
 def build_spectra_cards(manifest_rows: list, media_info: dict,
                         media_rel_prefix: str = "media",
                         paf_overlay_info: dict = None,
@@ -630,7 +690,28 @@ def build_summary_table(rows, plots_dir=None, media_map=None, paf_overlay_info=N
                     )
                 else:
                     cmp_qu_badge = ""
-                cells.append(f"<td>{html.escape(str(v))}{dl_badge}{qu_badge}{cmp_dl_badge}{cmp_qu_badge}</td>")
+                # Badge 5: dQ vs beam line plot (per variant) — note: plot_dQ_vs_beam uses "-" not "_"
+                field_tag_dq = str(v).replace("/", "-")
+                dq_beam_png = f"dQ_vs_beam_{field_tag_dq}_{vtag}.png"
+                if (plots_dir / dq_beam_png).exists():
+                    dq_beam_badge = (
+                        f" <a href='plots/{quote(dq_beam_png)}'"
+                        f" onclick=\"openModal(this.href,'img');return false;\""
+                        f" class='plot-badge' title='dQ vs beam'>dQ&#x223F;</a>"
+                    )
+                else:
+                    dq_beam_badge = ""
+                # Badge 6: dU vs beam line plot (per variant) — only present if --dU was used
+                du_beam_png = f"dU_vs_beam_{field_tag_dq}_{vtag}.png"
+                if (plots_dir / du_beam_png).exists():
+                    du_beam_badge = (
+                        f" <a href='plots/{quote(du_beam_png)}'"
+                        f" onclick=\"openModal(this.href,'img');return false;\""
+                        f" class='plot-badge' title='dU vs beam'>dU&#x223F;</a>"
+                    )
+                else:
+                    du_beam_badge = ""
+                cells.append(f"<td>{html.escape(str(v))}{dl_badge}{qu_badge}{cmp_dl_badge}{cmp_qu_badge}{dq_beam_badge}{du_beam_badge}</td>")
             elif h == "sb_ref_values":
                 variant = row.get("variant", "regular")
                 vtag = ".lcal" if variant == "lcal" else ""
@@ -1408,27 +1489,52 @@ def main():
         cube_link_html = "<p class='meta'>Cube file not found &mdash; run the full pipeline (without <code>--html-only</code>) to generate it.</p>"
 
     # ── Build index page ────────────────────────────────────────────────
-# ── PAF beam-overlay plots (per SB_REF) ─────────────────────────────
+# ── Plot generation (all skipped when --html-only; --force regenerates) ──────
     _cat_dir = Path(args.catalog_dir) if args.catalog_dir else output_dir / "catalogs"
-    print("\nGenerating PAF beam-overlay plots …")
-    paf_overlay_info = generate_paf_overlays(
-        manifest_rows, data_root, plots_dir,
-        force=args.force,
-        pol_sources=args.pol_sources,
-        catalog_dir=_cat_dir,
-        highlight_frac_pol=args.highlight_frac_pol,
-    )
-    print(f"  {len(paf_overlay_info)} PAF overlay(s) ready")
+    if args.html_only:
+        print("\n--html-only: skipping all plot generation (PAF overlays, movies, dQ/dU). "
+              "Using whatever is already on disk.")
+        paf_overlay_info = generate_paf_overlays(
+            manifest_rows, data_root, plots_dir,
+            force=False,  # discovery only — never regenerate
+            pol_sources=False,
+        )
+        paf_movie_info = generate_paf_movies(
+            manifest_rows, data_root, plots_dir,
+            force=False,
+            pol_sources=False,
+        )
+    else:
+        print("\nGenerating PAF beam-overlay plots …")
+        paf_overlay_info = generate_paf_overlays(
+            manifest_rows, data_root, plots_dir,
+            force=args.force,
+            pol_sources=args.pol_sources,
+            catalog_dir=_cat_dir,
+            highlight_frac_pol=args.highlight_frac_pol,
+        )
+        print(f"  {len(paf_overlay_info)} PAF overlay(s) ready")
 
-    print("Generating PAF beam-scan movies …")
-    paf_movie_info = generate_paf_movies(
-        manifest_rows, data_root, plots_dir,
-        force=args.force,
-        pol_sources=args.pol_sources,
-        catalog_dir=_cat_dir,
-        highlight_frac_pol=args.highlight_frac_pol,
-    )
-    print(f"  {len(paf_movie_info)} PAF movie(s) ready")
+        print("Generating PAF beam-scan movies …")
+        paf_movie_info = generate_paf_movies(
+            manifest_rows, data_root, plots_dir,
+            force=args.force,
+            pol_sources=args.pol_sources,
+            catalog_dir=_cat_dir,
+            highlight_frac_pol=args.highlight_frac_pol,
+        )
+        print(f"  {len(paf_movie_info)} PAF movie(s) ready")
+
+        # ── dQ (and dU) vs beam line plots (per field × variant) ────────────
+        print("\nGenerating dQ vs beam plots …")
+        generate_dq_beam_plots(
+            data_root, plots_dir,
+            manifest_path=manifest_path,
+            start_index=args.start_index,
+            end_index=args.end_index,
+            exclude_indices=args.exclude_indices,
+            force=args.force,
+        )
 
 # ── Leakage spectra cards (per SB_REF) ──────────────────────────────
     spectra_cards_html = build_spectra_cards(

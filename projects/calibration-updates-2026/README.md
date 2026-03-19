@@ -98,13 +98,13 @@ across beams, reference fields, and ODC weights:
 | `build_phase2_isolation_tables.py` | Produce Phase-2 beam×field and beam×ODC isolation CSVs |
 | `build_leakage_cube.py` | Construct a 3-D NetCDF4 cube (beam × field × odc) from the Phase-2 CSV |
 | `plot_leakage_footprint.py` | Generate beam-layout footprint heatmaps from the cube |
-| `build_phase3_html_report.py` | Run full pipeline end-to-end: summary tables, footprint links, per-SB_REF PAF beam-overlay plots, cube download. Generates `gain_calibration_strategy.html` alongside `index.html`. Supports `--package <path>` to assemble a self-contained shareable directory. |
+| `build_phase3_html_report.py` | Run full pipeline end-to-end: summary tables, footprint links, per-SB_REF PAF beam-overlay plots, cube download. Calls `plot_dQ_vs_beam.py` to generate dQ∿/dU∿ per-field line-plot PNGs and links them as badges in the summary table. Generates `gain_calibration_strategy.html` alongside `index.html`. Supports `--package <path>` for a self-contained shareable directory. `--html-only` skips all subprocesses (uses existing PNGs); `--force` regenerates everything. |
 
 ### dQ diagnostics and gain calibration strategy
 
 | Script | Purpose |
 |--------|---------|
-| `plot_dQ_vs_beam.py` | Per-field line plots of dQ (fractional Stokes-Q leakage) vs beam number per SB_REF; manifest-driven; `--fields` partial filter; smart ylim (floor ±2.5%, auto-expands); `--variant both\|regular\|lcal`; `--dU` for dU plots |
+| `plot_dQ_vs_beam.py` | Per-field line plots of dQ (and dU with `--dU`) vs beam number per SB_REF; manifest-driven; `--fields` partial filter; smart ylim (floor ±2.5%, auto-expands); `--variant both\|regular\|lcal`; per-file skip-if-exists; `--force` to regenerate. Called automatically by `build_phase3_html_report.py`. |
 | `run_dQ_plots.sh` | Example run script for `plot_dQ_vs_beam.py`; symlinked from `scratch/` |
 | `write_gain_calibration_strategy.py` | Generates `gain_calibration_strategy.html` — a self-contained KaTeX document with the full bandpass gain calibration derivation (§1–§5). Run standalone or call `generate(path)` from the report builder. |
 
