@@ -127,9 +127,15 @@ def parse_args():
         dest="regen_ylim_pol",
         nargs=2,
         type=float,
-        default=None,
+        default=[-5.0, 5.0],
         metavar=("YMIN", "YMAX"),
-        help="Y-axis limits in percent for pol-degree panels regenerated from .txt files (default: auto).",
+        help="Y-axis limits in percent for pol-degree panels regenerated from .txt files (default: -5 5, matching HPC pipeline).",
+    )
+    parser.add_argument(
+        "--regen-manifest",
+        dest="regen_manifest_path",
+        default=None,
+        help="Path to sb_manifest_reffield_average.txt for auto field-name lookup when --regen-beam-pngs is used.",
     )
     return parser.parse_args()
 
@@ -800,6 +806,7 @@ def main():
                         overwrite=args.regen_overwrite,
                         ylim_pol=args.regen_ylim_pol,
                         field_name=field_name,
+                        manifest_path=args.regen_manifest_path,
                         verbose=True,
                     )
                     total_written += len(written)

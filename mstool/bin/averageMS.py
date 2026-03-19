@@ -562,6 +562,8 @@ if __name__ == "__main__":
         f.write(f"# Telescope: {msInfo['telescope']}\n")
         f.write(f"# Reference Frequency: {msInfo['refFreq']} Hz\n")
         f.write(f"# Channel Width: {msInfo['chanWidth'][0]} Hz\n")
+        if fieldName:
+            f.write(f"# Field Name: {fieldName}\n")
         f.write(f"#\n")
         
         # Calculate and write leakage statistics for Stokes mode

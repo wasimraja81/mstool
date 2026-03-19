@@ -90,6 +90,7 @@ def parse_txt_file(txt_file):
         'time_avg': None,
         'freq_avg': None,
         'source_ms': None,
+        'field_name': '',
     }
 
     data_rows = []
@@ -137,6 +138,8 @@ def parse_txt_file(txt_file):
                             meta['freq_avg'] = int(val.split()[0])
                         except ValueError:
                             pass
+                    elif key == 'Field Name':
+                        meta['field_name'] = val
                     elif key == 'Averaged spectrum from':
                         meta['source_ms'] = val
             else:
@@ -191,12 +194,42 @@ def _build_plot_tag_text(meta):
 # Core PNG generator — shared with combine_beam_outputs.py
 # ---------------------------------------------------------------------------
 
+def lookup_fieldname_from_manifest(sb_ref_num, manifest_path):
+    """
+    Look up REF_FIELDNAME for a given SB_REF number from the manifest.
+    Returns the field name string, or '' if not found.
+    """
+    if not manifest_path or not os.path.isfile(manifest_path):
+        return ''
+    try:
+        with open(manifest_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                # Skip directive lines (KEY=VALUE with no leading index number)
+                parts = line.split()
+                if not parts[0].isdigit():
+                    continue
+                # columns: idx sb_ref sb_1934 sb_holo sb_target [tokens...]
+                if len(parts) < 2:
+                    continue
+                if parts[1] == str(sb_ref_num):
+                    for token in parts[5:]:
+                        if token.startswith('REF_FIELDNAME='):
+                            return token.split('=', 1)[1]
+    except Exception:
+        pass
+    return ''
+
+
 def generate_pngs_from_txt(
     txt_file,
     output_dir=None,
     overwrite=False,
     ylim_pol=None,
     field_name='',
+    manifest_path=None,
     verbose=True,
 ):
     """
@@ -227,6 +260,12 @@ def generate_pngs_from_txt(
         output_dir = os.path.dirname(os.path.abspath(txt_file))
 
     meta, avgData = parse_txt_file(txt_file)
+
+    # Resolve field_name: explicit arg > txt header > manifest lookup
+    if not field_name:
+        field_name = meta.get('field_name', '')
+    if not field_name and manifest_path:
+        field_name = lookup_fieldname_from_manifest(meta['sb_ref'], manifest_path)
     polMode = meta['polMode']
     nChan, nPol = avgData.shape
 
@@ -340,7 +379,7 @@ def generate_pngs_from_txt(
             ax.set_ylabel('Polarization Degree (%)', fontsize=12)
             ax.set_xlabel('Frequency (MHz)', fontsize=12)
             ax.grid(True, alpha=0.3)
-            ax.legend(loc='best', fontsize=10)
+            ax.legend(loc='upper right', fontsize=10)
 
             if ylim_pol is not None:
                 ax.set_ylim(ylim_pol[0], ylim_pol[1])
@@ -430,9 +469,13 @@ def parse_args():
         help='Overwrite existing PNGs (default: skip if PNG already exists).'
     )
     p.add_argument(
-        '--ylim-pol', dest='ylim_pol', nargs=2, type=float, default=None,
+        '--ylim-pol', dest='ylim_pol', nargs=2, type=float, default=[-5.0, 5.0],
         metavar=('YMIN', 'YMAX'),
-        help='Y-axis limits for pol-degree plots in percent (default: auto).'
+        help='Y-axis limits for pol-degree plots in percent (default: -5 5, matching HPC pipeline).'
+    )
+    p.add_argument(
+        '--manifest', dest='manifest_path', default=None,
+        help='Path to sb_manifest_reffield_average.txt for auto-lookup of REF_FIELDNAME per SB_REF.'
     )
     p.add_argument(
         '--field-name', dest='field_name', default='',
@@ -493,6 +536,42 @@ def main():
                 overwrite=args.overwrite,
                 ylim_pol=args.ylim_pol,
                 field_name=args.field_name,
+                verbose=True,
+            )
+            total_written += len(written)
+            if not written:
+                total_skipped += 1
+        except Exception as e:
+            print(f"  ERROR: {e}", file=sys.stderr)
+            total_errors += 1
+
+    print(f"\n{'='*60}")
+    print(f"Done.  PNGs written: {total_written}  |  Files skipped: {total_skipped}  |  Errors: {total_errors}")
+
+
+def main():
+    args = parse_args()
+    txt_files = collect_txt_files(args.inputs)
+
+    if not txt_files:
+        print("ERROR: no .txt files found.", file=sys.stderr)
+        sys.exit(1)
+
+    total_written = 0
+    total_skipped = 0
+    total_errors  = 0
+
+    for txt_file in txt_files:
+        print(f"\n{'='*60}")
+        print(f"Processing: {txt_file}")
+        try:
+            written = generate_pngs_from_txt(
+                txt_file,
+                output_dir=args.output_dir,
+                overwrite=args.overwrite,
+                ylim_pol=args.ylim_pol,
+                field_name=args.field_name,
+                manifest_path=args.manifest_path,
                 verbose=True,
             )
             total_written += len(written)
