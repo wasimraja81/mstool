@@ -173,10 +173,12 @@ table.</p>
 <p>The <code>std_dQ</code> and <code>n_obs</code> columns allow a downstream script to propagate
 uncertainty or to apply a beam-quality threshold (e.g. reject beams with
 $\sigma_{dQ} &gt; 1\%$ or $n_{\rm obs} &lt; 3$) before applying the correction.</p>
-<p>If only a single reference field is available for a given scheduling block,
-use the row with the matching <code>field</code> value.  If multiple fields overlap the
-observation, the correction from the closest reference field (in LST or sky
-position) is the most reliable choice.</p>
+<p>The reference field to use is determined by the scheduling block that
+produced the bandpass table being corrected: the interim bandpass was derived
+from a specific reference-field observation, so the correction factors for
+that same <code>field</code> value are the ones that must be applied.  Look up the
+<code>REF_FIELDNAME</code> for the relevant scheduling block in the manifest to identify
+the correct row.</p>
 </body>
 </html>
 """
