@@ -34,7 +34,7 @@ This is ideal for dimensional analysis because each `assessment_results` directo
 
 Within each `assessment_results/`, you already have per-beam files (00–35):
 
-- `*.beamXX.txt` (regular)
+- `*.beamXX.txt` (bpcal)
 - `*.beamXX.lcal.txt` (leakage-calibrated)
 - `*.beamXX_stokes.png`
 - `*.beamXX_pol-degree.png`
@@ -70,7 +70,7 @@ This is sufficient to build a rich comparison table without changing acquisition
    - Same `REF_FIELDNAME`, different ODC → isolate ODC effect.
 3. **Robust stats over means only**:
    - Median, MAD/robust sigma, and high-percentile tails (e.g., P90/P95).
-4. **Use both regular and `.lcal` channels**:
+4. **Use both bpcal and `.lcal` channels**:
    - If issue persists post-lcal, root cause may be stronger/systematic.
 5. **Confounders must be explicit**:
    - Keep `AMP_STRATEGY`, `DO_PREFLAG_REFTABLE`, `SB_1934`, `SB_HOLO` visible in all summaries.
@@ -81,7 +81,7 @@ This is sufficient to build a rich comparison table without changing acquisition
 
 Create one tabular dataset (CSV/Parquet conceptually) with one row per:
 
-- `(tuple_id, beam, variant)` where `variant ∈ {regular, lcal}`
+- `(tuple_id, beam, variant)` where `variant ∈ {bpcal, lcal}`
 
 Recommended columns:
 
@@ -92,7 +92,7 @@ Recommended columns:
 - `odc_weight`
 - `amp_strategy`, `do_preflag_reftable`
 - `tuple_path`
-- `variant` (`regular` / `lcal`)
+- `variant` (`bpcal` / `lcal`)
 - `beam`
 
 ### Leakage metrics
@@ -216,8 +216,8 @@ Purpose: quickly identify where to drill down.
 - X=beam, Y=`L/I`, color=ODC
 - plus ODC-vs-baseline deltas
 
-### Panel C: regular vs lcal comparison
-- scatter of `L/I_regular` vs `L/I_lcal` per beam/tuple
+### Panel C: bpcal vs lcal comparison
+- scatter of `L/I_bpcal` vs `L/I_lcal` per beam/tuple
 - residual issue after lcal indicates deeper problem
 
 ## 6.3 Tier-3: Tuple drill-down
@@ -398,7 +398,7 @@ Stage-0 outcome:
 
 - Enumerate all `assessment_results/` directories copied locally.
 - Enumerate all tuple `metadata/` directories copied locally (same tuple set as assessment outputs).
-- Validate expected beam coverage (0–35) for regular + lcal text files.
+- Validate expected beam coverage (0–35) for bpcal + lcal text files.
 - Validate metadata presence/completeness per tuple and record missing fields.
 - Report missingness matrix by tuple and beam.
 
@@ -408,7 +408,7 @@ Phase-0 MVP status:
 - Completed for subset indices `14-35` excluding `24-29`.
 - Artifact: `projects/calibration-updates-2026/reports/phase0_mvp_completeness_14-35_excl_24-29.md`
 - Artifact: `projects/calibration-updates-2026/reports/phase0_mvp_completeness_14-35_excl_24-29.csv`
-- Summary: `16/16` tuple directories present, `16/16` metadata directories present, `16/16` tuples with >=36 regular beam txt, `16/16` tuples with >=36 lcal beam txt.
+- Summary: `16/16` tuple directories present, `16/16` metadata directories present, `16/16` tuples with >=36 bpcal beam txt, `16/16` tuples with >=36 lcal beam txt.
 
 Full-scope Phase-0 status:
 - [ ] Pending for non-MVP indices outside the initial rollout subset.
@@ -448,7 +448,7 @@ Phase-2 MVP status:
 - Artifact: `/Users/raj030/DATA/reffield-average/phase2/beam_x_odc_at_fixed_field.csv`
 - Artifact: `/Users/raj030/DATA/reffield-average/phase2/odc_effect_scores_at_fixed_field.csv`
 - Artifact: `/Users/raj030/DATA/reffield-average/phase2/phase2_mvp_summary.md`
-- Summary: generated fixed-ODC/fixed-field beam tables and score tables for both `regular` and `lcal` variants.
+- Summary: generated fixed-ODC/fixed-field beam tables and score tables for both `bpcal` and `lcal` variants.
 - Implementation: `projects/calibration-updates-2026/scripts/build_phase2_isolation_tables.py`
 
 Full-scope Phase-2 status:
@@ -470,7 +470,7 @@ Phase-3 MVP status:
 - Artifact: `/Users/raj030/DATA/reffield-average/phase3/tables/beam_x_odc_at_fixed_field.csv`
 - Artifact: `/Users/raj030/DATA/reffield-average/phase3/tables/odc_effect_scores_at_fixed_field.csv`
 - Artifact: `/Users/raj030/DATA/reffield-average/phase3/tables/phase2_mvp_summary.md`
-- Summary: single-page report with relative links and top-N REF/ODC effect previews for `regular` and `lcal`.
+- Summary: single-page report with relative links and top-N REF/ODC effect previews for `bpcal` and `lcal`.
 - Implementation: `projects/calibration-updates-2026/scripts/build_phase3_html_report.py`
 
 Full-scope Phase-3 status:

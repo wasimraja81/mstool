@@ -330,7 +330,7 @@ def create_combined_pdf(output_dir, variant='', output_prefix=''):
     
     Args:
         output_dir: Directory containing the PNG files
-        variant: '' for regular, '.lcal' for leakage calibrated
+        variant: '' for bpcal, '.lcal' for leakage calibrated
     
     Returns:
         PDF filename
@@ -351,7 +351,7 @@ def create_combined_pdf(output_dir, variant='', output_prefix=''):
     stokes_files = glob.glob(stokes_pattern)
     poldeg_files = glob.glob(poldeg_pattern)
     
-    # Filter out .lcal files if we're looking for regular files
+    # Filter out .lcal files if we're looking for bpcal files
     if not variant:
         stokes_files = [f for f in stokes_files if '.lcal' not in f]
         poldeg_files = [f for f in poldeg_files if '.lcal' not in f]
@@ -364,7 +364,7 @@ def create_combined_pdf(output_dir, variant='', output_prefix=''):
     stokes_files = sorted(stokes_files, key=get_beam_num)
     poldeg_files = sorted(poldeg_files, key=get_beam_num)
     
-    print(f"\nProcessing {variant if variant else 'regular'} variant:")
+    print(f"\nProcessing {variant if variant else 'bpcal'} variant:")
     print(f"  Found {len(stokes_files)} stokes plots")
     print(f"  Found {len(poldeg_files)} pol-degree plots")
     
@@ -422,7 +422,7 @@ def plot_leakage_stats(output_dir, variant='', output_prefix='', plot_tag_text='
     
     Args:
         output_dir: Directory containing the text files
-        variant: '' for regular, '.lcal' for leakage calibrated
+        variant: '' for bpcal, '.lcal' for leakage calibrated
     
     Returns:
         Plot filename
@@ -439,11 +439,11 @@ def plot_leakage_stats(output_dir, variant='', output_prefix='', plot_tag_text='
     
     txt_files = sorted(glob.glob(txt_pattern))
     
-    # Filter out .lcal files if we're looking for regular files
+    # Filter out .lcal files if we're looking for bpcal files
     if not variant:
         txt_files = [f for f in txt_files if '.lcal' not in f]
     
-    print(f"\nProcessing leakage statistics for {variant if variant else 'regular'} variant:")
+    print(f"\nProcessing leakage statistics for {variant if variant else 'bpcal'} variant:")
     print(f"  Found {len(txt_files)} text files")
     
     if len(txt_files) == 0:
@@ -728,9 +728,9 @@ def main():
         print("\nNo files were written (dry-run mode).")
         sys.exit(0)
     
-    # Process regular variant
+    # Process bpcal variant
     print("\n" + "="*60)
-    print("REGULAR VARIANT")
+    print("BPCAL VARIANT")
     print("="*60)
     result = create_combined_pdf(output_dir, variant='', output_prefix=output_prefix)
     if result:
