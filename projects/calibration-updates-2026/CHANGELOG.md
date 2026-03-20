@@ -1,4 +1,21 @@
 # Changelog — calibration-u
+## 3.13 — 2026-03-20
+
+### GitHub Pages publishing (`publish_report.sh`)
+
+The HTML leakage report can now be published for colleagues to view in a browser without any local setup.
+
+#### Added
+- `scripts/publish_report.sh` (**new script**): syncs `~/DATA/reffield-average/final_mvp_share/` to the public GitHub Pages repo [`wasimraja81/askap-leakage-report`](https://github.com/wasimraja81/askap-leakage-report) and pushes to the `develop` branch.
+  - First run: clones the repo, adds `.nojekyll`, creates `develop` branch from `main`, pushes.
+  - Subsequent runs: `git pull`, `rsync --delete`, timestamped commit, `git push origin develop`.
+  - No-op if nothing has changed since last publish.
+  - Prints reminder to merge `develop → main` to go live on GitHub Pages.
+- `develop`/`main` branch convention for `askap-leakage-report`: `publish_report.sh` always targets `develop`; merging `develop → main` triggers a GitHub Pages deployment (~1–3 min).
+
+#### Documentation
+- New **Publishing the report to GitHub Pages** section in project README with one-time setup steps, publish workflow, and branch convention table.
+
 ## 3.12 — 2026-03-19
 
 ### Per-beam PNG regeneration: fully local stage-4 workflow
