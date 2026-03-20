@@ -182,6 +182,62 @@ def parse_footprint_name(metadata_dir: Path, sb_ref: str) -> str:
     return ""
 
 
+def parse_obs_metadata(metadata_dir: Path, sb_ref: str) -> dict:
+    """Parse observation-level beam configuration from the schedblock-info file.
+
+    Extracts:
+      - weights_id            (weights.id)
+      - centre_freq_mhz       (weights.centre_frequency)
+      - footprint_rotation_deg (weights.footprint_rotation)
+      - pol_axis_deg           (common.target.src%d.pol_axis, angle component)
+
+    Returns a dict with those keys; missing values are None.
+    """
+    preferred = metadata_dir / f"schedblock-info-{sb_ref}.txt"
+    candidates = [preferred] if preferred.exists() else []
+    candidates.extend(sorted(metadata_dir.glob("schedblock-info-*.txt")))
+
+    result: dict = {
+        "weights_id":            None,
+        "centre_freq_mhz":       None,
+        "footprint_rotation_deg": None,
+        "pol_axis_deg":           None,
+    }
+    _int_patterns = {
+        "weights_id": r"weights\.id\s*=\s*(\d+)",
+    }
+    _float_patterns = {
+        "centre_freq_mhz":        r"weights\.centre_frequency\s*=\s*([-+]?\d*\.?\d+)",
+        "footprint_rotation_deg": r"weights\.footprint_rotation\s*=\s*([-+]?\d*\.?\d+)",
+    }
+    # pol_axis: e.g. "[pa_fixed, 0.0]" — extract the angle (second element)
+    _pol_pattern = r"common\.target\.src%d\.pol_axis\s*=\s*\[.*?,\s*([-+]?\d*\.?\d+)"
+
+    for path in candidates:
+        try:
+            content = path.read_text()
+        except Exception:
+            continue
+        for key, pattern in _int_patterns.items():
+            if result[key] is None:
+                m = re.search(pattern, content)
+                if m:
+                    result[key] = int(m.group(1))
+        for key, pattern in _float_patterns.items():
+            if result[key] is None:
+                m = re.search(pattern, content)
+                if m:
+                    result[key] = float(m.group(1))
+        if result["pol_axis_deg"] is None:
+            m = re.search(_pol_pattern, content)
+            if m:
+                result["pol_axis_deg"] = float(m.group(1))
+        if all(v is not None for v in result.values()):
+            break
+
+    return result
+
+
 def parse_pitch_deg(metadata_dir: Path, sb_ref: str):
     preferred = metadata_dir / f"schedblock-info-{sb_ref}.txt"
     candidates = [preferred] if preferred.exists() else []
@@ -443,6 +499,7 @@ def main():
         assessment_dir = tuple_dir / f"1934-processing-SB-{tuple_info['sb_target_1934']}" / "assessment_results"
 
         footprint_name = parse_footprint_name(metadata_dir, tuple_info["sb_ref"])
+        obs_meta = parse_obs_metadata(metadata_dir, tuple_info["sb_ref"])
         pitch_deg, pitch_source_file = parse_pitch_deg(metadata_dir, tuple_info["sb_ref"])
         if pitch_deg is not None:
             tuples_with_pitch += 1
@@ -531,6 +588,10 @@ def main():
                         "pitch_sanity_pass": pitch_sanity_pass,
                         "footprint_name": footprint_name,
                         "footprint_file": str(footprint_file) if footprint_file else "",
+                        "weights_id":              obs_meta["weights_id"],
+                        "centre_freq_mhz":         obs_meta["centre_freq_mhz"],
+                        "footprint_rotation_deg":  obs_meta["footprint_rotation_deg"],
+                        "pol_axis_deg":             obs_meta["pol_axis_deg"],
                         "leak_q_over_i_pct": metrics["q_over_i_pct"],
                         "leak_u_over_i_pct": metrics["u_over_i_pct"],
                         "leak_l_over_i_pct": metrics["l_over_i_pct"],
@@ -579,6 +640,10 @@ def main():
         "pitch_sanity_pass",
         "footprint_name",
         "footprint_file",
+        "weights_id",
+        "centre_freq_mhz",
+        "footprint_rotation_deg",
+        "pol_axis_deg",
         "leak_q_over_i_pct",
         "leak_u_over_i_pct",
         "leak_l_over_i_pct",
