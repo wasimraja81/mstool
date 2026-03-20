@@ -1034,6 +1034,14 @@ def assemble_package(
             else:                   n_plots_csv += 1
     print(f"  plots: {n_plots_png} PNGs, {n_plots_mp4} MP4s, {n_plots_txt} TXTs, {n_plots_csv} CSVs")
 
+    # ── gain_calibration_strategy.html ────────────────────────────────
+    gain_html_src = phase3_dir / "gain_calibration_strategy.html"
+    if gain_html_src.exists():
+        shutil.copy2(gain_html_src, package_dir / "gain_calibration_strategy.html")
+        print(f"  gain_calibration_strategy.html: copied")
+    else:
+        print("  gain_calibration_strategy.html: not found, skipping")
+
     # ── cube ──────────────────────────────────────────────────────────
     if cube_src.exists():
         shutil.copy2(cube_src, package_dir / "leakage_cube.nc")
