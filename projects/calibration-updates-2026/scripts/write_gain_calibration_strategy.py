@@ -119,8 +119,11 @@ to uncalibrated data &mdash; no intermediate calibration step is required.</p>
 <code>&lt;data-root&gt;/phase3/plots/</code>:</p>
 <ul>
   <li><code>dq_du_correction_factors.csv</code> &mdash; machine-readable, one row per
-      (field, variant, beam) triple; suitable for pandas/numpy consumption by
-      downstream processing scripts.</li>
+      (footprint, field, variant, beam) quad; pure data file (no embedded comments)
+      suitable for pandas/numpy consumption by downstream processing scripts and
+      opens cleanly in Numbers / Excel.</li>
+  <li><code>dq_du_correction_factors_README.txt</code> &mdash; plain-text companion with
+      full provenance, column schema, physical meaning and usage examples.</li>
   <li><code>dq_du_correction_factors.txt</code> &mdash; fixed-width ASCII companion;
       human-readable and greppable without Python.</li>
 </ul>
@@ -128,6 +131,7 @@ to uncalibrated data &mdash; no intermediate calibration step is required.</p>
 <table>
   <thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead>
   <tbody>
+    <tr><td><code>footprint</code></td><td>str</td><td>ASKAP beam footprint name (e.g. <code>closepack36</code>); read from <code>weights.footprint_name</code> in the schedblock metadata. All rows produced from a single manifest share the same footprint; rows from different footprints (different manifests) can be safely appended before filtering.</td></tr>
     <tr><td><code>field</code></td><td>str</td><td>Reference field name, e.g. <code>REF_1324-28</code></td></tr>
     <tr><td><code>variant</code></td><td>str</td><td><code>bpcal</code> (bandpass-cal measurement) or <code>lcal</code> (leakage-cal measurement)</td></tr>
     <tr><td><code>beam</code></td><td>int</td><td>ASKAP beam index, 0-based (0&ndash;35 for closepack36)</td></tr>
@@ -138,27 +142,29 @@ to uncalibrated data &mdash; no intermediate calibration step is required.</p>
     <tr><td><code>n_obs</code></td><td>int</td><td>Number of (SB_REF, ODC) rows averaged for this beam</td></tr>
   </tbody>
 </table>
-<p>The CSV begins with <code>#</code>-prefixed comment lines that document the schema and
-usage pattern; these are skipped automatically by pandas when
-<code>comment='#'</code> is passed.</p>
 <h3>6.2 Reading the table</h3>
+<p>The CSV is a pure data file (column header row + data rows only) and opens
+cleanly in any spreadsheet. Full provenance and schema documentation is in the
+companion <code>dq_du_correction_factors_README.txt</code> in the same directory.</p>
 <pre><code class="language-python">import pandas as pd
 
-df = pd.read_csv("phase3/plots/dq_du_correction_factors.csv", comment="#")
+df = pd.read_csv("phase3/plots/dq_du_correction_factors.csv")
 
-# Per-beam lookup for a specific field, variant and beam
+# Per-beam lookup for a specific footprint / field / variant / beam
 row = df[
-    (df.field   == "REF_1324-28") &
-    (df.variant == "bpcal") &
-    (df.beam    == 12)
+    (df.footprint == "closepack36") &
+    (df.field     == "REF_1324-28") &
+    (df.variant   == "bpcal") &
+    (df.beam      == 12)
 ].iloc[0]
 dq, dq_std = row.mean_dQ, row.std_dQ   # fractional Stokes-Q leakage, %
 du, du_std = row.mean_dU, row.std_dU   # fractional Stokes-U leakage, %
 
 # All 36 beams as a numpy array (for vectorised correction)
 sub = df[
-    (df.field   == "REF_1324-28") &
-    (df.variant == "bpcal")
+    (df.footprint == "closepack36") &
+    (df.field     == "REF_1324-28") &
+    (df.variant   == "bpcal")
 ].sort_values("beam")
 dq_array = sub.mean_dQ.to_numpy()   # shape (36,)
 </code></pre>
