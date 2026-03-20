@@ -119,8 +119,11 @@ to uncalibrated data &mdash; no intermediate calibration step is required.</p>
 <code>&lt;data-root&gt;/phase3/plots/</code>:</p>
 <ul>
   <li><code>dq_du_correction_factors.csv</code> &mdash; machine-readable, one row per
-      (footprint, field, variant, beam) quad; suitable for pandas/numpy consumption by
-      downstream processing scripts.</li>
+      (footprint, field, variant, beam) quad; pure data file (no embedded comments)
+      suitable for pandas/numpy consumption by downstream processing scripts and
+      opens cleanly in Numbers / Excel.</li>
+  <li><code>dq_du_correction_factors_README.txt</code> &mdash; plain-text companion with
+      full provenance, column schema, physical meaning and usage examples.</li>
   <li><code>dq_du_correction_factors.txt</code> &mdash; fixed-width ASCII companion;
       human-readable and greppable without Python.</li>
 </ul>
@@ -139,13 +142,13 @@ to uncalibrated data &mdash; no intermediate calibration step is required.</p>
     <tr><td><code>n_obs</code></td><td>int</td><td>Number of (SB_REF, ODC) rows averaged for this beam</td></tr>
   </tbody>
 </table>
-<p>The CSV begins with <code>#</code>-prefixed comment lines that document the schema and
-usage pattern; these are skipped automatically by pandas when
-<code>comment='#'</code> is passed.</p>
 <h3>6.2 Reading the table</h3>
+<p>The CSV is a pure data file (column header row + data rows only) and opens
+cleanly in any spreadsheet. Full provenance and schema documentation is in the
+companion <code>dq_du_correction_factors_README.txt</code> in the same directory.</p>
 <pre><code class="language-python">import pandas as pd
 
-df = pd.read_csv("phase3/plots/dq_du_correction_factors.csv", comment="#")
+df = pd.read_csv("phase3/plots/dq_du_correction_factors.csv")
 
 # Per-beam lookup for a specific footprint / field / variant / beam
 row = df[
