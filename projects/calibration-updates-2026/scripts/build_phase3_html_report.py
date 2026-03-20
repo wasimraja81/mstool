@@ -1020,6 +1020,7 @@ def assemble_package(
     # ── plots/ ────────────────────────────────────────────────────────
     # Copy PNGs (footprint_*, paf_beam_overlay_*) and MP4s (paf_beam_movie_*)
     n_plots_png = n_plots_mp4 = 0
+    n_plots_txt = n_plots_csv = 0
     for f in sorted((phase3_dir / "plots").iterdir()):
         if f.suffix == ".png":
             shutil.copy2(f, package_dir / "plots" / f.name)
@@ -1027,7 +1028,11 @@ def assemble_package(
         elif f.suffix == ".mp4":
             shutil.copy2(f, package_dir / "plots" / f.name)
             n_plots_mp4 += 1
-    print(f"  plots: {n_plots_png} PNGs, {n_plots_mp4} MP4s")
+        elif f.suffix in (".txt", ".csv"):
+            shutil.copy2(f, package_dir / "plots" / f.name)
+            if f.suffix == ".txt": n_plots_txt += 1
+            else:                   n_plots_csv += 1
+    print(f"  plots: {n_plots_png} PNGs, {n_plots_mp4} MP4s, {n_plots_txt} TXTs, {n_plots_csv} CSVs")
 
     # ── cube ──────────────────────────────────────────────────────────
     if cube_src.exists():
@@ -1487,6 +1492,32 @@ def main():
     else:
         cube_link_html = "<p class='meta'>Cube file not found &mdash; run the full pipeline (without <code>--html-only</code>) to generate it.</p>"
 
+    _cf_txt    = output_dir / "plots" / "dq_du_correction_factors.txt"
+    _cf_csv    = output_dir / "plots" / "dq_du_correction_factors.csv"
+    _cf_readme = output_dir / "plots" / "dq_du_correction_factors_README.txt"
+    if _cf_txt.exists() or _cf_csv.exists():
+        _cf_items = []
+        if _cf_txt.exists():
+            _cf_items.append(
+                "<li><a href='plots/dq_du_correction_factors.txt' target='_blank' rel='noopener'>"
+                "dq_du_correction_factors.txt</a> &mdash; fixed-width ASCII, opens as plain text in browser</li>"
+            )
+        if _cf_csv.exists():
+            _cf_items.append(
+                "<li><a href='plots/dq_du_correction_factors.csv' target='_blank' rel='noopener'>"
+                "dq_du_correction_factors.csv</a> &mdash; pure-data CSV for pandas/numpy</li>"
+            )
+        if _cf_readme.exists():
+            _cf_items.append(
+                "<li><a href='plots/dq_du_correction_factors_README.txt' target='_blank' rel='noopener'>"
+                "dq_du_correction_factors_README.txt</a> &mdash; column schema, provenance and usage examples</li>"
+            )
+        corr_factors_html = (
+            "<ul>" + "".join(_cf_items) + "</ul>"
+        )
+    else:
+        corr_factors_html = "<p class='meta'>Correction factor files not found &mdash; run the full pipeline (without <code>--html-only</code>) to generate them.</p>"
+
     # ── Build index page ────────────────────────────────────────────────
 # ── Plot generation (all skipped when --html-only; --force regenerates) ──────
     _cat_dir = Path(args.catalog_dir) if args.catalog_dir else output_dir / "catalogs"
@@ -1706,6 +1737,11 @@ def main():
   <h3>Gain Calibration Strategy</h3>
   <p class='meta'><a href='gain_calibration_strategy.html' target='_blank' rel='noopener'>Open: Gain Calibration Strategy</a>
   &mdash; derivation of the bandpass correction factors from 1934&minus;638 measurements.</p>
+
+  <h3>dQ/dU Correction Factors</h3>
+  <p class='meta'>Per-beam leakage correction factors derived from 1934&minus;638 observations.
+  All three files open as plain text in a new browser tab.</p>
+  {corr_factors_html}
 
   <!-- ── Media modal ─────────────────────────────────────────── -->
   <div id='media-modal' onclick="if(event.target===this)closeModal()">
