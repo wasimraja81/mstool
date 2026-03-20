@@ -1333,7 +1333,6 @@ def main():
         "field_effect_scores_at_fixed_odc.csv": phase2_dir / "field_effect_scores_at_fixed_odc.csv",
         "beam_x_odc_at_fixed_field.csv": phase2_dir / "beam_x_odc_at_fixed_field.csv",
         "odc_effect_scores_at_fixed_field.csv": phase2_dir / "odc_effect_scores_at_fixed_field.csv",
-        "phase2_mvp_summary.md": phase2_dir / "phase2_mvp_summary.md",
     }
 
     missing = [name for name, path in inputs.items() if not path.exists()]
@@ -1707,10 +1706,6 @@ def main():
   <h3>Gain Calibration Strategy</h3>
   <p class='meta'><a href='gain_calibration_strategy.html' target='_blank' rel='noopener'>Open: Gain Calibration Strategy</a>
   &mdash; derivation of the bandpass correction factors from 1934&minus;638 measurements.</p>
-
-  <h3>Run summary</h3>
-  <ul><li>phase2_mvp_summary.md:
-    <a href='tables/phase2_mvp_summary.md' target='_blank' rel='noopener'>open</a></li></ul>
 
   <!-- ── Media modal ─────────────────────────────────────────── -->
   <div id='media-modal' onclick="if(event.target===this)closeModal()">
