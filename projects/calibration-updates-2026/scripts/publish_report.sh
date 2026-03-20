@@ -21,6 +21,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 #   bash projects/calibration-updates-2026/scripts/publish_report.sh
 #
+# publish_report.sh pushes to the 'develop' branch of askap-leakage-report.
+# When you are ready to go live, merge develop -> main on GitHub;
+# GitHub Pages is configured to serve from main.
+#
 # On first run the repo is cloned into ${PAGES_CLONE}.
 # On subsequent runs it pulls, syncs, commits and pushes in one step.
 #
@@ -53,7 +57,8 @@ if [[ ! -d "${PAGES_CLONE}/.git" ]]; then
     cd "${PAGES_CLONE}"
     git add .nojekyll
     git commit -m "chore: add .nojekyll for GitHub Pages"
-    git push origin main
+    git branch -M main
+    git push -u origin main
     cd -
 else
     echo "Pulling latest from origin ..."
@@ -80,10 +85,11 @@ else
     TIMESTAMP="$(date '+%Y-%m-%d %H:%M')"
     git add -A
     git commit -m "report: publish ${TIMESTAMP}"
-    git push origin main
+    git push origin develop
     echo ""
-    echo "Published!  Live at: ${PAGES_URL}"
-    echo "(GitHub Pages may take ~30 seconds to update.)"
+    echo "Pushed to develop branch of askap-leakage-report."
+    echo "To publish live: merge develop -> main on GitHub, then"
+    echo "GitHub Pages will update at: ${PAGES_URL}"
 fi
 
 cd -
