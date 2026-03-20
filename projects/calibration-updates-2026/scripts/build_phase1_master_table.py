@@ -182,60 +182,128 @@ def parse_footprint_name(metadata_dir: Path, sb_ref: str) -> str:
     return ""
 
 
+def _read_schedblock_file(metadata_dir: Path, sb_ref: str):
+    """Return the text content of the schedblock-info file for *sb_ref*,
+    trying the preferred filename first then any schedblock-info-*.txt.
+    Returns (content_str, path) or (None, None) if none found.
+    """
+    preferred = metadata_dir / f"schedblock-info-{sb_ref}.txt"
+    candidates = [preferred] if preferred.exists() else []
+    candidates.extend(p for p in sorted(metadata_dir.glob("schedblock-info-*.txt"))
+                      if p != preferred)
+    for path in candidates:
+        try:
+            return path.read_text(), path
+        except Exception:
+            continue
+    return None, None
+
+
 def parse_obs_metadata(metadata_dir: Path, sb_ref: str) -> dict:
     """Parse observation-level beam configuration from the schedblock-info file.
 
     Extracts:
-      - weights_id            (weights.id)
-      - centre_freq_mhz       (weights.centre_frequency)
-      - footprint_rotation_deg (weights.footprint_rotation)
-      - pol_axis_deg           (common.target.src%d.pol_axis, angle component)
+      - centre_freq_mhz      (weights.centre_frequency)
+      - footprint_rota_deg   (weights.footprint_rotation)
+      - pol_axis_deg         (common.target.src1.pol_axis angle, falling back
+                              to src%d; matches read_pol_axis_from_schedblock()
+                              in plot_paf_beam_overlay.py)
 
     Returns a dict with those keys; missing values are None.
     """
-    preferred = metadata_dir / f"schedblock-info-{sb_ref}.txt"
-    candidates = [preferred] if preferred.exists() else []
-    candidates.extend(sorted(metadata_dir.glob("schedblock-info-*.txt")))
+    content, _ = _read_schedblock_file(metadata_dir, sb_ref)
+    if content is None:
+        return {"centre_freq_mhz": None,
+                "footprint_rota_deg": None,
+                "pol_axis_deg": None}
 
     result: dict = {
-        "weights_id":            None,
-        "centre_freq_mhz":       None,
-        "footprint_rotation_deg": None,
-        "pol_axis_deg":           None,
+        "centre_freq_mhz":    None,
+        "footprint_rota_deg": None,
+        "pol_axis_deg":       None,
     }
-    _int_patterns = {
-        "weights_id": r"weights\.id\s*=\s*(\d+)",
-    }
-    _float_patterns = {
-        "centre_freq_mhz":        r"weights\.centre_frequency\s*=\s*([-+]?\d*\.?\d+)",
-        "footprint_rotation_deg": r"weights\.footprint_rotation\s*=\s*([-+]?\d*\.?\d+)",
-    }
-    # pol_axis: e.g. "[pa_fixed, 0.0]" — extract the angle (second element)
-    _pol_pattern = r"common\.target\.src%d\.pol_axis\s*=\s*\[.*?,\s*([-+]?\d*\.?\d+)"
 
-    for path in candidates:
-        try:
-            content = path.read_text()
-        except Exception:
-            continue
-        for key, pattern in _int_patterns.items():
-            if result[key] is None:
-                m = re.search(pattern, content)
-                if m:
-                    result[key] = int(m.group(1))
-        for key, pattern in _float_patterns.items():
-            if result[key] is None:
-                m = re.search(pattern, content)
-                if m:
-                    result[key] = float(m.group(1))
-        if result["pol_axis_deg"] is None:
-            m = re.search(_pol_pattern, content)
-            if m:
-                result["pol_axis_deg"] = float(m.group(1))
-        if all(v is not None for v in result.values()):
+    m = re.search(r"weights\.centre_frequency\s*=\s*([-+]?\d*\.?\d+)", content)
+    if m:
+        result["centre_freq_mhz"] = float(m.group(1))
+
+    m = re.search(r"weights\.footprint_rotation\s*=\s*([-+]?\d*\.?\d+)", content)
+    if m:
+        result["footprint_rota_deg"] = float(m.group(1))
+
+    # pol_axis: try src1 first (science target), fall back to src%d template.
+    # Matches the logic in read_pol_axis_from_schedblock() (plot_paf_beam_overlay.py).
+    for key in ("common.target.src1.pol_axis",
+                "common.target.src%d.pol_axis"):
+        m = re.search(rf"{re.escape(key)}\s*=\s*\[.*?,\s*([-+]?\d*\.?\d+)", content)
+        if m:
+            result["pol_axis_deg"] = float(m.group(1))
             break
 
     return result
+
+
+def parse_ref_ws(metadata_dir: Path, sb_ref: str):
+    """Read weights.ref_ws from the schedblock-info file for *sb_ref*.
+
+    Returns the integer ref_ws value, or None if not found.
+    """
+    content, _ = _read_schedblock_file(metadata_dir, sb_ref)
+    if content is None:
+        return None
+    m = re.search(r"weights\.ref_ws\s*=\s*(\d+)", content)
+    return int(m.group(1)) if m else None
+
+
+def check_ref_ws_consistency(tuples: list, local_base: Path) -> None:
+    """Verify that every SB_REF in *tuples* shares the same weights.ref_ws.
+
+    Reads ``weights.ref_ws`` from each tuple's schedblock-info file.  If more
+    than one unique value is found the function prints a detailed error message
+    listing which SB_REFs have unexpected values and calls sys.exit(1).
+
+    SB_REFs whose metadata directory does not exist locally are warned about
+    but do not cause a hard exit (they will be skipped by the main loop).
+    """
+    ref_ws_map: dict = {}  # sb_ref -> ref_ws (int or None)
+    for t in tuples:
+        tuple_dir = local_base / t["tuple_rel_path"]
+        if not tuple_dir.exists():
+            continue
+        metadata_dir = tuple_dir / "metadata"
+        val = parse_ref_ws(metadata_dir, t["sb_ref"])
+        if val is None:
+            print(f"  WARNING: weights.ref_ws not found for SB_REF {t['sb_ref']} "
+                  f"— skipping from consistency check")
+        else:
+            ref_ws_map[int(t["sb_ref"])] = val
+
+    unique_vals = set(ref_ws_map.values())
+    if len(unique_vals) <= 1:
+        ref_ws_val = next(iter(unique_vals), None)
+        print(f"ref_ws consistency check PASSED: all {len(ref_ws_map)} SB_REFs "
+              f"share ref_ws = {ref_ws_val}")
+        return
+
+    # More than one unique ref_ws — identify the majority value and outliers
+    from collections import Counter
+    counts = Counter(ref_ws_map.values())
+    majority_val, _ = counts.most_common(1)[0]
+    outliers = {sb: val for sb, val in ref_ws_map.items() if val != majority_val}
+    print()
+    print("ERROR: ref_ws consistency check FAILED.")
+    print(f"  Expected ref_ws = {majority_val} "
+          f"(used by {counts[majority_val]}/{len(ref_ws_map)} SB_REFs)")
+    print(f"  Outlier SB_REFs ({len(outliers)}):")
+    for sb, val in sorted(outliers.items()):
+        print(f"    SB_REF {sb}: ref_ws = {val}")
+    print()
+    print("  All SB_REFs in the manifest must share the same holography solution")
+    print("  (weights.ref_ws) so that footprint parameters and leakage correction")
+    print("  factors are physically comparable.")
+    print("  Please remove the outlier SB_REFs from the manifest and re-run.")
+    print()
+    sys.exit(1)
 
 
 def parse_pitch_deg(metadata_dir: Path, sb_ref: str):
@@ -479,6 +547,8 @@ def main():
     exclude_ranges = parse_exclude_indices(args.exclude_indices)
     tuples = parse_manifest_rows(manifest_path, args.start_index, args.end_index, exclude_ranges)
 
+    check_ref_ws_consistency(tuples, local_base)
+
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     output_summary.parent.mkdir(parents=True, exist_ok=True)
 
@@ -500,6 +570,7 @@ def main():
 
         footprint_name = parse_footprint_name(metadata_dir, tuple_info["sb_ref"])
         obs_meta = parse_obs_metadata(metadata_dir, tuple_info["sb_ref"])
+        ref_ws_val = parse_ref_ws(metadata_dir, tuple_info["sb_ref"])
         pitch_deg, pitch_source_file = parse_pitch_deg(metadata_dir, tuple_info["sb_ref"])
         if pitch_deg is not None:
             tuples_with_pitch += 1
@@ -588,10 +659,10 @@ def main():
                         "pitch_sanity_pass": pitch_sanity_pass,
                         "footprint_name": footprint_name,
                         "footprint_file": str(footprint_file) if footprint_file else "",
-                        "weights_id":              obs_meta["weights_id"],
+                        "ref_ws":                  ref_ws_val,
                         "centre_freq_mhz":         obs_meta["centre_freq_mhz"],
-                        "footprint_rotation_deg":  obs_meta["footprint_rotation_deg"],
-                        "pol_axis_deg":             obs_meta["pol_axis_deg"],
+                        "footprint_rota_deg":      obs_meta["footprint_rota_deg"],
+                        "pol_axis_deg":            obs_meta["pol_axis_deg"],
                         "leak_q_over_i_pct": metrics["q_over_i_pct"],
                         "leak_u_over_i_pct": metrics["u_over_i_pct"],
                         "leak_l_over_i_pct": metrics["l_over_i_pct"],
@@ -640,9 +711,9 @@ def main():
         "pitch_sanity_pass",
         "footprint_name",
         "footprint_file",
-        "weights_id",
+        "ref_ws",
         "centre_freq_mhz",
-        "footprint_rotation_deg",
+        "footprint_rota_deg",
         "pol_axis_deg",
         "leak_q_over_i_pct",
         "leak_u_over_i_pct",

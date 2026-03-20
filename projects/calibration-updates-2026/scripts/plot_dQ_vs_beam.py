@@ -168,10 +168,9 @@ def write_correction_table(
                  f" excl {meta['exclude_indices']!r}")
     lines.append(f"# SB_REFs    : {meta['n_sbrefs']} contributing observations")
     lines.append(f"# Footprint  : {meta.get('footprint_name', 'unknown')}")
-    lines.append(f"# Weights ID : {meta.get('weights_id', 'N/A')}")
     lines.append(f"# Centre Freq: {meta.get('centre_freq_mhz', 'N/A')} MHz")
     lines.append(f"# Pitch      : {meta.get('footprint_pitch_deg', 'N/A')} deg")
-    lines.append(f"# Rotation   : {meta.get('footprint_rotation_deg', 'N/A')} deg")
+    lines.append(f"# Rotation   : {meta.get('footprint_rota_deg', 'N/A')} deg")
     lines.append(f"# Pol Axis   : {meta.get('pol_axis_deg', 'N/A')} deg (pa_fixed)")
     lines.append("#")
     lines.append("# Lookup usage:")
@@ -180,7 +179,6 @@ def write_correction_table(
     lines.append("# Columns:")
     lines.append("#   field       reference field name")
     lines.append("#   footprint   beam footprint name (from schedblock metadata)")
-    lines.append("#   wt_id       ODC weights ID (weights.id)")
     lines.append("#   freq_MHz    beamformer centre frequency (MHz)")
     lines.append("#   pitch_deg   beam footprint pitch (degrees)")
     lines.append("#   rot_deg     footprint rotation angle (degrees)")
@@ -206,19 +204,18 @@ def write_correction_table(
         except (TypeError, ValueError):
             return str(val)
 
-    wt_id_s  = str(int(meta["weights_id"])) if meta.get("weights_id") is not None else "N/A"
-    freq_s   = _fmt(meta.get("centre_freq_mhz"),       ".1f")
-    pitch_s  = _fmt(meta.get("footprint_pitch_deg"),   ".4f")
-    rot_s    = _fmt(meta.get("footprint_rotation_deg"),".1f")
-    pol_s    = _fmt(meta.get("pol_axis_deg"),           ".1f")
+    freq_s   = _fmt(meta.get("centre_freq_mhz"),     ".1f")
+    pitch_s  = _fmt(meta.get("footprint_pitch_deg"), ".4f")
+    rot_s    = _fmt(meta.get("footprint_rota_deg"),  ".1f")
+    pol_s    = _fmt(meta.get("pol_axis_deg"),         ".1f")
 
     if has_dU:
-        hdr = (f"{'field':<24}  {'footprint':<16}  {'wt_id':>6}  {'freq_MHz':>8}  "
+        hdr = (f"{'field':<24}  {'footprint':<16}  {'freq_MHz':>8}  "
                f"{'pitch_deg':>9}  {'rot_deg':>7}  {'pol_deg':>7}  {'variant':<8}  {'beam':>4}  "
                f"{'mean_dQ':>9}  {'std_dQ':>8}  "
                f"{'mean_dU':>9}  {'std_dU':>8}  {'n_obs':>5}")
     else:
-        hdr = (f"{'field':<24}  {'footprint':<16}  {'wt_id':>6}  {'freq_MHz':>8}  "
+        hdr = (f"{'field':<24}  {'footprint':<16}  {'freq_MHz':>8}  "
                f"{'pitch_deg':>9}  {'rot_deg':>7}  {'pol_deg':>7}  {'variant':<8}  {'beam':>4}  "
                f"{'mean_dQ':>9}  {'std_dQ':>8}  {'n_obs':>5}")
     lines.append(hdr)
@@ -245,12 +242,12 @@ def write_correction_table(
             for beam in sorted(grp.groups.keys()):
                 n = int(n_obs[beam])
                 if has_dU and mean_du is not None:
-                    row = (f"{field:<24}  {fp_col:<16}  {wt_id_s:>6}  {freq_s:>8}  "
+                    row = (f"{field:<24}  {fp_col:<16}  {freq_s:>8}  "
                            f"{pitch_s:>9}  {rot_s:>7}  {pol_s:>7}  {v:<8}  {beam:>4}  "
                            f"{mean_dq[beam]:>+9.4f}  {std_dq[beam]:>8.4f}  "
                            f"{mean_du[beam]:>+9.4f}  {std_du[beam]:>8.4f}  {n:>5}")
                 else:
-                    row = (f"{field:<24}  {fp_col:<16}  {wt_id_s:>6}  {freq_s:>8}  "
+                    row = (f"{field:<24}  {fp_col:<16}  {freq_s:>8}  "
                            f"{pitch_s:>9}  {rot_s:>7}  {pol_s:>7}  {v:<8}  {beam:>4}  "
                            f"{mean_dq[beam]:>+9.4f}  {std_dq[beam]:>8.4f}  {n:>5}")
                 lines.append(row)
@@ -264,8 +261,8 @@ def write_correction_table(
     # Usage:
     #   df = pd.read_csv("dq_du_correction_factors.csv")
     #   dq = df.loc[(df.field=="REF_1324-28") & (df.variant=="bpcal") & (df.beam==0), "mean_dQ"].values[0]
-    csv_cols = ["field", "footprint", "weights_id", "centre_freq_mhz",
-                "footprint_pitch_deg", "footprint_rotation_deg", "pol_axis_deg",
+    csv_cols = ["field", "footprint", "centre_freq_mhz",
+                "footprint_pitch_deg", "footprint_rota_deg", "pol_axis_deg",
                 "variant", "beam", "mean_dQ", "std_dQ"]
     if has_dU:
         csv_cols += ["mean_dU", "std_dU"]
@@ -291,12 +288,11 @@ def write_correction_table(
                 mean_du = std_du = None
             for beam in sorted(grp.groups.keys()):
                 rec = {"field": field,
-                       "footprint": meta.get('footprint_name', 'unknown'),
-                       "weights_id":            meta.get('weights_id'),
-                       "centre_freq_mhz":       meta.get('centre_freq_mhz'),
-                       "footprint_pitch_deg":   meta.get('footprint_pitch_deg'),
-                       "footprint_rotation_deg": meta.get('footprint_rotation_deg'),
-                       "pol_axis_deg":           meta.get('pol_axis_deg'),
+                       "footprint":           meta.get('footprint_name', 'unknown'),
+                       "centre_freq_mhz":     meta.get('centre_freq_mhz'),
+                       "footprint_pitch_deg": meta.get('footprint_pitch_deg'),
+                       "footprint_rota_deg":  meta.get('footprint_rota_deg'),
+                       "pol_axis_deg":        meta.get('pol_axis_deg'),
                        "variant": v, "beam": int(beam),
                        "mean_dQ": round(mean_dq[beam], 6),
                        "std_dQ":  round(std_dq[beam],  6),
@@ -332,21 +328,19 @@ def write_correction_table(
         f" excl {meta['exclude_indices']!r}\n"
         f"SB_REFs      : {meta['n_sbrefs']} contributing observations\n"
         f"Footprint    : {meta.get('footprint_name', 'unknown')}\n"
-        f"Weights ID   : {meta.get('weights_id', 'N/A')}\n"
         f"Centre Freq  : {meta.get('centre_freq_mhz', 'N/A')} MHz\n"
         f"Pitch        : {meta.get('footprint_pitch_deg', 'N/A')} deg\n"
-        f"Rotation     : {meta.get('footprint_rotation_deg', 'N/A')} deg\n"
+        f"Rotation     : {meta.get('footprint_rota_deg', 'N/A')} deg\n"
         f"Pol Axis     : {meta.get('pol_axis_deg', 'N/A')} deg (pa_fixed)\n"
         "\n"
         "Column schema\n"
         "-------------\n"
         "  field                reference field name (e.g. REF_1324-28)\n"
         "  footprint            beam footprint name (from schedblock metadata, e.g. closepack36)\n"
-        "  weights_id           ODC weights solution ID (weights.id in schedblock metadata)\n"
         "  centre_freq_mhz      beamformer centre frequency in MHz (weights.centre_frequency)\n"
         "  footprint_pitch_deg  beam pitch in degrees (angular separation between adjacent beams)\n"
-        "  footprint_rotation_deg  footprint rotation angle in degrees (weights.footprint_rotation)\n"
-        "  pol_axis_deg         polarisation axis angle in degrees (common.target.src%d.pol_axis,\n"
+        "  footprint_rota_deg   footprint rotation angle in degrees (weights.footprint_rotation)\n"
+        "  pol_axis_deg         polarisation axis angle in degrees (common.target.src1.pol_axis,\n"
         "                       pa_fixed convention)\n"
         "  variant              calibration variant: 'bpcal' (bandpass cal) or 'lcal' (leakage cal)\n"
         "                       note: obs-config columns are constant within a single-manifest run;\n"
@@ -371,13 +365,13 @@ def write_correction_table(
         "  df = pd.read_csv('dq_du_correction_factors.csv')\n"
         "\n"
         "  # Per-beam lookup for a specific config / field / variant / beam\n"
-        "  row = df[(df.weights_id == 5229) & (df.field == 'REF_1324-28')\n"
+        "  row = df[(df.field == 'REF_1324-28')\n"
         "           & (df.variant == 'bpcal') & (df.beam == 12)].iloc[0]\n"
         "  dq, dq_std = row.mean_dQ, row.std_dQ\n"
         + du_usage_lines +
         "\n"
         "  # All 36 beams as a numpy array (for vectorised correction)\n"
-        "  sub = df[(df.weights_id == 5229) & (df.field == 'REF_1324-28')\n"
+        "  sub = df[(df.field == 'REF_1324-28')\n"
         "           & (df.variant == 'bpcal')].sort_values('beam')\n"
         "  dq_array = sub.mean_dQ.to_numpy()   # shape (36,), index = beam number\n"
         "\n"
@@ -588,6 +582,33 @@ def main():
         df = df[df["sb_ref"].isin(selected_sbrefs)]
         print(f"After manifest filter: {len(df)} rows ({df['sb_ref'].nunique()} SB_REFs)")
 
+    # ── ref_ws consistency check ──────────────────────────────────────────────
+    # All selected SB_REFs must share the same holography solution (ref_ws) so
+    # that the beam geometry and correction factors are physically comparable.
+    if "ref_ws" in df.columns:
+        unique_ref_ws = df["ref_ws"].dropna().unique()
+        if len(unique_ref_ws) > 1:
+            from collections import Counter
+            counts = Counter(df["ref_ws"].dropna().astype(int))
+            majority, _ = counts.most_common(1)[0]
+            outlier_sbs = (
+                df[df["ref_ws"] != majority][["sb_ref", "ref_ws"]]
+                .drop_duplicates()
+                .sort_values("sb_ref")
+            )
+            print()
+            print("ERROR: ref_ws consistency check FAILED in master CSV.")
+            print(f"  Expected ref_ws = {majority}")
+            print("  Outlier SB_REFs:")
+            for _, r in outlier_sbs.iterrows():
+                print(f"    SB_REF {r['sb_ref']}: ref_ws = {int(r['ref_ws'])}")
+            print("  All SB_REFs must share the same holography solution.")
+            print("  Please re-run build_phase1_master_table.py or adjust the manifest.")
+            print()
+            sys.exit(1)
+        elif len(unique_ref_ws) == 1:
+            print(f"ref_ws consistency check PASSED: ref_ws = {int(unique_ref_ws[0])}")
+
     # ── Determine which fields to iterate over ────────────────────────────────
     # Default: unique field names from manifest rows (ordered); no giant consolidated plot.
     if args.fields:
@@ -657,10 +678,9 @@ def main():
         return float(vals.round(4).mode().iloc[0])
 
     footprint_name       = _modal_str("footprint_name") or "unknown"
-    weights_id_val       = _modal_num("weights_id")
     centre_freq_val      = _modal_num("centre_freq_mhz")
     pitch_val            = _modal_num("pitch_deg_from_schedblock")
-    rotation_val         = _modal_num("footprint_rotation_deg")
+    rotation_val         = _modal_num("footprint_rota_deg")
     pol_axis_val         = _modal_num("pol_axis_deg")
 
     write_correction_table(
@@ -673,12 +693,11 @@ def main():
             "end_index":              args.end_index,
             "exclude_indices":        args.exclude_indices,
             "n_sbrefs":               df["sb_ref"].nunique(),
-            "footprint_name":         footprint_name,
-            "weights_id":             int(weights_id_val) if weights_id_val is not None else None,
-            "centre_freq_mhz":        centre_freq_val,
-            "footprint_pitch_deg":    pitch_val,
-            "footprint_rotation_deg": rotation_val,
-            "pol_axis_deg":           pol_axis_val,
+            "footprint_name":      footprint_name,
+            "centre_freq_mhz":     centre_freq_val,
+            "footprint_pitch_deg": pitch_val,
+            "footprint_rota_deg":  rotation_val,
+            "pol_axis_deg":        pol_axis_val,
         },
     )
 
