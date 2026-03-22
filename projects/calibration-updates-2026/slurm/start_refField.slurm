@@ -145,7 +145,7 @@ if [[ "${EARLY_DRY_RUN_PARSE}" != "true" ]]; then
     mkdir -p ${DIR_SB}
 fi
 
-WORK_DIR="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026"
+WORK_DIR="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026-qcorr"
 FETCHED_DIR="/askapbuffer/payne/dmitchell/askap-scheduling-blocks"
 #FETCHED_DIR="/scratch/askaprt/tgalvin/racs_low3"
 REF_CONFIG_TEMPLATE="${SCRIPT_DIR}/run_refField.sh"
