@@ -138,7 +138,8 @@ done
 
 DIR_SB=/askapbuffer/payne/raj030/askap-scheduling-blocks
 
-WORK_DIR="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026-qcorr"
+# WORK_DIR is set from HPC_BASE_DIR in the manifest (last used: assess_1934-2026-qcorr).
+WORK_DIR=""
 SCIENCE_CONFIG_TEMPLATE="${SCRIPT_DIR}/run_1934Field.sh"
 echo "INFO - SCIENCE_CONFIG_TEMPLATE: ${SCIENCE_CONFIG_TEMPLATE}"
 if [[ ! -f "${SCIENCE_CONFIG_TEMPLATE}" ]]; then
@@ -280,6 +281,9 @@ load_tuples_from_manifest() {
             local cfg_val="${BASH_REMATCH[2]}"
             cfg_val="$(echo "${cfg_val}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
             case "${cfg_key}" in
+                HPC_BASE_DIR)
+                    WORK_DIR="${cfg_val}"
+                    ;;
                 ODC_WEIGHT|ODC_WEIGHT_ID)
                     default_odc="$(strip_numeric_tag "${cfg_val}" "ODC-")"
                     if [[ -z "${default_odc}" ]]; then
@@ -424,6 +428,14 @@ load_tuples_from_manifest() {
 if [[ -f "${MANIFEST_FILE}" ]]; then
     echo "INFO - Loading tuples from manifest: ${MANIFEST_FILE}"
     load_tuples_from_manifest "${MANIFEST_FILE}"
+    if [[ -z "${WORK_DIR}" ]]; then
+        echo "ERROR - HPC_BASE_DIR is not set in manifest (${MANIFEST_FILE})."
+        echo "        Add: HPC_BASE_DIR=/scratch/.../your_work_dir"
+        exit 1
+    fi
+    mkdir -p "${WORK_DIR}/manifest_archive"
+    cp "${MANIFEST_FILE}" "${WORK_DIR}/manifest_archive/$(basename "${MANIFEST_FILE}" .txt).$(date +%Y%m%dT%H%M%S).txt"
+    echo "INFO - Manifest snapshot saved to ${WORK_DIR}/manifest_archive/"
 else
     echo "ERROR - Manifest not found (${MANIFEST_FILE}); strict strategy mode requires an explicit manifest"
     exit 1

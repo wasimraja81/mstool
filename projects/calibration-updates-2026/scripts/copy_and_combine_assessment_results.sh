@@ -283,7 +283,7 @@ build_subpaths_from_manifest() {
     # Manifest-level config directives (KEY=VALUE), e.g.
     # REMOTE=raj030@setonix-dm03.pawsey.org.au
     # REMOTE_BASE=/scratch/.../ODC-5229
-    # REMOTE_BASE_ROOT=/scratch/.../assess_1934-2026-qcorr
+    # HPC_BASE_DIR=/scratch/.../assess_1934-2026-qcorr  (canonical; also accepts REMOTE_BASE_ROOT)
     # ODC_WEIGHT_ID=5231
     # LOCAL_BASE=/Users/me/DATA/reffield-average-qcorr
     # AMP_STRATEGY=multiply
@@ -299,6 +299,9 @@ build_subpaths_from_manifest() {
           ;;
         REMOTE_BASE)
           REMOTE_BASE="${cfg_val}"
+          ;;
+        HPC_BASE_DIR)
+          REMOTE_BASE_ROOT="${cfg_val}"
           ;;
         REMOTE_BASE_ROOT)
           REMOTE_BASE_ROOT="${cfg_val}"

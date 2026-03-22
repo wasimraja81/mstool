@@ -33,7 +33,8 @@ BEAM_END="${BEAM_END:-35}"
 DRY_RUN="false"
 
 DIR_SB=/askapbuffer/payne/raj030/askap-scheduling-blocks
-WORK_DIR="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026-qcorr"
+# WORK_DIR is set from HPC_BASE_DIR in the manifest (last used: assess_1934-2026-qcorr).
+WORK_DIR=""
 BP_UPDATE_MODIFY_AMP_STRATEGY="multiply"
 DO_PREFLAG_REFTABLE="true"
 
@@ -232,6 +233,9 @@ load_tuples_from_manifest() {
             local cfg_val="${BASH_REMATCH[2]}"
             cfg_val="$(trim_whitespace "${cfg_val}")"
             case "${cfg_key}" in
+                HPC_BASE_DIR)
+                    WORK_DIR="${cfg_val}"
+                    ;;
                 ODC_WEIGHT_ID|ODC|WEIGHT_ID)
                     default_odc="$(strip_numeric_tag "${cfg_val}" "ODC-")"
                     ;;
@@ -348,6 +352,14 @@ load_tuples_from_manifest() {
 }
 
 load_tuples_from_manifest "${MANIFEST_FILE}"
+if [[ -z "${WORK_DIR}" ]]; then
+    echo "ERROR - HPC_BASE_DIR is not set in manifest (${MANIFEST_FILE})."
+    echo "        Add: HPC_BASE_DIR=/scratch/.../your_work_dir"
+    exit 1
+fi
+mkdir -p "${WORK_DIR}/manifest_archive"
+cp "${MANIFEST_FILE}" "${WORK_DIR}/manifest_archive/$(basename "${MANIFEST_FILE}" .txt).$(date +%Y%m%dT%H%M%S).txt"
+echo "INFO - Manifest snapshot saved to ${WORK_DIR}/manifest_archive/"
 
 nSBref=${#refFieldList[@]}
 nSBcal=${#calFieldList[@]}
