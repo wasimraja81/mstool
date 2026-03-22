@@ -72,7 +72,8 @@ done
 
 if [[ "${EARLY_DRY_RUN_PARSE}" != "true" ]]; then
     module use /askapbuffer/payne/raj030/askaprtModules
-    module load askappipeline/axa-3859-fix-generate-parset-for-offset-fields
+    module load askappipeline/axa-3877-implement-q-correction-factors
+    #module load askappipeline/axa-3859-fix-generate-parset-for-offset-fields
     #module load askappipeline/2.23.1
     #module load askappipeline/axa-3729-flag-bad-data-in-reference-tables
 fi
@@ -561,6 +562,11 @@ BP_UPDATE_MODIFY_AMP_STRATEGY=${ampStrategyNow}
 BPTOOL_VERSION=2.8.0-rc.1
 DO_PREFLAG_REFTABLE=${doPreflagNow}
 APPLY_PREFLAGS_DIRECTLY_REFTABLE=${doPreflagNow}
+# Q-correction of residual X/Y gain amplitude imbalance
+BP_UPDATE_APPLY_Q_CORRECTIONS=true
+BP_UPDATE_Q_CORR_CSV=/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction_factors.csv
+BP_UPDATE_Q_CORR_VARIANT=bpcal
+BP_UPDATE_Q_CORR_ALLOW_REF_WS_MISMATCH=false
 EOF
             processASKAP.sh -r ${sbRefNow} -b ${sb1934Now} -p ${holoSBNow} -t ${configNow1}
         fi
