@@ -33,7 +33,7 @@ BEAM_END="${BEAM_END:-35}"
 DRY_RUN="false"
 
 DIR_SB=/askapbuffer/payne/raj030/askap-scheduling-blocks
-WORK_DIR="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026"
+WORK_DIR="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026-qcorr"
 BP_UPDATE_MODIFY_AMP_STRATEGY="multiply"
 DO_PREFLAG_REFTABLE="true"
 

@@ -5,11 +5,11 @@ set -euo pipefail
 # User-configurable settings
 # -----------------------------
 REMOTE="raj030@setonix-dm03.pawsey.org.au"
-REMOTE_BASE_ROOT="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026"
+REMOTE_BASE_ROOT="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026-qcorr"
 ODC_WEIGHT_ID="5229"
 REMOTE_BASE="${REMOTE_BASE_ROOT}/ODC-${ODC_WEIGHT_ID}"
 LOCAL_PARENT="${HOME}/DATA"
-LOCAL_NAME="reffield-average"
+LOCAL_NAME="reffield-average-qcorr"
 LOCAL_BASE="${LOCAL_PARENT}/${LOCAL_NAME}"
 LOCAL_BASE_EXPLICIT=0
 DRY_RUN=0
@@ -283,9 +283,9 @@ build_subpaths_from_manifest() {
     # Manifest-level config directives (KEY=VALUE), e.g.
     # REMOTE=raj030@setonix-dm03.pawsey.org.au
     # REMOTE_BASE=/scratch/.../ODC-5229
-    # REMOTE_BASE_ROOT=/scratch/.../assess_1934-2026
+    # REMOTE_BASE_ROOT=/scratch/.../assess_1934-2026-qcorr
     # ODC_WEIGHT_ID=5231
-    # LOCAL_BASE=/Users/me/DATA/reffield-average
+    # LOCAL_BASE=/Users/me/DATA/reffield-average-qcorr
     # AMP_STRATEGY=multiply
     # DO_PREFLAG_REFTABLE=true
     if [[ "${line}" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.+)$ ]]; then
