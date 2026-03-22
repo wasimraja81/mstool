@@ -72,7 +72,8 @@ done
 
 if [[ "${EARLY_DRY_RUN_PARSE}" != "true" ]]; then
     module use /askapbuffer/payne/raj030/askaprtModules
-    module load askappipeline/axa-3859-fix-generate-parset-for-offset-fields
+    module load askappipeline/axa-3877-implement-q-correction-factors
+    #module load askappipeline/axa-3859-fix-generate-parset-for-offset-fields
     #module load askappipeline/2.23.1
     #module load askappipeline/axa-3741-allow-general-processing-of-1934-fields
     #module load askappipeline/axa-3729-flag-bad-data-in-reference-tables
