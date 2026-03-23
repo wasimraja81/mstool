@@ -105,9 +105,8 @@ source "${REPO_ROOT}/.venv/bin/activate"
 # ─────────────────────────────────────────────────────────────────────────────
  python3 "${SCRIPTS}"/build_phase3_html_report.py \
      --data-root          "${DATA_ROOT}" \
-     --start-index        14 \
-     --end-index          49 \
-     --exclude-indices    "24-29" \
+     --start-index        30 \
+     --end-index          30 \
      --pol-sources \
      --highlight-frac-pol 0.10 \
      --package           "${DATA_ROOT}/final_mvp_share" \
