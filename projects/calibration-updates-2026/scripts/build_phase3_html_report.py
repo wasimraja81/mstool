@@ -1575,6 +1575,28 @@ def main():
     else:
         corr_factors_html = "<p class='meta'>Correction factor files not found &mdash; run the full pipeline (without <code>--html-only</code>) to generate them.</p>"
 
+    # ── Correction factor section heading/description (context-aware) ────────
+    # Auto-derived from data_root basename:
+    #   reffield-average-qcorr  → "qcorr"  (residual after Q-correction)
+    #   anything else           → "input"  (baseline correction factors)
+    _dr_suffix = data_root.name.split("reffield-average-", 1)[-1] \
+                 if "reffield-average-" in data_root.name else ""
+    _corr_context = _dr_suffix if _dr_suffix else "input"
+    if _corr_context == "qcorr":
+        corr_section_heading = "Residual dQ/dU After Q-Correction"
+        corr_section_desc    = (
+            "Per-beam residual leakage measured <em>after</em> Q-correction was applied "
+            "to the reference bandpass table. These values are diagnostics of how well "
+            "the correction worked &mdash; they are <strong>not</strong> factors to be applied. "
+            "All three files open as plain text in a new browser tab."
+        )
+    else:
+        corr_section_heading = "dQ/dU Correction Factors"
+        corr_section_desc    = (
+            "Per-beam leakage correction factors derived from 1934&minus;638 observations. "
+            "All three files open as plain text in a new browser tab."
+        )
+
 # ── Leakage spectra cards (per SB_REF) ──────────────────────────────
     spectra_cards_html = build_spectra_cards(
         manifest_rows, media_info,
@@ -1747,9 +1769,8 @@ def main():
   <p class='meta'><a href='gain_calibration_strategy.html' target='_blank' rel='noopener'>Open: Gain Calibration Strategy</a>
   &mdash; derivation of the bandpass correction factors from 1934&minus;638 measurements.</p>
 
-  <h3>dQ/dU Correction Factors</h3>
-  <p class='meta'>Per-beam leakage correction factors derived from 1934&minus;638 observations.
-  All three files open as plain text in a new browser tab.</p>
+  <h3>{corr_section_heading}</h3>
+  <p class='meta'>{corr_section_desc}</p>
   {corr_factors_html}
 
   <!-- ── Media modal ─────────────────────────────────────────── -->
