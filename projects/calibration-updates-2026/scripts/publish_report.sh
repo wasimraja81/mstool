@@ -33,11 +33,35 @@
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-DATA_ROOT="${HOME}/DATA/reffield-average"
+SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
+MANIFEST_FILE="${SCRIPTS}/../manifests/sb_manifest_reffield_average.txt"
+
+# DATA_ROOT is read from LOCAL_BASE in the manifest.
+# Hardcoded fallback (last used: reffield-average-qcorr):
+DATA_ROOT="${HOME}/DATA/reffield-average-qcorr"
+if [[ -f "${MANIFEST_FILE}" ]]; then
+    _local_base=$(awk -F'=' '/^LOCAL_BASE=/{gsub(/[[:space:]]/,"",$2); print $2}' "${MANIFEST_FILE}" | tail -1)
+    [[ -n "${_local_base}" ]] && DATA_ROOT="${_local_base}"
+fi
+echo "INFO - DATA_ROOT: ${DATA_ROOT}"
+
 PACKAGE_DIR="${DATA_ROOT}/final_mvp_share"
 PAGES_CLONE="${HOME}/github-wasimraja81/askap-leakage-report"
 PAGES_REMOTE="git@github.com:wasimraja81/askap-leakage-report.git"
 PAGES_URL="https://wasimraja81.github.io/askap-leakage-report/"
+
+# Derive publication subdirectory from DATA_ROOT basename.
+# Root index.html is ALWAYS the navigation landing page — reports go in subdirs.
+# reffield-average        -> publishes to baseline/
+# reffield-average-qcorr -> publishes to qcorr/
+_data_base="$(basename "${DATA_ROOT}")"
+if [[ "${_data_base}" == "reffield-average" ]]; then
+    PAGES_SUBDIR="baseline"
+else
+    PAGES_SUBDIR="${_data_base#reffield-average-}"
+    [[ "${PAGES_SUBDIR}" == "${_data_base}" ]] && PAGES_SUBDIR="${_data_base}"
+fi
+echo "INFO - Publication subdir: '${PAGES_SUBDIR}'"
 
 # ── Sanity checks ─────────────────────────────────────────────────────────────
 if [[ ! -f "${PACKAGE_DIR}/index.html" ]]; then
@@ -68,10 +92,43 @@ else
 fi
 
 # ── Sync package → clone ──────────────────────────────────────────────────────
-echo "Syncing ${PACKAGE_DIR}/ → ${PAGES_CLONE}/ ..."
+# Root index.html is permanently the navigation landing page — never overwritten
+# by a report sync.  Each report lives in its own named subdirectory.
+DEST_DIR="${PAGES_CLONE}/${PAGES_SUBDIR}"
+echo "Syncing ${PACKAGE_DIR}/ → ${DEST_DIR}/ ..."
+mkdir -p "${DEST_DIR}"
 rsync -av --delete \
     --exclude=".git" \
-    "${PACKAGE_DIR}/" "${PAGES_CLONE}/"
+    "${PACKAGE_DIR}/" "${DEST_DIR}/"
+
+# Regenerate root landing page every publish so links stay up to date.
+LANDING="${PAGES_CLONE}/index.html"
+echo "Updating landing page: ${LANDING}"
+cat > "${LANDING}" << 'LANDING_EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASKAP Leakage Assessment Reports</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 60px auto; padding: 0 20px; }
+    h1   { font-size: 1.4em; }
+    ul   { line-height: 2; }
+    .tag { font-size: 0.75em; background: #e8f4e8; border-radius: 3px;
+           padding: 2px 6px; margin-left: 8px; }
+    .new { background: #fff3cd; }
+  </style>
+</head>
+<body>
+  <h1>ASKAP Leakage Assessment Reports</h1>
+  <ul>
+    <li><a href="./baseline/">Baseline (no Q-correction)</a></li>
+    <li><a href="./qcorr/">Q-corrected report</a><span class="tag new">new</span></li>
+  </ul>
+</body>
+</html>
+LANDING_EOF
 
 # Ensure .nojekyll survives the rsync (package dir won't contain it)
 touch "${PAGES_CLONE}/.nojekyll"
