@@ -11,7 +11,5 @@ source "${REPO_ROOT}/.venv/bin/activate"
 
 "${SCRIPTS}"/copy_and_combine_assessment_results.sh \
   --manifest "${MANIFESTS}"/sb_manifest_reffield_average.txt \
-  --start-index 14 --end-index 49 \
-  --exclude-indices 24-29 \
-  --combine-only \
+  --start-index 30 --end-index 30 \
   --copy-metadata
