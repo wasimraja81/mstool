@@ -84,10 +84,19 @@ set -euo pipefail
 # Resolve the real location of this script, following symlinks.
 # Uses Python (already a dependency) for macOS-portable realpath.
 SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
-DATA_ROOT="${HOME}/DATA/reffield-average"
+REPO_ROOT="$(cd "${SCRIPTS}/../../.." && pwd)"
+MANIFEST_FILE="${SCRIPTS}/../manifests/sb_manifest_reffield_average.txt"
+
+# DATA_ROOT is read from LOCAL_BASE in the manifest.
+# Hardcoded fallback (last used: reffield-average-qcorr):
+DATA_ROOT="${HOME}/DATA/reffield-average-qcorr"
+if [[ -f "${MANIFEST_FILE}" ]]; then
+    _local_base=$(awk -F'=' '/^LOCAL_BASE=/{gsub(/[[:space:]]/,"",$2); print $2}' "${MANIFEST_FILE}" | tail -1)
+    [[ -n "${_local_base}" ]] && DATA_ROOT="${_local_base}"
+fi
+echo "INFO - DATA_ROOT: ${DATA_ROOT}"
 
 # Activate the repo's virtual environment.
-REPO_ROOT="$(cd "${SCRIPTS}/../../.." && pwd)"
 source "${REPO_ROOT}/.venv/bin/activate"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -118,7 +127,8 @@ source "${REPO_ROOT}/.venv/bin/activate"
 #    --force
 
 echo ""
-echo "Report written to: ${DATA_ROOT}/phase3/index.html"
+echo "Report written to:  ${DATA_ROOT}/phase3/index.html"
+echo "Package written to: ${DATA_ROOT}/final_mvp_share/"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ALL AVAILABLE OPTIONS (uncomment and combine as needed)

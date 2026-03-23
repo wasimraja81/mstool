@@ -33,11 +33,34 @@
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-DATA_ROOT="${HOME}/DATA/reffield-average"
+SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
+MANIFEST_FILE="${SCRIPTS}/../manifests/sb_manifest_reffield_average.txt"
+
+# DATA_ROOT is read from LOCAL_BASE in the manifest.
+# Hardcoded fallback (last used: reffield-average-qcorr):
+DATA_ROOT="${HOME}/DATA/reffield-average-qcorr"
+if [[ -f "${MANIFEST_FILE}" ]]; then
+    _local_base=$(awk -F'=' '/^LOCAL_BASE=/{gsub(/[[:space:]]/,"",$2); print $2}' "${MANIFEST_FILE}" | tail -1)
+    [[ -n "${_local_base}" ]] && DATA_ROOT="${_local_base}"
+fi
+echo "INFO - DATA_ROOT: ${DATA_ROOT}"
+
 PACKAGE_DIR="${DATA_ROOT}/final_mvp_share"
 PAGES_CLONE="${HOME}/github-wasimraja81/askap-leakage-report"
 PAGES_REMOTE="git@github.com:wasimraja81/askap-leakage-report.git"
 PAGES_URL="https://wasimraja81.github.io/askap-leakage-report/"
+
+# Derive publication subdirectory from DATA_ROOT basename.
+# reffield-average        -> publishes to root  (old baseline, unchanged)
+# reffield-average-qcorr -> publishes to qcorr/ (new Q-corrected report)
+_data_base="$(basename "${DATA_ROOT}")"
+if [[ "${_data_base}" == "reffield-average" ]]; then
+    PAGES_SUBDIR=""
+else
+    PAGES_SUBDIR="${_data_base#reffield-average-}"
+    [[ "${PAGES_SUBDIR}" == "${_data_base}" ]] && PAGES_SUBDIR="${_data_base}"
+fi
+echo "INFO - Publication subdir: '${PAGES_SUBDIR:-<root>}'"
 
 # ── Sanity checks ─────────────────────────────────────────────────────────────
 if [[ ! -f "${PACKAGE_DIR}/index.html" ]]; then
@@ -68,10 +91,56 @@ else
 fi
 
 # ── Sync package → clone ──────────────────────────────────────────────────────
-echo "Syncing ${PACKAGE_DIR}/ → ${PAGES_CLONE}/ ..."
-rsync -av --delete \
-    --exclude=".git" \
-    "${PACKAGE_DIR}/" "${PAGES_CLONE}/"
+if [[ -z "${PAGES_SUBDIR}" ]]; then
+    # Baseline (root) report — sync directly to repo root
+    echo "Syncing ${PACKAGE_DIR}/ → ${PAGES_CLONE}/ ..."
+    rsync -av --delete \
+        --exclude=".git" \
+        "${PACKAGE_DIR}/" "${PAGES_CLONE}/"
+else
+    # Variant report (e.g. qcorr) — sync to subdirectory; root is not touched
+    DEST_DIR="${PAGES_CLONE}/${PAGES_SUBDIR}"
+    echo "Syncing ${PACKAGE_DIR}/ → ${DEST_DIR}/ ..."
+    mkdir -p "${DEST_DIR}"
+    rsync -av --delete \
+        --exclude=".git" \
+        "${PACKAGE_DIR}/" "${DEST_DIR}/"
+
+    # Regenerate root landing page so collaborators can navigate to both reports
+    LANDING="${PAGES_CLONE}/index.html"
+    echo "Updating landing page: ${LANDING}"
+    cat > "${LANDING}" << 'LANDING_EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASKAP Leakage Assessment Reports</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 60px auto; padding: 0 20px; }
+    h1   { font-size: 1.4em; }
+    ul   { line-height: 2; }
+    .tag { font-size: 0.75em; background: #e8f4e8; border-radius: 3px;
+           padding: 2px 6px; margin-left: 8px; }
+    .new { background: #fff3cd; }
+  </style>
+</head>
+<body>
+  <h1>ASKAP Leakage Assessment Reports</h1>
+  <ul>
+    <li><a href="./">Baseline (no Q-correction)</a></li>
+LANDING_EOF
+    # Append the new variant link dynamically
+    echo "    <li><a href=\"${PAGES_SUBDIR}/\">Q-corrected report</a><span class=\"tag new\">new</span></li>" >> "${LANDING}"
+    cat >> "${LANDING}" << 'LANDING_EOF2'
+  </ul>
+  <p style="font-size:0.85em; color:#666;">Q-correction removes residual X/Y gain
+  amplitude imbalance (dQ) from the reference bandpass table. See the
+  <a href="https://github.com/wasimraja81/mstool">mstool repo</a> for details.</p>
+</body>
+</html>
+LANDING_EOF2
+fi
 
 # Ensure .nojekyll survives the rsync (package dir won't contain it)
 touch "${PAGES_CLONE}/.nojekyll"
