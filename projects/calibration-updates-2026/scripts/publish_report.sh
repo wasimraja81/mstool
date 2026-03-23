@@ -51,16 +51,17 @@ PAGES_REMOTE="git@github.com:wasimraja81/askap-leakage-report.git"
 PAGES_URL="https://wasimraja81.github.io/askap-leakage-report/"
 
 # Derive publication subdirectory from DATA_ROOT basename.
-# reffield-average        -> publishes to root  (old baseline, unchanged)
-# reffield-average-qcorr -> publishes to qcorr/ (new Q-corrected report)
+# Root index.html is ALWAYS the navigation landing page — reports go in subdirs.
+# reffield-average        -> publishes to baseline/
+# reffield-average-qcorr -> publishes to qcorr/
 _data_base="$(basename "${DATA_ROOT}")"
 if [[ "${_data_base}" == "reffield-average" ]]; then
-    PAGES_SUBDIR=""
+    PAGES_SUBDIR="baseline"
 else
     PAGES_SUBDIR="${_data_base#reffield-average-}"
     [[ "${PAGES_SUBDIR}" == "${_data_base}" ]] && PAGES_SUBDIR="${_data_base}"
 fi
-echo "INFO - Publication subdir: '${PAGES_SUBDIR:-<root>}'"
+echo "INFO - Publication subdir: '${PAGES_SUBDIR}'"
 
 # ── Sanity checks ─────────────────────────────────────────────────────────────
 if [[ ! -f "${PACKAGE_DIR}/index.html" ]]; then
@@ -91,25 +92,19 @@ else
 fi
 
 # ── Sync package → clone ──────────────────────────────────────────────────────
-if [[ -z "${PAGES_SUBDIR}" ]]; then
-    # Baseline (root) report — sync directly to repo root
-    echo "Syncing ${PACKAGE_DIR}/ → ${PAGES_CLONE}/ ..."
-    rsync -av --delete \
-        --exclude=".git" \
-        "${PACKAGE_DIR}/" "${PAGES_CLONE}/"
-else
-    # Variant report (e.g. qcorr) — sync to subdirectory; root is not touched
-    DEST_DIR="${PAGES_CLONE}/${PAGES_SUBDIR}"
-    echo "Syncing ${PACKAGE_DIR}/ → ${DEST_DIR}/ ..."
-    mkdir -p "${DEST_DIR}"
-    rsync -av --delete \
-        --exclude=".git" \
-        "${PACKAGE_DIR}/" "${DEST_DIR}/"
+# Root index.html is permanently the navigation landing page — never overwritten
+# by a report sync.  Each report lives in its own named subdirectory.
+DEST_DIR="${PAGES_CLONE}/${PAGES_SUBDIR}"
+echo "Syncing ${PACKAGE_DIR}/ → ${DEST_DIR}/ ..."
+mkdir -p "${DEST_DIR}"
+rsync -av --delete \
+    --exclude=".git" \
+    "${PACKAGE_DIR}/" "${DEST_DIR}/"
 
-    # Regenerate root landing page so collaborators can navigate to both reports
-    LANDING="${PAGES_CLONE}/index.html"
-    echo "Updating landing page: ${LANDING}"
-    cat > "${LANDING}" << 'LANDING_EOF'
+# Regenerate root landing page every publish so links stay up to date.
+LANDING="${PAGES_CLONE}/index.html"
+echo "Updating landing page: ${LANDING}"
+cat > "${LANDING}" << 'LANDING_EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -128,19 +123,15 @@ else
 <body>
   <h1>ASKAP Leakage Assessment Reports</h1>
   <ul>
-    <li><a href="./">Baseline (no Q-correction)</a></li>
-LANDING_EOF
-    # Append the new variant link dynamically
-    echo "    <li><a href=\"${PAGES_SUBDIR}/\">Q-corrected report</a><span class=\"tag new\">new</span></li>" >> "${LANDING}"
-    cat >> "${LANDING}" << 'LANDING_EOF2'
+    <li><a href="./baseline/">Baseline (no Q-correction)</a></li>
+    <li><a href="./qcorr/">Q-corrected report</a><span class="tag new">new</span></li>
   </ul>
   <p style="font-size:0.85em; color:#666;">Q-correction removes residual X/Y gain
   amplitude imbalance (dQ) from the reference bandpass table. See the
   <a href="https://github.com/wasimraja81/mstool">mstool repo</a> for details.</p>
 </body>
 </html>
-LANDING_EOF2
-fi
+LANDING_EOF
 
 # Ensure .nojekyll survives the rsync (package dir won't contain it)
 touch "${PAGES_CLONE}/.nojekyll"
