@@ -126,9 +126,6 @@ cat > "${LANDING}" << 'LANDING_EOF'
     <li><a href="./baseline/">Baseline (no Q-correction)</a></li>
     <li><a href="./qcorr/">Q-corrected report</a><span class="tag new">new</span></li>
   </ul>
-  <p style="font-size:0.85em; color:#666;">Q-correction removes residual X/Y gain
-  amplitude imbalance (dQ) from the reference bandpass table. See the
-  <a href="https://github.com/wasimraja81/mstool">mstool repo</a> for details.</p>
 </body>
 </html>
 LANDING_EOF
