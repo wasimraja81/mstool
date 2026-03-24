@@ -13,6 +13,11 @@ START_INDEX=""
 END_INDEX=""
 DRY_RUN=0
 STAGE="ref"
+APPLY_Q_CORRECTIONS="true"
+Q_CORR_CSV="/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction_factors.csv"
+Q_CORR_VARIANT="bpcal"
+Q_CORR_REF_WS=""
+Q_CORR_ALLOW_MISMATCH="false"
 
 usage() {
   cat <<EOF
@@ -20,12 +25,17 @@ Usage:
   submit_pipeline.sh [options]
 
 Options:
-  --manifest PATH      Manifest file path (default: ${MANIFEST_DEFAULT})
-  --start-index N      Optional start index (0-based)
-  --end-index N        Optional end index (0-based)
-  --stage NAME         Stage to submit: ref | 1934 (default: ref)
-  --dry-run            Print sbatch commands without submitting
-  -h, --help           Show this help
+  --manifest PATH           Manifest file path (default: ${MANIFEST_DEFAULT})
+  --start-index N           Optional start index (0-based)
+  --end-index N             Optional end index (0-based)
+  --stage NAME              Stage to submit: ref | 1934 (default: ref)
+  --apply-q-corrections VAL   Pass true/false for BP_UPDATE_APPLY_Q_CORRECTIONS (default: true)
+  --q-corr-csv PATH           Path to Q-correction CSV file
+  --q-corr-variant VAL        CSV variant column: bpcal or lcal (default: bpcal)
+  --q-corr-ref-ws VAL         Override ref_ws for CSV row selection (default: from pipeline metadata)
+  --q-corr-allow-mismatch VAL Allow ref_ws mismatch: true/false (default: false)
+  --dry-run                   Print sbatch commands without submitting
+  -h, --help                  Show this help
 
 Examples:
   ./projects/calibration-updates-2026/slurm/submit_pipeline.sh --stage ref
@@ -51,6 +61,26 @@ while [[ $# -gt 0 ]]; do
       ;;
     --stage)
       STAGE="$2"
+      shift 2
+      ;;
+    --apply-q-corrections)
+      APPLY_Q_CORRECTIONS="$2"
+      shift 2
+      ;;
+    --q-corr-csv)
+      Q_CORR_CSV="$2"
+      shift 2
+      ;;
+    --q-corr-variant)
+      Q_CORR_VARIANT="$2"
+      shift 2
+      ;;
+    --q-corr-ref-ws)
+      Q_CORR_REF_WS="$2"
+      shift 2
+      ;;
+    --q-corr-allow-mismatch)
+      Q_CORR_ALLOW_MISMATCH="$2"
       shift 2
       ;;
     --dry-run)
@@ -79,7 +109,15 @@ fi
 [[ -f "${REF_SCRIPT}" ]] || { echo "ERROR: Missing script: ${REF_SCRIPT}"; exit 1; }
 [[ -f "${SCI_SCRIPT}" ]] || { echo "ERROR: Missing script: ${SCI_SCRIPT}"; exit 1; }
 
-ref_cmd=(sbatch --parsable "${REF_SCRIPT}" --manifest "${MANIFEST_FILE}")
+# Q-correction flags are ref-stage only — start_1934s.slurm does not accept them.
+ref_cmd=(sbatch --parsable "${REF_SCRIPT}" --manifest "${MANIFEST_FILE}"
+    --apply-q-corrections "${APPLY_Q_CORRECTIONS}"
+    --q-corr-csv "${Q_CORR_CSV}"
+    --q-corr-variant "${Q_CORR_VARIANT}"
+    --q-corr-allow-mismatch "${Q_CORR_ALLOW_MISMATCH}")
+if [[ -n "${Q_CORR_REF_WS}" ]]; then
+    ref_cmd+=(--q-corr-ref-ws "${Q_CORR_REF_WS}")
+fi
 sci_cmd=(sbatch --parsable "${SCI_SCRIPT}" --manifest "${MANIFEST_FILE}")
 
 if [[ -n "${START_INDEX}" ]]; then

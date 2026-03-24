@@ -19,11 +19,16 @@ for arg in "$@"; do
 Usage: start_refField.slurm [options]
 
 Options:
-  --manifest <path>      Path to manifest file
-  --start-index <idx>    Start tuple index (inclusive)
-  --end-index <idx>      End tuple index (inclusive)
-  --dry-run-parse        Print resolved tuple values and exit
-  -h, --help             Show this help and exit
+  --manifest <path>             Path to manifest file
+  --start-index <idx>           Start tuple index (inclusive)
+  --end-index <idx>             End tuple index (inclusive)
+  --apply-q-corrections <bool>   Set BP_UPDATE_APPLY_Q_CORRECTIONS (true/false, default: true)
+  --q-corr-csv <path>            Path to Q-correction CSV file
+  --q-corr-variant <val>         CSV variant column: bpcal or lcal (default: bpcal)
+  --q-corr-ref-ws <val>          Override ref_ws for CSV row selection (default: from pipeline metadata)
+  --q-corr-allow-mismatch <bool> Allow ref_ws mismatch (true/false, default: false)
+  --dry-run-parse                Print resolved tuple values and exit
+  -h, --help                     Show this help and exit
 EOF
         exit 0
     fi
@@ -108,6 +113,11 @@ MANIFEST_FILE="${MANIFEST_FILE:-${MANIFEST_FILE_DEFAULT}}"
 BSB_OVERRIDE="${BSB_OVERRIDE:-}"
 ESB_OVERRIDE="${ESB_OVERRIDE:-}"
 DRY_RUN_PARSE=false
+APPLY_Q_CORRECTIONS="true"
+Q_CORR_CSV="/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction_factors.csv"
+Q_CORR_VARIANT="bpcal"
+Q_CORR_REF_WS=""
+Q_CORR_ALLOW_MISMATCH="false"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -121,6 +131,26 @@ while [[ $# -gt 0 ]]; do
             ;;
         --end-index)
             ESB_OVERRIDE="$2"
+            shift 2
+            ;;
+        --apply-q-corrections)
+            APPLY_Q_CORRECTIONS="$2"
+            shift 2
+            ;;
+        --q-corr-csv)
+            Q_CORR_CSV="$2"
+            shift 2
+            ;;
+        --q-corr-variant)
+            Q_CORR_VARIANT="$2"
+            shift 2
+            ;;
+        --q-corr-ref-ws)
+            Q_CORR_REF_WS="$2"
+            shift 2
+            ;;
+        --q-corr-allow-mismatch)
+            Q_CORR_ALLOW_MISMATCH="$2"
             shift 2
             ;;
         --dry-run-parse)
@@ -574,11 +604,12 @@ BP_UPDATE_MODIFY_AMP_STRATEGY=${ampStrategyNow}
 BPTOOL_VERSION=2.8.0-rc.1
 DO_PREFLAG_REFTABLE=${doPreflagNow}
 APPLY_PREFLAGS_DIRECTLY_REFTABLE=${doPreflagNow}
-# Q-correction of residual X/Y gain amplitude imbalance
-BP_UPDATE_APPLY_Q_CORRECTIONS=true
-BP_UPDATE_Q_CORR_CSV=/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction_factors.csv
-BP_UPDATE_Q_CORR_VARIANT=bpcal
-BP_UPDATE_Q_CORR_ALLOW_REF_WS_MISMATCH=false
+# Q-correction of residual X/Y gain amplitude imbalance (values passed via CLI args)
+BP_UPDATE_APPLY_Q_CORRECTIONS=${APPLY_Q_CORRECTIONS}
+BP_UPDATE_Q_CORR_CSV=${Q_CORR_CSV}
+BP_UPDATE_Q_CORR_VARIANT=${Q_CORR_VARIANT}
+BP_UPDATE_Q_CORR_ALLOW_REF_WS_MISMATCH=${Q_CORR_ALLOW_MISMATCH}
+$([ -n "${Q_CORR_REF_WS}" ] && echo "BP_UPDATE_Q_CORR_REF_WS=${Q_CORR_REF_WS}" || echo "# BP_UPDATE_Q_CORR_REF_WS not set (pipeline derives from PARENT_WEIGHT_SCIENCE)")
 EOF
             processASKAP.sh -r ${sbRefNow} -b ${sb1934Now} -p ${holoSBNow} -t ${configNow1}
         fi
