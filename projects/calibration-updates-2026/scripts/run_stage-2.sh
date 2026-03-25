@@ -13,6 +13,7 @@ MANIFESTS="${SCRIPTS}/../manifests"
 MANIFEST_FILE="${MANIFESTS}/manifest_ref_ws-4788.txt"
 START_INDEX=""
 END_INDEX=""
+EXPERIMENT=""
 
 usage() { cat <<EOF
 Usage: $(basename "$0") [options]
@@ -20,10 +21,11 @@ Usage: $(basename "$0") [options]
 Submits the 1934 science calibrator (stage 2) SLURM jobs.
 
 Options:
-  --manifest FILE   Manifest file (default: manifest_ref_ws-4788.txt)
-  --start-index N   First manifest row index (0-based)
-  --end-index N     Last manifest row index (inclusive)
-  -h, --help        Show this help
+  --manifest FILE              Manifest file (default: manifest_ref_ws-4788.txt)
+  --start-index N              First manifest row index (0-based)
+  --end-index N                Last manifest row index (inclusive)
+  --experiment baseline|qcorr  Experiment type; qcorr appends -qcorr to HPC dir (default: baseline)
+  -h, --help                   Show this help
 EOF
 }
 
@@ -32,6 +34,7 @@ while [[ $# -gt 0 ]]; do
         --manifest)    MANIFEST_FILE="$2"; shift 2 ;;
         --start-index) START_INDEX="$2";   shift 2 ;;
         --end-index)   END_INDEX="$2";     shift 2 ;;
+        --experiment)  EXPERIMENT="$2";    shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "ERROR: Unknown argument '$1'"; exit 1 ;;
     esac
@@ -40,5 +43,6 @@ done
 CMD=("${SLURM}"/submit_pipeline.sh --stage 1934 --manifest "${MANIFEST_FILE}")
 [[ -n "${START_INDEX}" ]] && CMD+=(--start-index "${START_INDEX}")
 [[ -n "${END_INDEX}" ]]   && CMD+=(--end-index "${END_INDEX}")
+[[ -n "${EXPERIMENT}" ]]  && CMD+=(--experiment "${EXPERIMENT}")
 
 "${CMD[@]}"
