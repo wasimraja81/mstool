@@ -90,12 +90,27 @@ START_INDEX="0"
 END_INDEX="49"
 EXPERIMENT="baseline"
 
+usage() { cat <<EOF
+Usage: $(basename "$0") [options]
+
+Builds the Phase-3 HTML assessment report.
+
+Options:
+  --manifest FILE              Manifest file (default: manifest_ref_ws-4788.txt)
+  --start-index N              First manifest row index (default: 0)
+  --end-index N                Last manifest row index (default: 49)
+  --experiment baseline|qcorr  Appends -qcorr to DATA_ROOT when qcorr (default: baseline)
+  -h, --help                   Show this help
+EOF
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --manifest)    MANIFEST_FILE="$2"; shift 2 ;;
         --start-index) START_INDEX="$2";   shift 2 ;;
         --end-index)   END_INDEX="$2";     shift 2 ;;
         --experiment)  EXPERIMENT="$2";    shift 2 ;;
+        -h|--help) usage; exit 0 ;;
         *)
             echo "ERROR: Unknown argument '$1'"
             exit 1

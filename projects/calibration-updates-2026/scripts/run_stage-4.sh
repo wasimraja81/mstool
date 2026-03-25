@@ -12,6 +12,21 @@ END_INDEX=""
 EXPERIMENT="baseline"
 COPY_METADATA="false"
 
+usage() { cat <<EOF
+Usage: $(basename "$0") [options]
+
+Rsyncs assessment results from HPC and builds the local master CSV (stage 4).
+
+Options:
+  --manifest FILE              Manifest file (default: manifest_ref_ws-4788.txt)
+  --start-index N              First manifest row index (0-based)
+  --end-index N                Last manifest row index (inclusive)
+  --experiment baseline|qcorr  Appends -qcorr to LOCAL_BASE and HPC_BASE_DIR (default: baseline)
+  --copy-metadata              Also rsync metadata/ directories
+  -h, --help                   Show this help
+EOF
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --manifest)      MANIFEST_FILE="$2"; shift 2 ;;
@@ -19,6 +34,7 @@ while [[ $# -gt 0 ]]; do
         --end-index)     END_INDEX="$2";     shift 2 ;;
         --experiment)    EXPERIMENT="$2";    shift 2 ;;
         --copy-metadata) COPY_METADATA="true"; shift ;;
+        -h|--help) usage; exit 0 ;;
         *) echo "ERROR: Unknown argument '$1'"; exit 1 ;;
     esac
 done

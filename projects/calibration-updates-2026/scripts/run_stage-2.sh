@@ -14,11 +14,25 @@ MANIFEST_FILE="${MANIFESTS}/manifest_ref_ws-4788.txt"
 START_INDEX=""
 END_INDEX=""
 
+usage() { cat <<EOF
+Usage: $(basename "$0") [options]
+
+Submits the 1934 science calibrator (stage 2) SLURM jobs.
+
+Options:
+  --manifest FILE   Manifest file (default: manifest_ref_ws-4788.txt)
+  --start-index N   First manifest row index (0-based)
+  --end-index N     Last manifest row index (inclusive)
+  -h, --help        Show this help
+EOF
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --manifest)    MANIFEST_FILE="$2"; shift 2 ;;
         --start-index) START_INDEX="$2";   shift 2 ;;
         --end-index)   END_INDEX="$2";     shift 2 ;;
+        -h|--help) usage; exit 0 ;;
         *) echo "ERROR: Unknown argument '$1'"; exit 1 ;;
     esac
 done

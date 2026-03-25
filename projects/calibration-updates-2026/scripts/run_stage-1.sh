@@ -21,6 +21,24 @@ Q_CORR_VARIANT=""
 Q_CORR_REF_WS=""
 Q_CORR_ALLOW_MISMATCH=""
 
+usage() { cat <<EOF
+Usage: $(basename "$0") [options]
+
+Submits the reference-field bandpass derivation (stage 1) SLURM jobs.
+
+Options:
+  --manifest FILE                  Manifest file (default: manifest_ref_ws-4788.txt)
+  --start-index N                  First manifest row index (0-based)
+  --end-index N                    Last manifest row index (inclusive)
+  --apply-q-corrections true|false Enable Q-correction (default: false)
+  --q-corr-csv FILE                Path to dQ/dU correction CSV
+  --q-corr-variant bpcal|lcal      Correction variant
+  --q-corr-ref-ws N                Override ref_ws for CSV row selection
+  --q-corr-allow-mismatch true     Allow ref_ws mismatch (logs warning)
+  -h, --help                       Show this help
+EOF
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --manifest)              MANIFEST_FILE="$2";           shift 2 ;;
@@ -31,6 +49,7 @@ while [[ $# -gt 0 ]]; do
         --q-corr-variant)        Q_CORR_VARIANT="$2";         shift 2 ;;
         --q-corr-ref-ws)         Q_CORR_REF_WS="$2";         shift 2 ;;
         --q-corr-allow-mismatch) Q_CORR_ALLOW_MISMATCH="$2"; shift 2 ;;
+        -h|--help) usage; exit 0 ;;
         *) echo "ERROR: Unknown argument '$1'"; exit 1 ;;
     esac
 done

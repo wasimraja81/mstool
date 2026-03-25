@@ -37,6 +37,18 @@ SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys
 MANIFEST_FILE="${SCRIPTS}/../manifests/manifest_ref_ws-4788.txt"
 EXPERIMENT="baseline"
 
+usage() { cat <<EOF
+Usage: $(basename "$0") [options]
+
+Syncs the assembled report package to the GitHub Pages repo.
+
+Options:
+  --manifest FILE              Manifest file (default: manifest_ref_ws-4788.txt)
+  --experiment baseline|qcorr  Appends -qcorr to DATA_ROOT; drives PAGES_SUBDIR (default: baseline)
+  -h, --help                   Show this help
+EOF
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --manifest)
@@ -46,6 +58,9 @@ while [[ $# -gt 0 ]]; do
         --experiment)
             EXPERIMENT="$2"
             shift 2
+            ;;
+        -h|--help)
+            usage; exit 0
             ;;
         *)
             echo "ERROR: Unknown argument '$1'"
