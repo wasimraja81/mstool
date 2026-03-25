@@ -705,8 +705,9 @@ else
 fi
 
 echo "==> Configuration"
-echo "  Remote host/base: ${REMOTE}:${REMOTE_BASE}"
-echo "  ODC weight ID: ${ODC_WEIGHT_ID:-none}"
+echo "  Remote host    : ${REMOTE}"
+echo "  Remote base root: ${REMOTE_BASE_ROOT:-${REMOTE_BASE}}"
+echo "  ODC weight ID (global default, per-row may differ): ${ODC_WEIGHT_ID:-none}"
 echo "  Local destination: ${LOCAL_BASE}"
 echo "  Dry run: ${DRY_RUN}"
 echo "  Copy metadata: ${COPY_METADATA}"
