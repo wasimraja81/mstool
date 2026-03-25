@@ -746,6 +746,7 @@ for i in "${!SUBPATHS[@]}"; do
   remote_base_for_sub="${SUBPATH_REMOTE_BASES[$i]:-${REMOTE_BASE}}"
   sub_rel="${sub%/}"
   remote_path="${remote_base_for_sub}/${sub_rel}"
+  echo "  [$(( i + 1 ))/${#SUBPATHS[@]}] Source: ${REMOTE}:${remote_path}"
   if [[ ${METADATA_ONLY} -eq 0 && ${COMBINE_ONLY} -eq 0 ]]; then
     if ssh "${REMOTE}" "test -d \"${remote_path}\""; then
       if [[ ${DRY_RUN} -eq 1 ]]; then
