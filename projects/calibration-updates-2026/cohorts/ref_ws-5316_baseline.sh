@@ -29,14 +29,15 @@ stage1() {
         --manifest      "${MANIFEST}" \
         --start-index   "${START_INDEX}" \
         --end-index     "${END_INDEX}" \
-        --apply-q-corrections false
+        --experiment    "${EXPERIMENT}"
 }
 
 stage2() {
     "${SCRIPTS}"/run_stage-2.sh \
         --manifest      "${MANIFEST}" \
         --start-index   "${START_INDEX}" \
-        --end-index     "${END_INDEX}"
+        --end-index     "${END_INDEX}" \
+        --experiment    "${EXPERIMENT}"
 }
 
 stage3() {

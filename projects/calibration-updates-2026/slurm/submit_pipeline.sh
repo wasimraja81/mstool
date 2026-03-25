@@ -13,8 +13,8 @@ START_INDEX=""
 END_INDEX=""
 DRY_RUN=0
 STAGE="ref"
-APPLY_Q_CORRECTIONS="true"
-Q_CORR_CSV="/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction_factors.csv"
+EXPERIMENT=""
+Q_CORR_CSV=""
 Q_CORR_VARIANT="bpcal"
 Q_CORR_REF_WS=""
 Q_CORR_ALLOW_MISMATCH="false"
@@ -29,10 +29,10 @@ Options:
   --start-index N           Optional start index (0-based)
   --end-index N             Optional end index (0-based)
   --stage NAME              Stage to submit: ref | 1934 (default: ref)
-  --apply-q-corrections VAL   Pass true/false for BP_UPDATE_APPLY_Q_CORRECTIONS (default: true)
-  --q-corr-csv PATH           Path to Q-correction CSV file
+  --q-corr-csv PATH           Path to Q-correction CSV (override; auto-derived from manifest for --experiment qcorr)
   --q-corr-variant VAL        CSV variant column: bpcal or lcal (default: bpcal)
   --q-corr-ref-ws VAL         Override ref_ws for CSV row selection (default: from pipeline metadata)
+  --experiment baseline|qcorr  Experiment type; qcorr appends -qcorr to HPC work dir (default: baseline)
   --q-corr-allow-mismatch VAL Allow ref_ws mismatch: true/false (default: false)
   --dry-run                   Print sbatch commands without submitting
   -h, --help                  Show this help
@@ -63,10 +63,6 @@ while [[ $# -gt 0 ]]; do
       STAGE="$2"
       shift 2
       ;;
-    --apply-q-corrections)
-      APPLY_Q_CORRECTIONS="$2"
-      shift 2
-      ;;
     --q-corr-csv)
       Q_CORR_CSV="$2"
       shift 2
@@ -77,6 +73,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --q-corr-ref-ws)
       Q_CORR_REF_WS="$2"
+      shift 2
+      ;;
+    --experiment)
+      EXPERIMENT="$2"
       shift 2
       ;;
     --q-corr-allow-mismatch)
@@ -111,14 +111,19 @@ fi
 
 # Q-correction flags are ref-stage only — start_1934s.slurm does not accept them.
 ref_cmd=(sbatch --parsable "${REF_SCRIPT}" --manifest "${MANIFEST_FILE}"
-    --apply-q-corrections "${APPLY_Q_CORRECTIONS}"
-    --q-corr-csv "${Q_CORR_CSV}"
     --q-corr-variant "${Q_CORR_VARIANT}"
     --q-corr-allow-mismatch "${Q_CORR_ALLOW_MISMATCH}")
+if [[ -n "${Q_CORR_CSV}" ]]; then
+    ref_cmd+=(--q-corr-csv "${Q_CORR_CSV}")
+fi
 if [[ -n "${Q_CORR_REF_WS}" ]]; then
     ref_cmd+=(--q-corr-ref-ws "${Q_CORR_REF_WS}")
 fi
 sci_cmd=(sbatch --parsable "${SCI_SCRIPT}" --manifest "${MANIFEST_FILE}")
+if [[ -n "${EXPERIMENT}" ]]; then
+  ref_cmd+=(--experiment "${EXPERIMENT}")
+  sci_cmd+=(--experiment "${EXPERIMENT}")
+fi
 
 if [[ -n "${START_INDEX}" ]]; then
   ref_cmd+=(--start-index "${START_INDEX}")

@@ -25,8 +25,8 @@ EXPERIMENT="qcorr"
 START_INDEX="0"
 END_INDEX="49"
 
-# Q-correction parameters — update Q_CORR_CSV when a new table is derived.
-Q_CORR_CSV="/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction_factors.csv"
+# Q-correction variant: bpcal uses bandpass-calibrator-derived corrections.
+# CSV is auto-derived from manifest cohort: .../askap-calibration-updates/<cohort>/dq_du_correction_factors.csv
 Q_CORR_VARIANT="bpcal"
 
 stage1() {
@@ -34,8 +34,7 @@ stage1() {
         --manifest              "${MANIFEST}" \
         --start-index           "${START_INDEX}" \
         --end-index             "${END_INDEX}" \
-        --apply-q-corrections   true \
-        --q-corr-csv            "${Q_CORR_CSV}" \
+        --experiment            "${EXPERIMENT}" \
         --q-corr-variant        "${Q_CORR_VARIANT}"
 }
 
@@ -43,7 +42,8 @@ stage2() {
     "${SCRIPTS}"/run_stage-2.sh \
         --manifest      "${MANIFEST}" \
         --start-index   "${START_INDEX}" \
-        --end-index     "${END_INDEX}"
+        --end-index     "${END_INDEX}" \
+        --experiment    "${EXPERIMENT}"
 }
 
 stage3() {
