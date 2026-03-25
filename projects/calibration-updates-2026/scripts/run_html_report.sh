@@ -87,6 +87,19 @@ SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys
 REPO_ROOT="$(cd "${SCRIPTS}/../../.." && pwd)"
 MANIFEST_FILE="${SCRIPTS}/../manifests/sb_manifest_reffield_average.txt"
 
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --manifest)
+            MANIFEST_FILE="$2"
+            shift 2
+            ;;
+        *)
+            echo "ERROR: Unknown argument '$1'"
+            exit 1
+            ;;
+    esac
+done
+
 # DATA_ROOT is read from LOCAL_BASE in the manifest.
 # Hardcoded fallback (last used: reffield-average-qcorr):
 DATA_ROOT="${HOME}/DATA/reffield-average-qcorr"
@@ -105,8 +118,9 @@ source "${REPO_ROOT}/.venv/bin/activate"
 # ─────────────────────────────────────────────────────────────────────────────
  python3 "${SCRIPTS}"/build_phase3_html_report.py \
      --data-root          "${DATA_ROOT}" \
+     --manifest           "${MANIFEST_FILE}" \
      --start-index        30 \
-     --end-index          30 \
+     --end-index          33 \
      --pol-sources \
      --highlight-frac-pol 0.10 \
      --package           "${DATA_ROOT}/final_mvp_share" \

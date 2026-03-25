@@ -36,6 +36,19 @@ set -euo pipefail
 SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
 MANIFEST_FILE="${SCRIPTS}/../manifests/sb_manifest_reffield_average.txt"
 
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --manifest)
+            MANIFEST_FILE="$2"
+            shift 2
+            ;;
+        *)
+            echo "ERROR: Unknown argument '$1'"
+            exit 1
+            ;;
+    esac
+done
+
 # DATA_ROOT is read from LOCAL_BASE in the manifest.
 # Hardcoded fallback (last used: reffield-average-qcorr):
 DATA_ROOT="${HOME}/DATA/reffield-average-qcorr"

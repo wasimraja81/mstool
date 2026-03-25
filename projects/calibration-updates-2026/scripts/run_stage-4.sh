@@ -6,10 +6,25 @@ SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys
 REPO_ROOT="$(cd "${SCRIPTS}/../../.." && pwd)"
 MANIFESTS="${SCRIPTS}/../manifests"
 
+MANIFEST_FILE="${MANIFESTS}/sb_manifest_reffield_average.txt"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --manifest)
+            MANIFEST_FILE="$2"
+            shift 2
+            ;;
+        *)
+            echo "ERROR: Unknown argument '$1'"
+            exit 1
+            ;;
+    esac
+done
+
 # Activate the repo's virtual environment.
 source "${REPO_ROOT}/.venv/bin/activate"
 
 "${SCRIPTS}"/copy_and_combine_assessment_results.sh \
-  --manifest "${MANIFESTS}"/sb_manifest_reffield_average.txt \
-  --start-index 30 --end-index 30 \
+  --manifest "${MANIFEST_FILE}" \
+  --start-index 33 --end-index 33 \
   --copy-metadata
