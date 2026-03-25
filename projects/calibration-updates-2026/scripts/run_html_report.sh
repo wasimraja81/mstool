@@ -85,7 +85,7 @@ set -euo pipefail
 # Uses Python (already a dependency) for macOS-portable realpath.
 SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
 REPO_ROOT="$(cd "${SCRIPTS}/../../.." && pwd)"
-MANIFEST_FILE="${SCRIPTS}/../manifests/sb_manifest_reffield_average.txt"
+MANIFEST_FILE="${SCRIPTS}/../manifests/manifest_ref_ws-4788.txt"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -160,7 +160,7 @@ echo "Package written to: ${DATA_ROOT}/final_mvp_share/"
 #     Where the HTML report and all generated assets are written.
 #     Defaults to <data-root>/phase3.
 
-# --manifest /path/to/sb_manifest_reffield_average.txt
+# --manifest /path/to/manifest_ref_ws-4788.txt
 #     Explicitly set the manifest.  If omitted, the script searches
 #     <repo>/projects/calibration-updates-2026/manifests/ then <data-root>.
 

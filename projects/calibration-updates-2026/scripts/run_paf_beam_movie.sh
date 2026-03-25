@@ -9,7 +9,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 SCRIPTS="projects/calibration-updates-2026/scripts"
-MANIFEST="projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt"
+MANIFEST="projects/calibration-updates-2026/manifests/manifest_ref_ws-4788.txt"
 
 # ── Most common use-case: all active SBs (idx 14-49, excluding ODC-5233 24-29) ──
 bash "${SCRIPTS}"/create_paf_beam_movie.sh \

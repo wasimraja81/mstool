@@ -108,7 +108,7 @@ if [[ -z "${SCRIPT_DIR}" ]]; then
 fi
 
 echo "INFO - SCRIPT_DIR: ${SCRIPT_DIR}"
-MANIFEST_FILE_DEFAULT="${SCRIPT_DIR}/../manifests/sb_manifest_reffield_average.txt"
+MANIFEST_FILE_DEFAULT="${SCRIPT_DIR}/../manifests/manifest_ref_ws-4788.txt"
 MANIFEST_FILE="${MANIFEST_FILE:-${MANIFEST_FILE_DEFAULT}}"
 BSB_OVERRIDE="${BSB_OVERRIDE:-}"
 ESB_OVERRIDE="${ESB_OVERRIDE:-}"

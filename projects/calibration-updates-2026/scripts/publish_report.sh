@@ -34,7 +34,7 @@ set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
-MANIFEST_FILE="${SCRIPTS}/../manifests/sb_manifest_reffield_average.txt"
+MANIFEST_FILE="${SCRIPTS}/../manifests/manifest_ref_ws-4788.txt"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in

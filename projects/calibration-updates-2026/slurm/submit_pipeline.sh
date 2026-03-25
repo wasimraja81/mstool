@@ -6,7 +6,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 REF_SCRIPT="${SCRIPT_DIR}/start_refField.slurm"
 SCI_SCRIPT="${SCRIPT_DIR}/start_1934s.slurm"
-MANIFEST_DEFAULT="${SCRIPT_DIR}/../manifests/sb_manifest_reffield_average.txt"
+MANIFEST_DEFAULT="${SCRIPT_DIR}/../manifests/manifest_ref_ws-4788.txt"
 
 MANIFEST_FILE="${MANIFEST_DEFAULT}"
 START_INDEX=""
@@ -41,7 +41,7 @@ Examples:
   ./projects/calibration-updates-2026/slurm/submit_pipeline.sh --stage ref
   ./projects/calibration-updates-2026/slurm/submit_pipeline.sh --stage 1934
   ./projects/calibration-updates-2026/slurm/submit_pipeline.sh --start-index 19 --end-index 19
-  ./projects/calibration-updates-2026/slurm/submit_pipeline.sh --manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt
+  ./projects/calibration-updates-2026/slurm/submit_pipeline.sh --manifest projects/calibration-updates-2026/manifests/manifest_ref_ws-4788.txt
 EOF
 }
 

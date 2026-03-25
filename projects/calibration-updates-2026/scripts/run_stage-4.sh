@@ -6,7 +6,7 @@ SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys
 REPO_ROOT="$(cd "${SCRIPTS}/../../.." && pwd)"
 MANIFESTS="${SCRIPTS}/../manifests"
 
-MANIFEST_FILE="${MANIFESTS}/sb_manifest_reffield_average.txt"
+MANIFEST_FILE="${MANIFESTS}/manifest_ref_ws-4788.txt"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in

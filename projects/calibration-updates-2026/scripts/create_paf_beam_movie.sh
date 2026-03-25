@@ -7,7 +7,7 @@
 #
 # Run from the repo root (or use the convenience wrapper run_paf_beam_movie.sh):
 #   bash projects/calibration-updates-2026/scripts/create_paf_beam_movie.sh \
-#       --manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+#       --manifest projects/calibration-updates-2026/manifests/manifest_ref_ws-4788.txt \
 #       --start-index 14 --end-index 42 --exclude-indices 24-29
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ Usage:
   create_paf_beam_movie.sh [options]
 
 Manifest / index options:
-  --manifest FILE           Manifest file (sb_manifest_reffield_average.txt)
+  --manifest FILE           Manifest file (manifest_ref_ws-4788.txt)
   --start-index N           First manifest index to process (inclusive)
   --end-index N             Last manifest index to process (inclusive)
   --exclude-indices SPEC    Indices/ranges to skip, e.g. 24-29 or 24-29,31
@@ -141,12 +141,12 @@ Movie options:
 Examples:
   # All active SB_REFs, excluding ODC-5233:
   create_paf_beam_movie.sh \
-    --manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+    --manifest projects/calibration-updates-2026/manifests/manifest_ref_ws-4788.txt \
     --start-index 14 --end-index 42 --exclude-indices 24-29
 
   # Single index:
   create_paf_beam_movie.sh \
-    --manifest projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt \
+    --manifest projects/calibration-updates-2026/manifests/manifest_ref_ws-4788.txt \
     --start-index 19 --end-index 19
 
   # Blues colourmap, slower playback:
@@ -212,7 +212,7 @@ done
 [[ -z "${OUTPUT_DIR}" ]] && OUTPUT_DIR="${DATA_ROOT}/phase3/plots"
 
 if [[ -z "${MANIFEST_FILE}" ]]; then
-  CANDIDATE="${SCRIPT_DIR}/../manifests/sb_manifest_reffield_average.txt"
+  CANDIDATE="${SCRIPT_DIR}/../manifests/manifest_ref_ws-4788.txt"
   [[ -f "${CANDIDATE}" ]] && MANIFEST_FILE="${CANDIDATE}"
 fi
 [[ -n "${MANIFEST_FILE}" && -f "${MANIFEST_FILE}" ]] || {

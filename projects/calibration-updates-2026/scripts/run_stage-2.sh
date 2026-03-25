@@ -8,5 +8,5 @@ MANIFESTS="${SCRIPTS}/../manifests"
 
 "${SLURM}"/submit_pipeline.sh \
   --stage 1934 \
-  --manifest "${MANIFESTS}"/sb_manifest_reffield_average.txt \
+  --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
   --start-index 2 --end-index 2

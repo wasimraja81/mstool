@@ -6,6 +6,6 @@ SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys
 MANIFESTS="${SCRIPTS}/../manifests"
 
 "${SCRIPTS}"/assess_possum_1934s.sh \
-  --manifest "${MANIFESTS}"/sb_manifest_reffield_average.txt \
+  --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
   --start-index 2 --end-index 2 \
   --beam-start 0 --beam-end 3

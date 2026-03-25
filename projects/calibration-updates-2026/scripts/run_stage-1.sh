@@ -15,7 +15,7 @@ Q_CORR_CSV="/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction
 # [1] ACTIVE — Standard Q-corrections run (bpcal, standard dQ/dU CSV)
 "${SLURM}"/submit_pipeline.sh \
   --stage ref \
-  --manifest "${MANIFESTS}"/sb_manifest_reffield_average.txt \
+  --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
   --start-index 2 --end-index 2 \
   --apply-q-corrections true \
   --q-corr-csv "${Q_CORR_CSV}" \
@@ -24,14 +24,14 @@ Q_CORR_CSV="/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction
 # [2] Baseline run — Q-corrections disabled (produces unmodified bandpass table)
 # "${SLURM}"/submit_pipeline.sh \
 #   --stage ref \
-#   --manifest "${MANIFESTS}"/sb_manifest_reffield_average.txt \
+#   --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
 #   --start-index 2 --end-index 2 \
 #   --apply-q-corrections false
 
 # [3] Q-corrections with an updated CSV file (e.g. newly derived dQ/dU table)
 # "${SLURM}"/submit_pipeline.sh \
 #   --stage ref \
-#   --manifest "${MANIFESTS}"/sb_manifest_reffield_average.txt \
+#   --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
 #   --start-index 2 --end-index 2 \
 #   --apply-q-corrections true \
 #   --q-corr-csv /askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction_factors_v2.csv \
@@ -40,7 +40,7 @@ Q_CORR_CSV="/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction
 # [4] Use lcal variant (leakage-calibrator-derived correction factors instead of bpcal)
 # "${SLURM}"/submit_pipeline.sh \
 #   --stage ref \
-#   --manifest "${MANIFESTS}"/sb_manifest_reffield_average.txt \
+#   --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
 #   --start-index 2 --end-index 2 \
 #   --apply-q-corrections true \
 #   --q-corr-csv "${Q_CORR_CSV}" \
@@ -49,7 +49,7 @@ Q_CORR_CSV="/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction
 # [5] Cross-survey reuse — override ref_ws to select rows from a different survey's dQ table
 # "${SLURM}"/submit_pipeline.sh \
 #   --stage ref \
-#   --manifest "${MANIFESTS}"/sb_manifest_reffield_average.txt \
+#   --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
 #   --start-index 2 --end-index 2 \
 #   --apply-q-corrections true \
 #   --q-corr-csv "${Q_CORR_CSV}" \
@@ -58,7 +58,7 @@ Q_CORR_CSV="/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction
 # [6] Escape hatch — allow ref_ws mismatch (use with caution; logs a warning per beam)
 # "${SLURM}"/submit_pipeline.sh \
 #   --stage ref \
-#   --manifest "${MANIFESTS}"/sb_manifest_reffield_average.txt \
+#   --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
 #   --start-index 2 --end-index 2 \
 #   --apply-q-corrections true \
 #   --q-corr-csv "${Q_CORR_CSV}" \
