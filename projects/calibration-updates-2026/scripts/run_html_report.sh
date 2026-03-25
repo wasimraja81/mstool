@@ -86,13 +86,16 @@ set -euo pipefail
 SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
 REPO_ROOT="$(cd "${SCRIPTS}/../../.." && pwd)"
 MANIFEST_FILE="${SCRIPTS}/../manifests/manifest_ref_ws-4788.txt"
+START_INDEX="0"
+END_INDEX="49"
+EXPERIMENT="baseline"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --manifest)
-            MANIFEST_FILE="$2"
-            shift 2
-            ;;
+        --manifest)    MANIFEST_FILE="$2"; shift 2 ;;
+        --start-index) START_INDEX="$2";   shift 2 ;;
+        --end-index)   END_INDEX="$2";     shift 2 ;;
+        --experiment)  EXPERIMENT="$2";    shift 2 ;;
         *)
             echo "ERROR: Unknown argument '$1'"
             exit 1
@@ -100,13 +103,13 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# DATA_ROOT is read from LOCAL_BASE in the manifest.
-# Hardcoded fallback (last used: reffield-average-qcorr):
-DATA_ROOT="${HOME}/DATA/reffield-average-qcorr"
+# DATA_ROOT is read from LOCAL_BASE in the manifest; -qcorr suffix applied when --experiment qcorr.
+DATA_ROOT="${HOME}/DATA/reffield-average"
 if [[ -f "${MANIFEST_FILE}" ]]; then
     _local_base=$(awk -F'=' '/^LOCAL_BASE=/{gsub(/[[:space:]]/,"",$2); print $2}' "${MANIFEST_FILE}" | tail -1)
     [[ -n "${_local_base}" ]] && DATA_ROOT="${_local_base}"
 fi
+[[ "${EXPERIMENT}" == "qcorr" ]] && DATA_ROOT="${DATA_ROOT}-qcorr"
 echo "INFO - DATA_ROOT: ${DATA_ROOT}"
 
 # Activate the repo's virtual environment.
@@ -119,8 +122,8 @@ source "${REPO_ROOT}/.venv/bin/activate"
  python3 "${SCRIPTS}"/build_phase3_html_report.py \
      --data-root          "${DATA_ROOT}" \
      --manifest           "${MANIFEST_FILE}" \
-     --start-index        30 \
-     --end-index          33 \
+     --start-index        "${START_INDEX}" \
+     --end-index          "${END_INDEX}" \
      --pol-sources \
      --highlight-frac-pol 0.10 \
      --package           "${DATA_ROOT}/final_mvp_share" \

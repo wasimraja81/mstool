@@ -6,60 +6,44 @@ SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys
 SLURM="${SCRIPTS}/../slurm"
 MANIFESTS="${SCRIPTS}/../manifests"
 
-Q_CORR_CSV="/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction_factors.csv"
+Q_CORR_CSV_DEFAULT="/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction_factors.csv"
 
 # ---------------------------------------------------------------------------
-# Examples — uncomment the block you want and comment the rest.
+# CLI args — all optional; override as needed.
+# Use cohorts/<name>.sh wrappers for reproducible per-experiment invocations.
 # ---------------------------------------------------------------------------
+MANIFEST_FILE="${MANIFESTS}/manifest_ref_ws-4788.txt"
+START_INDEX=""
+END_INDEX=""
+APPLY_Q_CORRECTIONS=""
+Q_CORR_CSV="${Q_CORR_CSV_DEFAULT}"
+Q_CORR_VARIANT=""
+Q_CORR_REF_WS=""
+Q_CORR_ALLOW_MISMATCH=""
 
-# [1] ACTIVE — Standard Q-corrections run (bpcal, standard dQ/dU CSV)
-"${SLURM}"/submit_pipeline.sh \
-  --stage ref \
-  --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
-  --start-index 2 --end-index 2 \
-  --apply-q-corrections true \
-  --q-corr-csv "${Q_CORR_CSV}" \
-  --q-corr-variant bpcal
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --manifest)              MANIFEST_FILE="$2";           shift 2 ;;
+        --start-index)           START_INDEX="$2";             shift 2 ;;
+        --end-index)             END_INDEX="$2";               shift 2 ;;
+        --apply-q-corrections)   APPLY_Q_CORRECTIONS="$2";    shift 2 ;;
+        --q-corr-csv)            Q_CORR_CSV="$2";             shift 2 ;;
+        --q-corr-variant)        Q_CORR_VARIANT="$2";         shift 2 ;;
+        --q-corr-ref-ws)         Q_CORR_REF_WS="$2";         shift 2 ;;
+        --q-corr-allow-mismatch) Q_CORR_ALLOW_MISMATCH="$2"; shift 2 ;;
+        *) echo "ERROR: Unknown argument '$1'"; exit 1 ;;
+    esac
+done
 
-# [2] Baseline run — Q-corrections disabled (produces unmodified bandpass table)
-# "${SLURM}"/submit_pipeline.sh \
-#   --stage ref \
-#   --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
-#   --start-index 2 --end-index 2 \
-#   --apply-q-corrections false
+CMD=("${SLURM}"/submit_pipeline.sh --stage ref --manifest "${MANIFEST_FILE}")
+[[ -n "${START_INDEX}" ]]           && CMD+=(--start-index "${START_INDEX}")
+[[ -n "${END_INDEX}" ]]             && CMD+=(--end-index "${END_INDEX}")
+[[ -n "${APPLY_Q_CORRECTIONS}" ]]   && CMD+=(--apply-q-corrections "${APPLY_Q_CORRECTIONS}")
+if [[ "${APPLY_Q_CORRECTIONS}" == "true" ]]; then
+    [[ -n "${Q_CORR_CSV}" ]]            && CMD+=(--q-corr-csv "${Q_CORR_CSV}")
+    [[ -n "${Q_CORR_VARIANT}" ]]        && CMD+=(--q-corr-variant "${Q_CORR_VARIANT}")
+    [[ -n "${Q_CORR_REF_WS}" ]]         && CMD+=(--q-corr-ref-ws "${Q_CORR_REF_WS}")
+    [[ -n "${Q_CORR_ALLOW_MISMATCH}" ]] && CMD+=(--q-corr-allow-mismatch "${Q_CORR_ALLOW_MISMATCH}")
+fi
 
-# [3] Q-corrections with an updated CSV file (e.g. newly derived dQ/dU table)
-# "${SLURM}"/submit_pipeline.sh \
-#   --stage ref \
-#   --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
-#   --start-index 2 --end-index 2 \
-#   --apply-q-corrections true \
-#   --q-corr-csv /askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction_factors_v2.csv \
-#   --q-corr-variant bpcal
-
-# [4] Use lcal variant (leakage-calibrator-derived correction factors instead of bpcal)
-# "${SLURM}"/submit_pipeline.sh \
-#   --stage ref \
-#   --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
-#   --start-index 2 --end-index 2 \
-#   --apply-q-corrections true \
-#   --q-corr-csv "${Q_CORR_CSV}" \
-#   --q-corr-variant lcal
-
-# [5] Cross-survey reuse — override ref_ws to select rows from a different survey's dQ table
-# "${SLURM}"/submit_pipeline.sh \
-#   --stage ref \
-#   --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
-#   --start-index 2 --end-index 2 \
-#   --apply-q-corrections true \
-#   --q-corr-csv "${Q_CORR_CSV}" \
-#   --q-corr-ref-ws 12345
-
-# [6] Escape hatch — allow ref_ws mismatch (use with caution; logs a warning per beam)
-# "${SLURM}"/submit_pipeline.sh \
-#   --stage ref \
-#   --manifest "${MANIFESTS}"/manifest_ref_ws-4788.txt \
-#   --start-index 2 --end-index 2 \
-#   --apply-q-corrections true \
-#   --q-corr-csv "${Q_CORR_CSV}" \
-#   --q-corr-allow-mismatch true
+"${CMD[@]}"

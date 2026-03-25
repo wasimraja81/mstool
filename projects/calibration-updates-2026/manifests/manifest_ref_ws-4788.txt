@@ -6,9 +6,9 @@
 # Optional config directives
 # -----------------------------
 REMOTE=raj030@setonix-dm03.pawsey.org.au
-HPC_BASE_DIR=/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026-qcorr
+HPC_BASE_DIR=/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026
 ODC_WEIGHT_ID=5231
-LOCAL_BASE=/Users/raj030/DATA/reffield-average-qcorr
+LOCAL_BASE=/Users/raj030/DATA/reffield-average
 AMP_STRATEGY=multiply
 DO_PREFLAG_REFTABLE=true
 

@@ -33,8 +33,9 @@ BEAM_END="${BEAM_END:-35}"
 DRY_RUN="false"
 
 DIR_SB=/askapbuffer/payne/raj030/askap-scheduling-blocks
-# WORK_DIR is set from HPC_BASE_DIR in the manifest (last used: assess_1934-2026-qcorr).
+# WORK_DIR is set from HPC_BASE_DIR in the manifest (overridable via --hpc-base-dir).
 WORK_DIR=""
+HPC_BASE_DIR_CLI=""
 BP_UPDATE_MODIFY_AMP_STRATEGY="multiply"
 DO_PREFLAG_REFTABLE="true"
 
@@ -59,6 +60,7 @@ Options:
   --beam-start N         Start beam index (default: 0)
   --beam-end N           End beam index (default: 35)
     --dry-run              Print planned actions without running averageMS.py
+  --hpc-base-dir PATH    Override HPC_BASE_DIR from manifest (e.g. for --experiment qcorr)
   -h, --help             Show this help
 EOF
 }
@@ -92,6 +94,10 @@ while [[ $# -gt 0 ]]; do
         --dry-run)
             DRY_RUN="true"
             shift
+            ;;
+        --hpc-base-dir)
+            HPC_BASE_DIR_CLI="$2"
+            shift 2
             ;;
         -h|--help)
             usage
@@ -352,8 +358,9 @@ load_tuples_from_manifest() {
 }
 
 load_tuples_from_manifest "${MANIFEST_FILE}"
+[[ -n "${HPC_BASE_DIR_CLI}" ]] && WORK_DIR="${HPC_BASE_DIR_CLI}"
 if [[ -z "${WORK_DIR}" ]]; then
-    echo "ERROR - HPC_BASE_DIR is not set in manifest (${MANIFEST_FILE})."
+    echo "ERROR - HPC_BASE_DIR is not set in manifest (${MANIFEST_FILE}).  Use --hpc-base-dir to override."
     echo "        Add: HPC_BASE_DIR=/scratch/.../your_work_dir"
     exit 1
 fi
