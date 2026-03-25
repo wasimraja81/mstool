@@ -12,6 +12,7 @@ LOCAL_PARENT="${HOME}/DATA"
 LOCAL_NAME="reffield-average-qcorr"
 LOCAL_BASE="${LOCAL_PARENT}/${LOCAL_NAME}"
 LOCAL_BASE_EXPLICIT=0
+REMOTE_BASE_ROOT_EXPLICIT=0
 DRY_RUN=0
 COPY_METADATA=0
 METADATA_ONLY=0
@@ -301,17 +302,19 @@ build_subpaths_from_manifest() {
           REMOTE_BASE="${cfg_val}"
           ;;
         HPC_BASE_DIR)
-          REMOTE_BASE_ROOT="${cfg_val}"
+          [[ ${REMOTE_BASE_ROOT_EXPLICIT} -eq 0 ]] && REMOTE_BASE_ROOT="${cfg_val}"
           ;;
         REMOTE_BASE_ROOT)
-          REMOTE_BASE_ROOT="${cfg_val}"
+          [[ ${REMOTE_BASE_ROOT_EXPLICIT} -eq 0 ]] && REMOTE_BASE_ROOT="${cfg_val}"
           ;;
         ODC_WEIGHT_ID|ODC|WEIGHT_ID)
           ODC_WEIGHT_ID="${cfg_val}"
           ;;
         LOCAL_BASE)
-          LOCAL_BASE="${cfg_val}"
-          LOCAL_BASE_EXPLICIT=1
+          if [[ ${LOCAL_BASE_EXPLICIT} -eq 0 ]]; then
+            LOCAL_BASE="${cfg_val}"
+            LOCAL_BASE_EXPLICIT=1
+          fi
           ;;
         LOCAL_PARENT)
           LOCAL_PARENT="${cfg_val}"
@@ -574,8 +577,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --remote-base-root)
       [[ $# -ge 2 ]] || { echo "ERROR: --remote-base-root requires a value"; exit 1; }
-      REMOTE_BASE_ROOT="$2"
-      shift 2
+      REMOTE_BASE_ROOT="$2"      REMOTE_BASE_ROOT_EXPLICIT=1      shift 2
       ;;
     --local-base)
       [[ $# -ge 2 ]] || { echo "ERROR: --local-base requires a value"; exit 1; }

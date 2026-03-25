@@ -54,7 +54,7 @@ CMD=("${SCRIPTS}"/copy_and_combine_assessment_results.sh --manifest "${MANIFEST_
 [[ -n "${START_INDEX}" ]]  && CMD+=(--start-index "${START_INDEX}")
 [[ -n "${END_INDEX}" ]]    && CMD+=(--end-index "${END_INDEX}")
 [[ -n "${_local_base}" ]]  && CMD+=(--local-base "${_local_base}")
-[[ -n "${_hpc_base}" ]]    && CMD+=(--remote-base "${_hpc_base}")
+[[ -n "${_hpc_base}" ]]    && CMD+=(--remote-base-root "${_hpc_base}")
 [[ "${COPY_METADATA}" == "true" ]] && CMD+=(--copy-metadata)
 
 "${CMD[@]}"
