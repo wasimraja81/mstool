@@ -2,13 +2,13 @@
 # run_paf_beam_overlay.sh
 #
 # Generate a static PAF beam overlay PNG using plot_paf_beam_overlay.py.
-# Run from the repo root with:
+# Run from any directory:
 #
-#   bash projects/calibration-updates-2026/scripts/run_paf_beam_overlay.sh
+#   bash /path/to/projects/calibration-updates-2026/scripts/run_paf_beam_overlay.sh
 #
 # ─────────────────────────────────────────────────────────────────────────────
 
-SCRIPTS="projects/calibration-updates-2026/scripts"
+SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
 DATA_ROOT="/Users/raj030/DATA/reffield-average"
 OUT_DIR="${DATA_ROOT}/phase3/plots"
 

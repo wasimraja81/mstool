@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Getting Started — Calibration Updates Pipeline 2026</title>
+  <style>
+    :root {
+      --accent:   #1a6fbe;
+      --accent-l: #e8f1fb;
+      --warn:     #7a4a00;
+      --warn-l:   #fdf3e3;
+      --ok:       #1a5c2e;
+      --ok-l:     #e6f4ec;
+      --code-bg:  #f4f6f8;
+      --border:   #d0d7de;
+      --text:     #1a1a2e;
+      --muted:    #5a6270;
+      --nav-w:    240px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--text);
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar nav ─────────────────────────────────────── */
+    nav {
+      width: var(--nav-w);
+      min-width: var(--nav-w);
+      background: #f0f4f8;
+      border-right: 1px solid var(--border);
+      padding: 2rem 0 4rem;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+    nav .nav-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 0 1.2rem 0.6rem;
+    }
+    nav a {
+      display: block;
+      padding: 0.3rem 1.2rem;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 0.875rem;
+    }
+    nav a:hover { color: var(--accent); background: #e2eaf4; }
+    nav a.sub { padding-left: 2rem; color: var(--muted); font-size: 0.82rem; }
+    nav hr { border: none; border-top: 1px solid var(--border); margin: 0.8rem 1.2rem; }
+
+    /* ── Main content ────────────────────────────────────── */
+    main {
+      flex: 1;
+      max-width: 860px;
+      padding: 2.5rem 3rem 6rem;
+    }
+    h1 { font-size: 1.9rem; margin-bottom: 0.3rem; }
+    h1 .sub { font-size: 1rem; font-weight: 400; color: var(--muted); display: block; margin-top: 0.2rem; }
+    h2 { font-size: 1.25rem; margin: 2.8rem 0 0.9rem; padding-bottom: 0.35rem; border-bottom: 2px solid var(--border); }
+    h3 { font-size: 1.05rem; margin: 1.8rem 0 0.5rem; color: var(--accent); }
+    p  { margin: 0.6rem 0; }
+    ul, ol { margin: 0.5rem 0 0.5rem 1.5rem; }
+    li { margin: 0.25rem 0; }
+    a  { color: var(--accent); }
+
+    /* ── Code ────────────────────────────────────────────── */
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.865em;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.15em 0.4em;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      margin: 0.8rem 0;
+      font-size: 0.84em;
+      line-height: 1.55;
+    }
+    pre code { background: none; border: none; padding: 0; }
+
+    /* ── Callout boxes ───────────────────────────────────── */
+    .callout {
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      margin: 1rem 0;
+      border-left: 4px solid;
+    }
+    .callout.info  { background: var(--accent-l); border-color: var(--accent);  color: #0d3d6e; }
+    .callout.warn  { background: var(--warn-l);   border-color: #c87a00;        color: var(--warn);  }
+    .callout.ok    { background: var(--ok-l);     border-color: #2a8c4a;        color: var(--ok); }
+    .callout strong { font-weight: 700; }
+
+    /* ── Tables ──────────────────────────────────────────── */
+    table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; font-size: 0.88em; }
+    th { background: var(--code-bg); text-align: left; padding: 0.45rem 0.8rem; border: 1px solid var(--border); }
+    td { padding: 0.4rem 0.8rem; border: 1px solid var(--border); vertical-align: top; }
+    tr:hover td { background: #fafbfc; }
+
+    /* ── Step counter ────────────────────────────────────── */
+    .steps { counter-reset: step; list-style: none; margin-left: 0; }
+    .steps li { counter-increment: step; display: flex; gap: 1rem; margin: 0.8rem 0; }
+    .steps li::before {
+      content: counter(step);
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.8rem;
+      min-width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 0.15rem;
+    }
+
+    /* ── Badge-like labels ───────────────────────────────── */
+    .badge {
+      display: inline-block;
+      font-size: 0.72em;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0.15em 0.55em;
+      border-radius: 4px;
+      margin-right: 0.3em;
+    }
+    .badge.hpc   { background: #dde8fc; color: #1a4b99; }
+    .badge.local { background: #ddf3e4; color: #1a5c2e; }
+
+    /* ── Divider ─────────────────────────────────────────── */
+    hr.section { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+  </style>
+</head>
+<body>
+
+<!-- ─────────────────── SIDEBAR ─────────────────── -->
+<nav>
+  <div class="nav-title">Getting Started</div>
+  <a href="#overview">Overview</a>
+  <a href="#prereqs">Prerequisites</a>
+  <a href="#concepts">Key concepts</a>
+  <a class="sub" href="#manifests">Manifests</a>
+  <a class="sub" href="#experiments">Experiments</a>
+  <a class="sub" href="#cohorts">Cohort wrappers</a>
+  <hr>
+  <a href="#first-run">First run: baseline</a>
+  <a class="sub" href="#stage1">Stage 1 — refField</a>
+  <a class="sub" href="#stage2">Stage 2 — 1934</a>
+  <a class="sub" href="#stage3">Stage 3 — assess</a>
+  <a class="sub" href="#stage4">Stage 4 — copy/combine</a>
+  <hr>
+  <a href="#report">HTML report</a>
+  <a href="#qcorr">Adding Q-corrections</a>
+  <a href="#publish">Publishing</a>
+  <hr>
+  <a href="#troubleshooting">Troubleshooting</a>
+  <a href="#reference">Further reference</a>
+</nav>
+
+<!-- ─────────────────── MAIN ─────────────────── -->
+<main>
+
+<h1>
+  Calibration Updates Pipeline 2026
+  <span class="sub">A step-by-step guide for new users</span>
+</h1>
+
+<p>This guide walks you through running the full pipeline — from SLURM job
+submission on HPC all the way to a published HTML leakage report — for the
+first time.  It is written as a narrative complement to the <a href="../README.md">project README</a>,
+which contains exhaustive flag references and script tables.  Read this first,
+then use the README as a day-to-day reference.</p>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="overview">Overview</h2>
+
+<p>The pipeline measures on-axis polarisation leakage across ASKAP beams
+and reference fields. It has two
+side-by-side experiments for each <strong>cohort</strong> — a group of scheduling blocks
+that share the same holography reference weights, identified by their
+<code>ref_ws</code> ID (e.g. <code>ref_ws-4788</code>, <code>ref_ws-5316</code>):</p>
+
+<table>
+  <tr><th>Experiment</th><th>What it does</th><th>Run order</th></tr>
+  <tr>
+    <td><code>baseline</code></td>
+    <td>Processes data <em>without</em> Q-corrections. The resulting leakage
+    measurements reveal the raw X/Y amplitude imbalance and are used to derive
+    the correction factors (a CSV file).</td>
+    <td>Always run first</td>
+  </tr>
+  <tr>
+    <td><code>qcorr</code></td>
+    <td>Re-processes the same data with Q-corrections applied (using the CSV
+    from the baseline run). The resulting report quantifies residual leakage
+    after correction.</td>
+    <td>Run after <code>baseline</code> has produced its CSV</td>
+  </tr>
+</table>
+
+<p>Each experiment runs through four stages:</p>
+
+<table>
+  <tr><th>Stage</th><th>Where</th><th>Purpose</th></tr>
+  <tr><td>1 — refField</td><td><span class="badge hpc">HPC</span></td><td>Generate bandpass + leakage tables from reference-field observations</td></tr>
+  <tr><td>2 — 1934</td><td><span class="badge hpc">HPC</span></td><td>Apply tables to 1934 control data set and generate calibrated visibilities.</td></tr>
+  <tr><td>3 — assess</td><td><span class="badge hpc">HPC</span></td><td>Write out the baseline-averaged I,Q,U&amp;V visibility spectra per beam into text files (<code>.txt</code> for bandpass calibrated and <code>.lcal.txt</code> for bandpass+on-axis leakage calibrated visibilities of the control dataset), and per-beam diagnostic plots: <code>_stokes.png</code> (Stokes I,Q,U,V spectra) and <code>_pol-degree.png</code> (polarization degree) for each variant.</td></tr>
+  <tr><td>4 — copy/combine</td><td><span class="badge local">Local</span></td><td>Rsync outputs locally; invoke <code>combine_beam_outputs.py</code> to consolidate all 36 beams into single-file summary products: a <code>leakage_stats.png</code> panel showing channel-averaged leakage levels across all beams at a glance, a <code>.pdf</code> with every beam's Stokes and polarization-degree spectra plots laid out on one page, and <code>.mp4</code>/<code>.gif</code> animations that step through beams sequentially.</td></tr>
+</table>
+
+<p>After stage 4, all work is local: build the HTML report, generate dQ plots
+and PAF overlays, then publish.</p>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="prereqs">Prerequisites</h2>
+
+<h3>Software and environment</h3>
+<ul>
+  <li>Clone the repo and create a Python virtual environment:
+<pre><code>git clone https://github.com/wasimraja81/mstool.git
+cd mstool
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+</code></pre>
+  </li>
+  <li>The <code>.venv</code> must be active whenever you run local analysis scripts.</li>
+  <li>HPC access (Setonix / Pawsey) with <code>ssh</code> key and <code>sbatch</code> available.</li>
+  <li><code>rsync</code> for stage-4 transfers.</li>
+</ul>
+
+<h3>Directory layout</h3>
+<p>All scripts self-locate using <code>dirname "$0"</code> or <code>realpath</code> — they can be
+invoked from any working directory, regardless of where you have cloned the
+repo.</p>
+
+<div class="callout info">
+  <strong>Recommended practice:</strong> if you are working inside the repo, run from
+  a <code>scratch/</code> directory at the repository root. This keeps any generated
+  files (logs, temporary outputs) out of the tracked tree.
+<pre><code>mkdir -p scratch
+cd scratch
+</code></pre>
+  You can equally run the scripts from outside the repo — just supply the
+  correct path to the script, for example:
+<pre><code>bash ~/repos/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_baseline.sh stage1
+</code></pre>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="concepts">Key concepts</h2>
+
+<h3 id="manifests">Manifests</h3>
+<p>A <em>manifest</em> is a tab-delimited text file that maps each scheduling
+block tuple to its processing parameters.  Manifests live in
+<code>projects/calibration-updates-2026/manifests/</code> and are named by their
+holography reference weights ID:</p>
+
+<table>
+  <tr><th>File</th><th>Cohort (ref_ws)</th></tr>
+  <tr><td><code>manifest_ref_ws-4788.txt</code></td><td>ref_ws-4788</td></tr>
+  <tr><td><code>manifest_ref_ws-5316.txt</code></td><td>ref_ws-5316</td></tr>
+</table>
+
+<p>Each row in the manifest defines one scheduling block tuple.
+Per-row columns are <code>idx</code>, <code>sb_ref</code>, <code>sb_1934</code>, <code>sb_holo</code>,
+<code>sb_target_1934</code>, followed by optional key=value tokens —
+<code>ODC_WEIGHT=&lt;id&gt;</code>, <code>REF_FIELDNAME=&lt;name&gt;</code>, <code>AMP_STRATEGY=&lt;value&gt;</code>,
+<code>DO_PREFLAG_REFTABLE=&lt;true|false&gt;</code> — specified per row in any order.
+Global directives at the top of the file (<code>ODC_WEIGHT_ID</code>, <code>LOCAL_BASE</code>,
+<code>HPC_BASE_DIR</code>, <code>REMOTE</code>, <code>AMP_STRATEGY</code>) are legacy fallbacks;
+prefer setting these per-row for clarity.
+All scripts accept <code>--manifest PATH</code> to select a different manifest.</p>
+
+<p>Extract from <code>manifest_ref_ws-4788.txt</code>:</p>
+<pre><code># SB combinations
+# idx  sb_ref  sb_1934  sb_holo  sb_target_1934  [optional key=value tokens]
+# ODC-5229
+14 81082 77045 76554 81089 ODC_WEIGHT=5229 REF_FIELDNAME=REF_0324-28
+15 81083 77045 76554 81089 ODC_WEIGHT=5229 REF_FIELDNAME=REF_0236-28
+16 81084 77045 76554 81089 ODC_WEIGHT=5229 REF_FIELDNAME=REF_0324-28
+
+# ODC-5231
+19 81099 77045 76554 81107 ODC_WEIGHT=5231 REF_FIELDNAME=REF_0236-28
+20 81100 77045 76554 81107 ODC_WEIGHT=5231 REF_FIELDNAME=REF_0324-28
+21 81104 77045 76554 81107 ODC_WEIGHT=5231 REF_FIELDNAME=REF_1212-28
+</code></pre>
+
+<p>Every stage script accepts three flags that let you process a subset of
+manifest rows rather than all of them in one go — useful for testing on a
+single scheduling block, reprocessing a failed row, or splitting a large
+cohort across multiple jobs:</p>
+<ul>
+  <li><code>--start-index</code> / <code>--end-index</code> — select a contiguous row range by manifest
+  index (the first column of each data row).</li>
+  <li><code>--exclude-indices</code> — exclude specific rows from the selected range
+  (e.g. <code>24-29</code> to skip rows 24 through 29).</li>
+</ul>
+<p>These three flags accept the same values across all four stages — use the
+same numbers throughout a run so that each stage operates on exactly the
+same set of scheduling blocks.</p>
+
+<h3 id="experiments">The <code>--experiment</code> flag</h3>
+<p>Every stage-1 through stage-4 run script accepts:</p>
+<pre><code>--experiment  baseline | qcorr</code></pre>
+
+<p>This single flag controls the entire data path:</p>
+<ul>
+  <li><strong>baseline</strong> — standard processing; HPC work directory and local
+  results directory are the paths given in the manifest.</li>
+  <li><strong>qcorr</strong> — Q-corrections enabled; the pipeline appends <code>-qcorr</code>
+  to both the HPC work directory and the local results directory, keeping
+  the two experiments cleanly separated. The Q-correction CSV is
+  auto-derived from the manifest cohort ID.</li>
+</ul>
+
+<div class="callout warn">
+  <strong>Important:</strong> run <code>baseline</code> first and generate the correction CSV
+  before attempting a <code>qcorr</code> run.  The <code>qcorr</code> pipeline validates the CSV
+  and every field name at startup — it will exit with a clear error message
+  before submitting any SLURM jobs if something is missing.
+</div>
+
+<h3 id="cohorts">Cohort wrapper scripts</h3>
+<p>For reproducible, auditable runs the recommended approach is to use the
+pre-built cohort wrappers in <code>cohorts/</code>. Each wrapper script encodes the
+manifest, experiment, index range, and Q-correction variant for a specific
+cohort as a named function for each stage:</p>
+
+<pre><code>cohorts/
+  ref_ws-4788_baseline.sh   # ref_ws-4788 baseline run
+  ref_ws-4788_qcorr.sh      # ref_ws-4788 Q-correction run
+  ref_ws-5316_baseline.sh   # ref_ws-5316 baseline run
+</code></pre>
+
+<p>Usage — call the wrapper with the name of the stage you want to run
+(<code>~/mstool</code> is the repository root — adjust if you cloned elsewhere):</p>
+<pre><code>bash ~/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_baseline.sh stage1
+bash ~/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_baseline.sh stage2
+# … and so on
+</code></pre>
+
+<p>The wrappers call the same underlying <code>run_stage-*.sh</code> scripts with all
+arguments pre-filled; you can inspect them to see the exact flags passed, or
+pass your own flags directly to the run scripts for non-standard runs.</p>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<hr class="section">
+<h2 id="first-run">First run: baseline experiment</h2>
+
+<p>Work through the stages in order.  Stages 1–3 submit SLURM jobs to the HPC;
+wait for each to complete before moving to the next.</p>
+
+<h3 id="stage1">Stage 1 — reference field <span class="badge hpc">HPC</span></h3>
+<p>Generates bandpass and leakage tables from reference-field observations.</p>
+
+<pre><code># Using the cohort wrapper (recommended):
+bash ~/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_baseline.sh stage1
+
+# Or directly:
+bash ~/mstool/projects/calibration-updates-2026/scripts/run_stage-1.sh \
+    --manifest    ~/mstool/projects/calibration-updates-2026/manifests/manifest_ref_ws-4788.txt \
+    --start-index 0 \
+    --end-index   49 \
+    --experiment  baseline
+</code></pre>
+
+<p>This submits one SLURM job per scheduling block row in the index range.
+Monitor job status on the HPC with <code>squeue -u $USER</code>.</p>
+
+<div class="callout info">
+  <strong>Tip:</strong> pass <code>--help</code> to any <code>run_stage-*.sh</code> script to see all
+  available options, including <code>--exclude-indices</code> for skipping problematic rows.
+</div>
+
+<h3 id="stage2">Stage 2 — 1934 calibration <span class="badge hpc">HPC</span></h3>
+<p>Applies the bandpass and leakage tables to 1934 data and quality-checks the calibration.</p>
+
+<pre><code>bash ~/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_baseline.sh stage2
+</code></pre>
+
+<div class="callout warn">
+  <strong>Wait:</strong> do not start stage 2 until all stage-1 jobs have completed
+  successfully.  Check the HPC job log files for any failures before proceeding.
+</div>
+
+<h3 id="stage3">Stage 3 — assessment <span class="badge hpc">HPC</span></h3>
+<p>Runs <code>averageMS.py</code> per beam; produces per-beam <code>.txt</code> and <code>.lcal.txt</code>
+channel measurement files and PNG plots in the HPC work directory.</p>
+
+<pre><code>bash ~/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_baseline.sh stage3
+</code></pre>
+
+<h3 id="stage4">Stage 4 — copy and combine <span class="badge local">Local</span></h3>
+<p>Rsyncs the HPC assessment outputs to your local machine, then runs
+<code>combine_beam_outputs.py</code> to assemble the per-SB_REF results into the
+combined data structures that the report pipeline consumes.</p>
+
+<pre><code>bash ~/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_baseline.sh stage4
+</code></pre>
+
+<p>Add <code>--copy-metadata</code> on the first run (or when you need PAF overlay plots):
+it also rsyncs the <code>metadata/</code> directories from the HPC — required for
+PAF beam-overlay images in the report.</p>
+
+<pre><code># Directly, with metadata:
+bash ~/mstool/projects/calibration-updates-2026/scripts/run_stage-4.sh \
+    --manifest      ~/mstool/projects/calibration-updates-2026/manifests/manifest_ref_ws-4788.txt \
+    --start-index   0 \
+    --end-index     49 \
+    --experiment    baseline \
+    --copy-metadata
+</code></pre>
+
+<div class="callout ok">
+  <strong>After stage 4</strong> all subsequent steps run entirely locally — no HPC
+  connection required.
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="report">Building the HTML report</h2>
+
+<p>The HTML report is built in a single command that runs the full local
+post-processing pipeline: Phase 1 master table → Phase 2 isolation tables
+→ leakage cube → footprint heatmaps → PAF overlays → dQ plots → HTML.</p>
+
+<pre><code>bash ~/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_baseline.sh report
+
+# Or directly:
+bash ~/mstool/projects/calibration-updates-2026/scripts/run_html_report.sh \
+    --manifest   ~/mstool/projects/calibration-updates-2026/manifests/manifest_ref_ws-4788.txt \
+    --experiment baseline
+</code></pre>
+
+<p>Once generated, open <code>phase3/index.html</code> (under your <code>LOCAL_BASE</code> directory)
+directly in any browser to preview the report before publishing.</p>
+
+<p>The output artefacts are written under your <code>LOCAL_BASE</code> directory:</p>
+<ul>
+  <li><code>phase3/index.html</code> — the main report</li>
+  <li><code>phase3/plots/</code> — footprint heatmaps, PAF overlays, dQ plots, beam movies</li>
+  <li><code>phase2/leakage_cube.nc</code> — 3-D NetCDF4 leakage cube (xarray-compatible)</li>
+</ul>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="qcorr">Adding Q-corrections (qcorr experiment)</h2>
+
+<p>Once the baseline run is complete and the correction CSV has been
+generated by <code>plot_dQ_vs_beam.py</code> (called automatically inside
+<code>run_html_report.sh</code>), you can run the <code>qcorr</code> experiment.</p>
+
+<div class="callout info">
+  The CSV is expected at:<br>
+  <code>/askapbuffer/payne/raj030/askap-calibration-updates/ref_ws-4788/dq_du_correction_factors.csv</code><br>
+  where <code>ref_ws-4788</code> is derived automatically from the manifest filename.
+  The pipeline validates the file exists <em>and</em> that every field in the
+  manifest has entries in it — before submitting any SLURM jobs.
+</div>
+
+<p>The workflow mirrors the baseline run exactly — just use the <code>qcorr</code> cohort wrapper:</p>
+
+<pre><code>bash ~/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_qcorr.sh stage1
+# … wait for HPC …
+bash ~/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_qcorr.sh stage2
+# … wait for HPC …
+bash ~/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_qcorr.sh stage3
+bash ~/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_qcorr.sh stage4
+bash ~/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_qcorr.sh report
+</code></pre>
+
+<p>The <code>-qcorr</code> suffix is appended automatically to both the HPC work
+directory and local results directory, so both experiments coexist without
+overwriting each other.  The local results will appear under e.g.
+<code>~/DATA/reffield-average-qcorr/</code>.</p>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="publish">Publishing the report</h2>
+
+<p>When the report looks good, publish it to GitHub Pages:</p>
+
+<pre><code>bash ~/mstool/projects/calibration-updates-2026/cohorts/ref_ws-4788_baseline.sh publish
+
+# Or directly:
+bash ~/mstool/projects/calibration-updates-2026/scripts/publish_report.sh \
+    --manifest   ~/mstool/projects/calibration-updates-2026/manifests/manifest_ref_ws-4788.txt \
+    --experiment baseline
+</code></pre>
+
+<p>The script rsyncs the assembled package to
+<a href="https://github.com/wasimraja81/askap-leakage-report">wasimraja81/askap-leakage-report</a>
+on the <code>develop</code> branch.  To go live, merge <code>develop</code> → <code>main</code> on
+GitHub (either via a PR or from the command line in the
+<code>~/github-wasimraja81/askap-leakage-report</code> clone). GitHub Pages
+redeploys automatically within 1–3 minutes.</p>
+
+<div class="callout info">
+  The live report is at
+  <a href="https://wasimraja81.github.io/askap-leakage-report/">https://wasimraja81.github.io/askap-leakage-report/</a>.
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="troubleshooting">Troubleshooting</h2>
+
+<table>
+  <tr><th>Symptom</th><th>Likely cause and fix</th></tr>
+  <tr>
+    <td>Stage 1 exits with <em>"Q correction ref_ws not found in CSV"</em></td>
+    <td>The holography reference weights ID (<code>ref_ws</code>) resolved from the manifest is not present
+    in the correction CSV.  Check that the CSV was generated for this cohort
+    and that <code>BP_UPDATE_Q_CORR_REF_WS</code> / <code>PARENT_WEIGHT_SCIENCE</code> resolves
+    to the correct integer.</td>
+  </tr>
+  <tr>
+    <td>Stage 1 exits with <em>"No CSV rows found for field='REF_…'"</em></td>
+    <td>A field name in the manifest is absent from the correction CSV.
+    The error message lists all available fields.  Add the missing field to
+    the CSV or exclude that row with <code>--exclude-indices</code>.</td>
+  </tr>
+  <tr>
+    <td>PAF overlays missing in the HTML report</td>
+    <td>Stage 4 was not run with <code>--copy-metadata</code>, so the local
+    <code>metadata/</code> directories were not populated.  Re-run stage 4 with
+    <code>--copy-metadata</code>, then re-run the report.</td>
+  </tr>
+  <tr>
+    <td>Stage-4 rsync fails for some rows</td>
+    <td>Check HPC connectivity and that stage 3 completed for those rows.
+    Re-run stage 4 with a narrowed <code>--start-index / --end-index</code> for the
+    failing subset.</td>
+  </tr>
+  <tr>
+    <td><em>"BP_UPDATE_Q_CORR_CSV no longer found"</em> inside SLURM job</td>
+    <td>The correction CSV was present when <code>processDefaults.sh</code> ran but was
+    subsequently removed or moved. Restore the file and resubmit.</td>
+  </tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="reference">Further reference</h2>
+
+<ul>
+  <li><a href="../README.md">Project README</a> — exhaustive script and flag reference, output artefact list, PAF visualisation docs, publishing one-time setup</li>
+  <li><a href="../../README.md">Repository root README</a> — repo layout, mstool Python scripts, installation</li>
+  <li><code>--help</code> on any <code>run_stage-*.sh</code>, <code>run_html_report.sh</code>, or <code>publish_report.sh</code> for the full flag list</li>
+  <li>Inspect the cohort wrapper scripts in <code>cohorts/</code> to see which flags are passed for each experiment</li>
+</ul>
+
+<hr class="section">
+<p style="color: var(--muted); font-size:0.8rem;">
+  Calibration Updates Pipeline 2026 · CSIRO ATNF ·
+  <a href="https://github.com/wasimraja81/mstool">wasimraja81/mstool</a>
+</p>
+
+</main>
+</body>
+</html>
