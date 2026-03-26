@@ -1,5 +1,17 @@
 # Changelog — calibration-updates-2026
 
+## 4.1 — 2026-03-26
+
+### GitHub Pages publishing for Getting Started guide
+
+- `.nojekyll` added to repo root so GitHub Pages serves HTML without Jekyll
+  processing.
+- Both READMEs (root + project) updated to link directly to the GitHub Pages
+  URL for the Getting Started guide:  
+  `https://wasimraja81.github.io/mstool/projects/calibration-updates-2026/docs/getting-started.html`
+
+---
+
 ## 4.0 — 2026-03-26
 
 ### Getting Started guide + documentation accuracy pass

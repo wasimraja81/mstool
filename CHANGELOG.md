@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 4.1 — 2026-03-26
+
+Enables GitHub Pages for the mstool repo. Adds `.nojekyll` at repo root;
+updates root and project READMEs to link the Getting Started guide via the
+GitHub Pages URL.
+
 ## 4.0 — 2026-03-26
 
 Adds a comprehensive Getting Started guide (`docs/getting-started.html`) for
