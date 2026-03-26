@@ -2,7 +2,7 @@
 
 > **New to the pipeline?** Start with the [Getting Started guide](https://wasimraja81.github.io/mstool/projects/calibration-updates-2026/docs/getting-started.html) — a step-by-step walkthrough from stage 1 through to publishing the report.
 
-> **Current release: tag `4.0`** — New [Getting Started guide](https://wasimraja81.github.io/mstool/projects/calibration-updates-2026/docs/getting-started.html); path-independence fixes for `run_paf_beam_movie.sh` and `run_paf_beam_overlay.sh`; documentation accuracy pass (`ref_ws` terminology, manifest format, code example paths).
+> **Current release: tag `4.1`** — GitHub Pages enabled; Getting Started guide now served at [wasimraja81.github.io/mstool/…/getting-started.html](https://wasimraja81.github.io/mstool/projects/calibration-updates-2026/docs/getting-started.html).
 
 This project measures and analyses on-axis polarisation leakage across ASKAP
 beams, reference fields, and ODC calibration-weight configurations.  It drives
