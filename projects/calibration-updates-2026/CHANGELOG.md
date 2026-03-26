@@ -1,5 +1,12 @@
 # Changelog — calibration-updates-2026
 
+## 4.2 — 2026-03-26
+
+- `docs/getting-started.html`: README links now point to `github.com` blob URLs
+  so they render as markdown rather than raw text on GitHub Pages.
+
+---
+
 ## 4.1 — 2026-03-26
 
 ### GitHub Pages publishing for Getting Started guide

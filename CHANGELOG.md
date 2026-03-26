@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## 4.2 — 2026-03-26
+
+Fixes README links in the Getting Started guide to point to `github.com` blob
+URLs so they render as markdown on GitHub Pages.
+
 ## 4.1 — 2026-03-26
 
 Enables GitHub Pages for the mstool repo. Adds `.nojekyll` at repo root;
