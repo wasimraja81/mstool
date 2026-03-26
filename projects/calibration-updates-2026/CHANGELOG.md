@@ -1,5 +1,32 @@
 # Changelog — calibration-updates-2026
 
+## 4.3 — 2026-03-27
+
+### Cohort directory naming convention (`assess_1934-ref_ws-NNNN`)
+
+- `manifests/manifest_ref_ws-4788.txt`, `manifest_ref_ws-5316.txt`: `HPC_BASE_DIR`
+  and `LOCAL_BASE` updated to use `assess_1934-ref_ws-NNNN` naming, replacing the
+  opaque `assess_1934-2026` / `assess_1934-2026-test` names.
+- `scripts/copy_and_combine_assessment_results.sh`: script-level defaults updated
+  to match new naming.
+
+### `publish_report.sh` fixes
+
+- **Subdir derivation**: regex `^assess_1934-ref_ws-([0-9]+)(-qcorr)?$` now
+  maps correctly to `ref_ws-NNNN/baseline` or `ref_ws-NNNN/qcorr`; legacy
+  `reffield-average` names retained as fallback.
+- **`sh` compatibility**: replaced bash `< <(find...)` process substitution with
+  POSIX-compatible `find | sort | while read` pipe.
+- **Branch consistency**: script now always explicitly `git checkout develop` and
+  pulls/pushes `origin/develop`; previously risked pulling `main` into the wrong
+  local branch.
+- **Two-tier GitHub Pages navigation**: root `index.html` lists `ref_ws-NNNN`
+  cohort directories only; each cohort gets its own auto-generated `index.html`
+  listing `baseline`/`qcorr` with a back-link to the root. Both pages regenerate
+  automatically on every publish run — no manual edits needed for new cohorts.
+
+---
+
 ## 4.2 — 2026-03-26
 
 - `docs/getting-started.html`: README links now point to `github.com` blob URLs

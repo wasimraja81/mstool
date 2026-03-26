@@ -2,7 +2,7 @@
 
 > **New to the pipeline?** Start with the [Getting Started guide](https://wasimraja81.github.io/mstool/projects/calibration-updates-2026/docs/getting-started.html) — a step-by-step walkthrough from stage 1 through to publishing the report.
 
-> **Current release: tag `4.2`** — Getting Started guide README links now open on GitHub (rendered markdown).
+> **Current release: tag `4.3`** — `assess_1934-ref_ws-NNNN` cohort naming; `publish_report.sh` two-tier nav, branch and `sh`-compat fixes.
 
 This project measures and analyses on-axis polarisation leakage across ASKAP
 beams, reference fields, and ODC calibration-weight configurations.  It drives

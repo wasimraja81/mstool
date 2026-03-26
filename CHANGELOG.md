@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## 4.3 — 2026-03-27
+
+Adopts `assess_1934-ref_ws-NNNN` naming convention for cohort directories on
+both HPC and local. Fixes `publish_report.sh`: subdir derivation for new
+naming, bash process-substitution incompatibility, branch consistency bug, and
+two-tier GitHub Pages navigation (root lists `ref_ws-NNNN` cohorts; each
+cohort has its own index listing `baseline`/`qcorr`).
+
 ## 4.2 — 2026-03-26
 
 Fixes README links in the Getting Started guide to point to `github.com` blob
