@@ -5,11 +5,11 @@ set -euo pipefail
 # User-configurable settings
 # -----------------------------
 REMOTE="raj030@setonix-dm03.pawsey.org.au"
-REMOTE_BASE_ROOT="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026"
+REMOTE_BASE_ROOT="/scratch/askaprt/raj030/tickets/axa-3649-component-models/ref_ws-4788"
 ODC_WEIGHT_ID="5231"
 REMOTE_BASE="${REMOTE_BASE_ROOT}/ODC-${ODC_WEIGHT_ID}"
-LOCAL_PARENT="${HOME}/DATA"
-LOCAL_NAME="reffield-average"
+LOCAL_PARENT="${HOME}/DATA/reffield-average"
+LOCAL_NAME="ref_ws-4788"
 LOCAL_BASE="${LOCAL_PARENT}/${LOCAL_NAME}"
 LOCAL_BASE_EXPLICIT=0
 REMOTE_BASE_ROOT_EXPLICIT=0
@@ -284,7 +284,7 @@ build_subpaths_from_manifest() {
     # Manifest-level config directives (KEY=VALUE), e.g.
     # REMOTE=raj030@setonix-dm03.pawsey.org.au
     # REMOTE_BASE=/scratch/.../ODC-5229
-    # HPC_BASE_DIR=/scratch/.../assess_1934-2026-qcorr  (canonical; also accepts REMOTE_BASE_ROOT)
+    # HPC_BASE_DIR=/scratch/.../ref_ws-4788  (canonical; also accepts REMOTE_BASE_ROOT; -qcorr appended at runtime)
     # ODC_WEIGHT_ID=5231
     # LOCAL_BASE=/Users/me/DATA/reffield-average-qcorr
     # AMP_STRATEGY=multiply
