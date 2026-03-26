@@ -151,12 +151,6 @@ rsync -av --delete \
 # so new cohorts appear automatically without editing this script.
 LANDING="${PAGES_CLONE}/index.html"
 echo "Updating landing page: ${LANDING}"
-_list_items=""
-while IFS= read -r _idx_path; do
-    _rel_dir="${_idx_path#${PAGES_CLONE}/}"
-    _rel_dir="${_rel_dir%/index.html}"
-    _list_items+="    <li><a href=\"./${_rel_dir}/\">${_rel_dir}</a></li>\n"
-done < <(find "${PAGES_CLONE}" -mindepth 2 -maxdepth 2 -name "index.html" | sort)
 
 {
 cat << 'HEAD_EOF'
@@ -176,7 +170,12 @@ cat << 'HEAD_EOF'
   <h1>ASKAP Leakage Assessment Reports</h1>
   <ul>
 HEAD_EOF
-printf "%b" "${_list_items}"
+find "${PAGES_CLONE}" -mindepth 2 -maxdepth 2 -name "index.html" | sort | \
+    while IFS= read -r _idx_path; do
+        _rel_dir="${_idx_path#${PAGES_CLONE}/}"
+        _rel_dir="${_rel_dir%/index.html}"
+        printf '    <li><a href="./%s/">%s</a></li>\n' "${_rel_dir}" "${_rel_dir}"
+    done
 cat << 'FOOT_EOF'
   </ul>
 </body>
