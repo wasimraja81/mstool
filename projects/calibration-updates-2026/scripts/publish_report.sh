@@ -108,6 +108,8 @@ else
     PAGES_SUBDIR="${_data_base}"
 fi
 echo "INFO - Publication subdir: '${PAGES_SUBDIR}'"
+# Top-level cohort directory (part before the first '/'), e.g. ref_ws-5316
+_ref_ws_id="${PAGES_SUBDIR%%/*}"
 
 # ── Sanity checks ─────────────────────────────────────────────────────────────
 if [[ ! -f "${PACKAGE_DIR}/index.html" ]]; then
@@ -155,11 +157,49 @@ rsync -av --delete \
     --exclude=".git" \
     "${PACKAGE_DIR}/" "${DEST_DIR}/"
 
-# Regenerate root landing page — scan clone for published report dirs (depth 2)
-# so new cohorts appear automatically without editing this script.
+# ── Generate per-cohort index (ref_ws-NNNN/index.html) ───────────────────────
+# Lists baseline/ and qcorr/ subdirs found inside the ref_ws-NNNN directory.
+_REF_WS_DIR="${PAGES_CLONE}/${_ref_ws_id}"
+_REF_WS_INDEX="${_REF_WS_DIR}/index.html"
+echo "Updating cohort index: ${_REF_WS_INDEX}"
+{
+cat << 'RW_HEAD_EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASKAP Leakage Assessment Reports</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 60px auto; padding: 0 20px; }
+    h1   { font-size: 1.4em; }
+    h2   { font-size: 1.1em; color: #555; }
+    ul   { line-height: 2; }
+    a.back { font-size: 0.9em; color: #888; }
+  </style>
+</head>
+<body>
+  <a class="back" href="../">&#8592; All cohorts</a>
+RW_HEAD_EOF
+printf '  <h1>ASKAP Leakage Assessment Reports</h1>\n'
+printf '  <h2>%s</h2>\n' "${_ref_ws_id}"
+printf '  <ul>\n'
+find "${_REF_WS_DIR}" -mindepth 1 -maxdepth 1 -type d | sort | \
+    while IFS= read -r _sub; do
+        _name="$(basename "${_sub}")"
+        printf '    <li><a href="./%s/">%s</a></li>\n' "${_name}" "${_name}"
+    done
+cat << 'RW_FOOT_EOF'
+  </ul>
+</body>
+</html>
+RW_FOOT_EOF
+} > "${_REF_WS_INDEX}"
+
+# ── Regenerate root landing page ──────────────────────────────────────────────
+# Scans depth-1 for ref_ws-* directories; each links to its own cohort index.
 LANDING="${PAGES_CLONE}/index.html"
 echo "Updating landing page: ${LANDING}"
-
 {
 cat << 'HEAD_EOF'
 <!DOCTYPE html>
@@ -178,11 +218,10 @@ cat << 'HEAD_EOF'
   <h1>ASKAP Leakage Assessment Reports</h1>
   <ul>
 HEAD_EOF
-find "${PAGES_CLONE}" -mindepth 2 -maxdepth 2 -name "index.html" | sort | \
-    while IFS= read -r _idx_path; do
-        _rel_dir="${_idx_path#${PAGES_CLONE}/}"
-        _rel_dir="${_rel_dir%/index.html}"
-        printf '    <li><a href="./%s/">%s</a></li>\n' "${_rel_dir}" "${_rel_dir}"
+find "${PAGES_CLONE}" -mindepth 1 -maxdepth 1 -type d -name "ref_ws-*" | sort | \
+    while IFS= read -r _rw_dir; do
+        _name="$(basename "${_rw_dir}")"
+        printf '    <li><a href="./%s/">%s</a></li>\n' "${_name}" "${_name}"
     done
 cat << 'FOOT_EOF'
   </ul>
