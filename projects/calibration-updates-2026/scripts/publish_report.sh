@@ -121,19 +121,27 @@ if [[ ! -d "${PAGES_CLONE}/.git" ]]; then
     echo "First run: cloning ${PAGES_REMOTE} ..."
     mkdir -p "$(dirname "${PAGES_CLONE}")"
     git clone "${PAGES_REMOTE}" "${PAGES_CLONE}"
-
-    # Add .nojekyll so GitHub Pages serves files/dirs with underscores correctly
-    touch "${PAGES_CLONE}/.nojekyll"
     cd "${PAGES_CLONE}"
+    # Ensure develop branch exists; create from main if not
+    if ! git show-ref --quiet refs/remotes/origin/develop; then
+        git checkout -b develop
+        git push -u origin develop
+    else
+        git checkout -b develop --track origin/develop
+    fi
+    # Add .nojekyll so GitHub Pages serves files/dirs with underscores correctly
+    touch .nojekyll
     git add .nojekyll
-    git commit -m "chore: add .nojekyll for GitHub Pages"
-    git branch -M main
-    git push -u origin main
+    git commit -m "chore: add .nojekyll for GitHub Pages" || true
+    git push origin develop
     cd -
 else
-    echo "Pulling latest from origin ..."
+    echo "Checking out develop and pulling latest ..."
     cd "${PAGES_CLONE}"
-    git pull --ff-only origin main
+    git fetch origin
+    # Switch to develop if not already on it
+    git checkout develop 2>/dev/null || git checkout -b develop --track origin/develop
+    git pull --ff-only origin develop
     cd -
 fi
 
