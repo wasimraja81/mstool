@@ -84,15 +84,28 @@ PAGES_REMOTE="git@github.com:wasimraja81/askap-leakage-report.git"
 PAGES_URL="https://wasimraja81.github.io/askap-leakage-report/"
 
 # Derive publication subdirectory from DATA_ROOT basename.
-# Root index.html is ALWAYS the navigation landing page — reports go in subdirs.
-# reffield-average        -> publishes to baseline/
-# reffield-average-qcorr -> publishes to qcorr/
+# New convention:
+#   assess_1934-ref_ws-4788        -> ref_ws-4788/baseline
+#   assess_1934-ref_ws-4788-qcorr  -> ref_ws-4788/qcorr
+#   assess_1934-ref_ws-5316        -> ref_ws-5316/baseline
+# Legacy fallback (old naming):
+#   reffield-average               -> ref_ws-4788/baseline
+#   reffield-average-qcorr         -> ref_ws-4788/qcorr
 _data_base="$(basename "${DATA_ROOT}")"
-if [[ "${_data_base}" == "reffield-average" ]]; then
-    PAGES_SUBDIR="baseline"
+if [[ "${_data_base}" =~ ^assess_1934-ref_ws-([0-9]+)(-qcorr)?$ ]]; then
+    _ref_ws_id="ref_ws-${BASH_REMATCH[1]}"
+    if [[ -n "${BASH_REMATCH[2]}" ]]; then
+        PAGES_SUBDIR="${_ref_ws_id}/qcorr"
+    else
+        PAGES_SUBDIR="${_ref_ws_id}/baseline"
+    fi
+elif [[ "${_data_base}" == "reffield-average-qcorr" ]]; then
+    PAGES_SUBDIR="ref_ws-4788/qcorr"
+elif [[ "${_data_base}" == "reffield-average" ]]; then
+    PAGES_SUBDIR="ref_ws-4788/baseline"
 else
-    PAGES_SUBDIR="${_data_base#reffield-average-}"
-    [[ "${PAGES_SUBDIR}" == "${_data_base}" ]] && PAGES_SUBDIR="${_data_base}"
+    # Last-resort fallback — use basename as-is
+    PAGES_SUBDIR="${_data_base}"
 fi
 echo "INFO - Publication subdir: '${PAGES_SUBDIR}'"
 
@@ -134,10 +147,19 @@ rsync -av --delete \
     --exclude=".git" \
     "${PACKAGE_DIR}/" "${DEST_DIR}/"
 
-# Regenerate root landing page every publish so links stay up to date.
+# Regenerate root landing page — scan clone for published report dirs (depth 2)
+# so new cohorts appear automatically without editing this script.
 LANDING="${PAGES_CLONE}/index.html"
 echo "Updating landing page: ${LANDING}"
-cat > "${LANDING}" << 'LANDING_EOF'
+_list_items=""
+while IFS= read -r _idx_path; do
+    _rel_dir="${_idx_path#${PAGES_CLONE}/}"
+    _rel_dir="${_rel_dir%/index.html}"
+    _list_items+="    <li><a href=\"./${_rel_dir}/\">${_rel_dir}</a></li>\n"
+done < <(find "${PAGES_CLONE}" -mindepth 2 -maxdepth 2 -name "index.html" | sort)
+
+{
+cat << 'HEAD_EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -148,20 +170,19 @@ cat > "${LANDING}" << 'LANDING_EOF'
     body { font-family: sans-serif; max-width: 600px; margin: 60px auto; padding: 0 20px; }
     h1   { font-size: 1.4em; }
     ul   { line-height: 2; }
-    .tag { font-size: 0.75em; background: #e8f4e8; border-radius: 3px;
-           padding: 2px 6px; margin-left: 8px; }
-    .new { background: #fff3cd; }
   </style>
 </head>
 <body>
   <h1>ASKAP Leakage Assessment Reports</h1>
   <ul>
-    <li><a href="./baseline/">Baseline (no Q-correction)</a></li>
-    <li><a href="./qcorr/">Q-corrected report</a><span class="tag new">new</span></li>
+HEAD_EOF
+printf "%b" "${_list_items}"
+cat << 'FOOT_EOF'
   </ul>
 </body>
 </html>
-LANDING_EOF
+FOOT_EOF
+} > "${LANDING}"
 
 # Ensure .nojekyll survives the rsync (package dir won't contain it)
 touch "${PAGES_CLONE}/.nojekyll"
