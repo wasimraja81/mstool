@@ -5,7 +5,7 @@ This repository contains tools for ASKAP table analysis.
 * `mstool/bin` - reusable python scripts for ASKAP ms table query/analysis and continuum removal.
 * `mstool/src` - Fortran codes for poly-harm fitting used for continuum removal per baseline per timestamp.
 * `mstool/doc` - historical notes/presentations about mstool features.
-* `projects/calibration-updates-2026` - project-specific helpers (manifests, slurm, orchestration scripts) for calibration updates using reference fields.
+* `projects/calibration-updates-2026` - project-specific helpers (manifests, slurm, orchestration scripts) for calibration updates using reference fields. See the [Getting Started guide](https://wasimraja81.github.io/mstool/projects/calibration-updates-2026/docs/getting-started.html).
 
 The required fortran libraries are built and the core scripts are installed in the system default directories with the fortran libraries properly linked.
 ### Python scripts 
