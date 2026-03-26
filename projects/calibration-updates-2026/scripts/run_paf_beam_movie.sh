@@ -2,14 +2,14 @@
 # run_paf_beam_movie.sh
 #
 # Run create_paf_beam_movie.sh for the calibration-updates-2026 project.
-# Edit the active command below and execute from the repo root with:
+# Edit the active command below and run from any directory:
 #
-#   bash projects/calibration-updates-2026/scripts/run_paf_beam_movie.sh
+#   bash /path/to/projects/calibration-updates-2026/scripts/run_paf_beam_movie.sh
 #
 # ─────────────────────────────────────────────────────────────────────────────
 
-SCRIPTS="projects/calibration-updates-2026/scripts"
-MANIFEST="projects/calibration-updates-2026/manifests/manifest_ref_ws-4788.txt"
+SCRIPTS="$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0")"
+MANIFEST="${SCRIPTS}/../manifests/manifest_ref_ws-4788.txt"
 
 # ── Most common use-case: all active SBs (idx 14-49, excluding ODC-5233 24-29) ──
 bash "${SCRIPTS}"/create_paf_beam_movie.sh \

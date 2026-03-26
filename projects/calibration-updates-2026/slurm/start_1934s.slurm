@@ -110,6 +110,7 @@ MANIFEST_FILE="${MANIFEST_FILE:-${MANIFEST_FILE_DEFAULT}}"
 BSB_OVERRIDE="${BSB_OVERRIDE:-}"
 ESB_OVERRIDE="${ESB_OVERRIDE:-}"
 DRY_RUN_PARSE=false
+EXPERIMENT=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -125,6 +126,10 @@ while [[ $# -gt 0 ]]; do
             ESB_OVERRIDE="$2"
             shift 2
             ;;
+        --experiment)
+            EXPERIMENT="$2"
+            shift 2
+            ;;
         --dry-run-parse)
             DRY_RUN_PARSE=true
             shift
@@ -138,7 +143,8 @@ done
 
 DIR_SB=/askapbuffer/payne/raj030/askap-scheduling-blocks
 
-# WORK_DIR is set from HPC_BASE_DIR in the manifest (last used: assess_1934-2026-qcorr).
+# WORK_DIR is set from HPC_BASE_DIR in the manifest; --experiment qcorr appends -qcorr at runtime.
+EXPERIMENT="${EXPERIMENT:-baseline}"
 WORK_DIR=""
 SCIENCE_CONFIG_TEMPLATE="${SCRIPT_DIR}/run_1934Field.sh"
 echo "INFO - SCIENCE_CONFIG_TEMPLATE: ${SCIENCE_CONFIG_TEMPLATE}"
@@ -433,6 +439,8 @@ if [[ -f "${MANIFEST_FILE}" ]]; then
         echo "        Add: HPC_BASE_DIR=/scratch/.../your_work_dir"
         exit 1
     fi
+    [[ "${EXPERIMENT}" == "qcorr" ]] && WORK_DIR="${WORK_DIR}-qcorr"
+    echo "INFO - EXPERIMENT=${EXPERIMENT}; WORK_DIR=${WORK_DIR}"
     mkdir -p "${WORK_DIR}/manifest_archive"
     cp "${MANIFEST_FILE}" "${WORK_DIR}/manifest_archive/$(basename "${MANIFEST_FILE}" .txt).$(date +%Y%m%dT%H%M%S).txt"
     echo "INFO - Manifest snapshot saved to ${WORK_DIR}/manifest_archive/"

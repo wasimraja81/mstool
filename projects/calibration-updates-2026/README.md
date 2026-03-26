@@ -1,6 +1,8 @@
 # Calibration updates (reference fields) — 2026
 
-> **Current release: tag `3.13`** — Per-beam PNG regeneration (`regen_beam_pngs.py`): stage 4 onwards now runs fully locally from `.txt`/`.lcal.txt` files — no HPC access or measurement sets required. `combine_beam_outputs.py` gains `--regen-beam-pngs`/`--regen-manifest` flags. `averageMS.py` writes `# Field Name:` header. Plot fixes: field label, ylim ±5 %, legend `upper right`.
+> **New to the pipeline?** Start with the [Getting Started guide](docs/getting-started.html) — a step-by-step walkthrough from stage 1 through to publishing the report.
+
+> **Current release: tag `4.0`** — New [Getting Started guide](docs/getting-started.html); path-independence fixes for `run_paf_beam_movie.sh` and `run_paf_beam_overlay.sh`; documentation accuracy pass (`ref_ws` terminology, manifest format, code example paths).
 
 This project measures and analyses on-axis polarisation leakage across ASKAP
 beams, reference fields, and ODC calibration-weight configurations.  It drives

@@ -5,11 +5,11 @@ set -euo pipefail
 # User-configurable settings
 # -----------------------------
 REMOTE="raj030@setonix-dm03.pawsey.org.au"
-REMOTE_BASE_ROOT="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026-qcorr"
-ODC_WEIGHT_ID="5229"
+REMOTE_BASE_ROOT="/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-2026"
+ODC_WEIGHT_ID="5231"
 REMOTE_BASE="${REMOTE_BASE_ROOT}/ODC-${ODC_WEIGHT_ID}"
 LOCAL_PARENT="${HOME}/DATA"
-LOCAL_NAME="reffield-average-qcorr"
+LOCAL_NAME="reffield-average"
 LOCAL_BASE="${LOCAL_PARENT}/${LOCAL_NAME}"
 LOCAL_BASE_EXPLICIT=0
 REMOTE_BASE_ROOT_EXPLICIT=0
@@ -577,7 +577,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --remote-base-root)
       [[ $# -ge 2 ]] || { echo "ERROR: --remote-base-root requires a value"; exit 1; }
-      REMOTE_BASE_ROOT="$2"      REMOTE_BASE_ROOT_EXPLICIT=1      shift 2
+      REMOTE_BASE_ROOT="$2"
+      REMOTE_BASE_ROOT_EXPLICIT=1
+      shift 2
       ;;
     --local-base)
       [[ $# -ge 2 ]] || { echo "ERROR: --local-base requires a value"; exit 1; }
@@ -703,8 +705,9 @@ else
 fi
 
 echo "==> Configuration"
-echo "  Remote host/base: ${REMOTE}:${REMOTE_BASE}"
-echo "  ODC weight ID: ${ODC_WEIGHT_ID:-none}"
+echo "  Remote host    : ${REMOTE}"
+echo "  Remote base root: ${REMOTE_BASE_ROOT:-${REMOTE_BASE}}"
+echo "  ODC weight ID (global default, per-row may differ): ${ODC_WEIGHT_ID:-none}"
 echo "  Local destination: ${LOCAL_BASE}"
 echo "  Dry run: ${DRY_RUN}"
 echo "  Copy metadata: ${COPY_METADATA}"
@@ -744,6 +747,7 @@ for i in "${!SUBPATHS[@]}"; do
   remote_base_for_sub="${SUBPATH_REMOTE_BASES[$i]:-${REMOTE_BASE}}"
   sub_rel="${sub%/}"
   remote_path="${remote_base_for_sub}/${sub_rel}"
+  echo "  [$(( i + 1 ))/${#SUBPATHS[@]}] Source: ${REMOTE}:${remote_path}"
   if [[ ${METADATA_ONLY} -eq 0 && ${COMBINE_ONLY} -eq 0 ]]; then
     if ssh "${REMOTE}" "test -d \"${remote_path}\""; then
       if [[ ${DRY_RUN} -eq 1 ]]; then

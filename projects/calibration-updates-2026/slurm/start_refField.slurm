@@ -22,8 +22,8 @@ Options:
   --manifest <path>             Path to manifest file
   --start-index <idx>           Start tuple index (inclusive)
   --end-index <idx>             End tuple index (inclusive)
-  --apply-q-corrections <bool>   Set BP_UPDATE_APPLY_Q_CORRECTIONS (true/false, default: true)
-  --q-corr-csv <path>            Path to Q-correction CSV file
+  --experiment <baseline|qcorr>  Experiment type: drives Q-corrections and HPC output path
+  --q-corr-csv <path>            Override Q-correction CSV (auto-derived from manifest cohort for qcorr)
   --q-corr-variant <val>         CSV variant column: bpcal or lcal (default: bpcal)
   --q-corr-ref-ws <val>          Override ref_ws for CSV row selection (default: from pipeline metadata)
   --q-corr-allow-mismatch <bool> Allow ref_ws mismatch (true/false, default: false)
@@ -113,8 +113,9 @@ MANIFEST_FILE="${MANIFEST_FILE:-${MANIFEST_FILE_DEFAULT}}"
 BSB_OVERRIDE="${BSB_OVERRIDE:-}"
 ESB_OVERRIDE="${ESB_OVERRIDE:-}"
 DRY_RUN_PARSE=false
-APPLY_Q_CORRECTIONS="true"
-Q_CORR_CSV="/askapbuffer/payne/raj030/askap-calibration-updates/dq_du_correction_factors.csv"
+EXPERIMENT=""
+Q_CORR_CSV=""
+Q_CORR_CSV_EXPLICIT=0
 Q_CORR_VARIANT="bpcal"
 Q_CORR_REF_WS=""
 Q_CORR_ALLOW_MISMATCH="false"
@@ -133,12 +134,9 @@ while [[ $# -gt 0 ]]; do
             ESB_OVERRIDE="$2"
             shift 2
             ;;
-        --apply-q-corrections)
-            APPLY_Q_CORRECTIONS="$2"
-            shift 2
-            ;;
         --q-corr-csv)
             Q_CORR_CSV="$2"
+            Q_CORR_CSV_EXPLICIT=1
             shift 2
             ;;
         --q-corr-variant)
@@ -151,6 +149,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --q-corr-allow-mismatch)
             Q_CORR_ALLOW_MISMATCH="$2"
+            shift 2
+            ;;
+        --experiment)
+            EXPERIMENT="$2"
             shift 2
             ;;
         --dry-run-parse)
@@ -175,7 +177,8 @@ if [[ "${EARLY_DRY_RUN_PARSE}" != "true" ]]; then
     mkdir -p ${DIR_SB}
 fi
 
-# WORK_DIR is set from HPC_BASE_DIR in the manifest (last used: assess_1934-2026-qcorr).
+# WORK_DIR is set from HPC_BASE_DIR in the manifest; --experiment qcorr appends -qcorr at runtime.
+EXPERIMENT="${EXPERIMENT:-baseline}"
 WORK_DIR=""
 FETCHED_DIR="/askapbuffer/payne/dmitchell/askap-scheduling-blocks"
 #FETCHED_DIR="/scratch/askaprt/tgalvin/racs_low3"
@@ -466,6 +469,29 @@ if [[ -f "${MANIFEST_FILE}" ]]; then
         echo "ERROR - HPC_BASE_DIR is not set in manifest (${MANIFEST_FILE})."
         echo "        Add: HPC_BASE_DIR=/scratch/.../your_work_dir"
         exit 1
+    fi
+    [[ "${EXPERIMENT}" == "qcorr" ]] && WORK_DIR="${WORK_DIR}-qcorr"
+    echo "INFO - EXPERIMENT=${EXPERIMENT}; WORK_DIR=${WORK_DIR}"
+    # Derive APPLY_Q_CORRECTIONS and validate Q_CORR_CSV from --experiment.
+    if [[ "${EXPERIMENT}" == "qcorr" ]]; then
+        APPLY_Q_CORRECTIONS="true"
+        if [[ ${Q_CORR_CSV_EXPLICIT} -eq 0 ]]; then
+            _cohort_id="$(basename "${MANIFEST_FILE}" .txt | sed 's/^manifest_//')"
+            Q_CORR_CSV="/askapbuffer/payne/raj030/askap-calibration-updates/${_cohort_id}/dq_du_correction_factors.csv"
+        fi
+        if [[ ! -f "${Q_CORR_CSV}" ]]; then
+            echo "ERROR ================================================================"
+            echo "ERROR  Q-correction CSV not found for --experiment qcorr:"
+            echo "ERROR    ${Q_CORR_CSV}"
+            echo "ERROR  Complete the baseline pipeline first, then copy the output:"
+            echo "ERROR    cp <LOCAL_BASE>/plots/dq_du_correction_factors.csv \\"
+            echo "ERROR       $(dirname \"${Q_CORR_CSV}\")/"
+            echo "ERROR ================================================================"
+            exit 1
+        fi
+        echo "INFO - Q_CORR_CSV=${Q_CORR_CSV}"
+    else
+        APPLY_Q_CORRECTIONS="false"
     fi
     mkdir -p "${WORK_DIR}/manifest_archive"
     cp "${MANIFEST_FILE}" "${WORK_DIR}/manifest_archive/$(basename "${MANIFEST_FILE}" .txt).$(date +%Y%m%dT%H%M%S).txt"

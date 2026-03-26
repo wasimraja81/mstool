@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## 4.0 — 2026-03-26
+
+Adds a comprehensive Getting Started guide (`docs/getting-started.html`) for
+new pipeline users, covering manifests, cohorts, all four stages, the
+`--experiment` flag, subset-processing flags, report generation, and a
+troubleshooting table.  Fixes path-dependency bugs in `run_paf_beam_movie.sh`
+and `run_paf_beam_overlay.sh`.  Full documentation accuracy pass: corrects
+`ref_ws` terminology, removes ODC/ref_ws conflation, updates all code examples
+to use absolute `~/mstool/` paths.
+
 ## 3.12 — 2026-03-19
 
 Wires dQ/dU vs beam plots directly into the HTML report builder so the report

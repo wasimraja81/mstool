@@ -1,4 +1,49 @@
-# Changelog — calibration-u
+# Changelog — calibration-updates-2026
+
+## 4.0 — 2026-03-26
+
+### Getting Started guide + documentation accuracy pass
+
+Adds a comprehensive newcomer guide covering the full pipeline from manifest
+setup through to publishing the report, alongside a documentation accuracy pass
+that corrects `ref_ws` terminology, removes ODC/ref_ws conflation, and makes
+all code examples runnable from any directory.
+
+#### Added
+- `docs/getting-started.html` (**new**): step-by-step onboarding guide covering
+  cohort/manifest structure, all four pipeline stages with exact commands,
+  the `--experiment` flag, subset-processing flags, the HTML report, and a
+  troubleshooting table.  Linked from the project README header.
+- `docs/getting-started.html` — manifest section: real excerpt showing per-row
+  column format (`idx sb_ref sb_1934 sb_holo sb_target_1934 ODC_WEIGHT=…
+  REF_FIELDNAME=…`); global-directives block documented as legacy fallback.
+- `docs/getting-started.html` — cohort definition: a cohort is a group of SBs
+  sharing the same holography reference weights (`ref_ws` ID).
+- `docs/getting-started.html` — subset-processing flags section: explains
+  `--start-index`, `--end-index`, `--exclude-indices` with concrete use cases
+  (test single SB, reprocess failed row, split large cohort).
+
+#### Fixed
+- `scripts/run_paf_beam_movie.sh` — changed hardcoded
+  `SCRIPTS="projects/calibration-updates-2026/scripts"` to a `python3 realpath`
+  self-location pattern; script now works from any directory.
+- `scripts/run_paf_beam_overlay.sh` — same path-independence fix.
+
+#### Documentation
+- `docs/getting-started.html` — corrected `ref_ws` meaning from
+  "reference workspace" to "reference weights" throughout; removed all
+  ODC/ref_ws conflation (ODC weight IDs are per-row manifest attributes,
+  not cohort identifiers).
+- `docs/getting-started.html` — directory layout section rewritten: scripts
+  self-locate and work from any directory; `scratch/` is a recommended
+  convention, not a requirement.
+- `docs/getting-started.html` — all 13 code-block examples updated from
+  `../projects/calibration-updates-2026/` to `~/mstool/projects/
+  calibration-updates-2026/` with an explanatory note.
+- Project `README.md` — added Getting Started guide link in header.
+
+---
+
 ## 3.13 — 2026-03-20
 
 ### GitHub Pages publishing (`publish_report.sh`)
