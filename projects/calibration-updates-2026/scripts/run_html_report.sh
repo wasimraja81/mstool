@@ -89,6 +89,7 @@ MANIFEST_FILE="${SCRIPTS}/../manifests/manifest_ref_ws-4788.txt"
 START_INDEX="0"
 END_INDEX="49"
 EXPERIMENT="baseline"
+FORCE=""
 
 usage() { cat <<EOF
 Usage: $(basename "$0") [options]
@@ -100,6 +101,7 @@ Options:
   --start-index N              First manifest row index (default: 0)
   --end-index N                Last manifest row index (default: 49)
   --experiment baseline|qcorr  Appends -qcorr to DATA_ROOT when qcorr (default: baseline)
+  --force                      Force regeneration of PAF overlays, movies, and dQ/dU plots
   -h, --help                   Show this help
 EOF
 }
@@ -110,6 +112,7 @@ while [[ $# -gt 0 ]]; do
         --start-index) START_INDEX="$2";   shift 2 ;;
         --end-index)   END_INDEX="$2";     shift 2 ;;
         --experiment)  EXPERIMENT="$2";    shift 2 ;;
+        --force)       FORCE="--force";    shift ;;
         -h|--help) usage; exit 0 ;;
         *)
             echo "ERROR: Unknown argument '$1'"
@@ -142,6 +145,7 @@ source "${REPO_ROOT}/.venv/bin/activate"
      --pol-sources \
      --highlight-frac-pol 0.10 \
      --package           "${DATA_ROOT}/final_mvp_share" \
+     ${FORCE}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ACTIVE COMMAND — standard rebuild with polarised-source overlays
