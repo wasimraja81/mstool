@@ -559,6 +559,10 @@ TABLE_BANDPASS=${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.t
 TABLE_LEAKAGE=${tupleProcessingDir}/BPCAL/calparameters.1934_bpleakage.SB${sbRefNow}.tab
 DIR_SB=${DIR_SB}
 BP_UPDATE_MODIFY_AMP_STRATEGY=${ampStrategyNow}
+DO_RAPID_SURVEY=true
+DO_MOSAIC=false
+DO_ALT_IMAGER_CONT=false
+NUM_CORES_CONTIMG_SCI=4
 EOF
             processASKAP.sh -s ${sbCalNow} -b ${sbRefNow} -p ${holoSBNow} -t "${configNow1}"
         done
