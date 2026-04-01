@@ -736,6 +736,20 @@ if [[ ${DRY_RUN} -eq 0 ]]; then
   mkdir -p "${LOCAL_BASE}"
 fi
 
+# Open a persistent SSH ControlMaster connection so all subsequent ssh calls
+# reuse a single TCP channel, avoiding connection-rate limits on the remote.
+SSH_MUX_PATH="/tmp/ssh_mux_copy_$$"
+if [[ ${COMBINE_ONLY} -eq 0 ]]; then
+  ssh -MNf \
+    -o ControlPath="${SSH_MUX_PATH}" \
+    -o ControlPersist=300 \
+    "${REMOTE}"
+  trap 'ssh -S "${SSH_MUX_PATH}" -O exit "${REMOTE}" 2>/dev/null; rm -f "${SSH_MUX_PATH}"' EXIT
+fi
+
+# Thin wrapper: run ssh via the multiplexed channel.
+ssh_mux() { ssh -o ControlPath="${SSH_MUX_PATH}" "$@"; }
+
 echo "==> Copying assessment_results directories from remote"
 copied_count=0
 missing_count=0
@@ -749,16 +763,30 @@ for i in "${!SUBPATHS[@]}"; do
   remote_path="${remote_base_for_sub}/${sub_rel}"
   echo "  [$(( i + 1 ))/${#SUBPATHS[@]}] Source: ${REMOTE}:${remote_path}"
   if [[ ${METADATA_ONLY} -eq 0 && ${COMBINE_ONLY} -eq 0 ]]; then
-    if ssh "${REMOTE}" "test -d \"${remote_path}\""; then
-      if [[ ${DRY_RUN} -eq 1 ]]; then
+    if [[ ${DRY_RUN} -eq 1 ]]; then
+      if ssh_mux "${REMOTE}" "test -d \"${remote_path}\""; then
         echo "    DRY-RUN: ssh ${REMOTE} \"tar -C '${remote_base_for_sub}' -cf - '${sub_rel}'\" | tar -C '${LOCAL_BASE}' -xf -"
+        copied_count=$((copied_count + 1))
       else
-        ssh "${REMOTE}" "tar -C \"${remote_base_for_sub}\" -cf - \"${sub_rel}\"" | tar -C "${LOCAL_BASE}" -xf -
+        echo "    WARNING: Missing remote directory, skipping: ${remote_path}"
+        missing_count=$((missing_count + 1))
       fi
-      copied_count=$((copied_count + 1))
     else
-      echo "    WARNING: Missing remote directory, skipping: ${remote_path}"
-      missing_count=$((missing_count + 1))
+      # Single SSH call: exits 2 if dir missing, 0 on success (options 2+3).
+      set +o pipefail
+      ssh_mux "${REMOTE}" "test -d \"${remote_path}\" || exit 2; tar -C \"${remote_base_for_sub}\" -cf - \"${sub_rel}\"" \
+        | tar -C "${LOCAL_BASE}" -xf -
+      _pipe=("${PIPESTATUS[@]}")
+      set -o pipefail
+      if [[ ${_pipe[0]} -eq 2 ]]; then
+        echo "    WARNING: Missing remote directory, skipping: ${remote_path}"
+        missing_count=$((missing_count + 1))
+      elif [[ ${_pipe[0]} -ne 0 || ${_pipe[1]} -ne 0 ]]; then
+        echo "    ERROR: Transfer failed (ssh_rc=${_pipe[0]} tar_rc=${_pipe[1]}): ${remote_path}"
+        exit 1
+      else
+        copied_count=$((copied_count + 1))
+      fi
     fi
   fi
 
@@ -779,16 +807,30 @@ for i in "${!SUBPATHS[@]}"; do
       continue
     fi
 
-    if ssh "${REMOTE}" "test -d \"${remote_metadata_path}\""; then
-      if [[ ${DRY_RUN} -eq 1 ]]; then
+    if [[ ${DRY_RUN} -eq 1 ]]; then
+      if ssh_mux "${REMOTE}" "test -d \"${remote_metadata_path}\""; then
         echo "    DRY-RUN METADATA: ssh ${REMOTE} \"tar -C '${remote_base_for_sub}' -cf - '${tuple_rel}/metadata'\" | tar -C '${LOCAL_BASE}' -xf -"
+        metadata_copied_count=$((metadata_copied_count + 1))
       else
-        ssh "${REMOTE}" "tar -C \"${remote_base_for_sub}\" -cf - \"${tuple_rel}/metadata\"" | tar -C "${LOCAL_BASE}" -xf -
+        echo "    WARNING: Missing remote metadata directory, skipping: ${remote_metadata_path}"
+        metadata_missing_count=$((metadata_missing_count + 1))
       fi
-      metadata_copied_count=$((metadata_copied_count + 1))
     else
-      echo "    WARNING: Missing remote metadata directory, skipping: ${remote_metadata_path}"
-      metadata_missing_count=$((metadata_missing_count + 1))
+      # Single SSH call: exits 2 if dir missing, 0 on success (options 2+3).
+      set +o pipefail
+      ssh_mux "${REMOTE}" "test -d \"${remote_metadata_path}\" || exit 2; tar -C \"${remote_base_for_sub}\" -cf - \"${tuple_rel}/metadata\"" \
+        | tar -C "${LOCAL_BASE}" -xf -
+      _pipe=("${PIPESTATUS[@]}")
+      set -o pipefail
+      if [[ ${_pipe[0]} -eq 2 ]]; then
+        echo "    WARNING: Missing remote metadata directory, skipping: ${remote_metadata_path}"
+        metadata_missing_count=$((metadata_missing_count + 1))
+      elif [[ ${_pipe[0]} -ne 0 || ${_pipe[1]} -ne 0 ]]; then
+        echo "    ERROR: Metadata transfer failed (ssh_rc=${_pipe[0]} tar_rc=${_pipe[1]}): ${remote_metadata_path}"
+        exit 1
+      else
+        metadata_copied_count=$((metadata_copied_count + 1))
+      fi
     fi
   fi
 done
