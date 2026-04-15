@@ -564,6 +564,7 @@ DO_MOSAIC=false
 DO_ALT_IMAGER_CONT=false
 NUM_CORES_CONTIMG_SCI=4
 USE_PARALLEL_WRITE_MS=false
+JOB_MEMORY_APPLY_LEAKAGE=0
 EOF
             processASKAP.sh -s ${sbCalNow} -b ${sbRefNow} -p ${holoSBNow} -t "${configNow1}"
         done
