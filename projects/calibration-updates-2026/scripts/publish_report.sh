@@ -153,7 +153,7 @@ fi
 DEST_DIR="${PAGES_CLONE}/${PAGES_SUBDIR}"
 echo "Syncing ${PACKAGE_DIR}/ → ${DEST_DIR}/ ..."
 mkdir -p "${DEST_DIR}"
-rsync -av --delete \
+rsync -avc --delete \
     --exclude=".git" \
     "${PACKAGE_DIR}/" "${DEST_DIR}/"
 
@@ -236,17 +236,13 @@ touch "${PAGES_CLONE}/.nojekyll"
 # ── Commit and push ───────────────────────────────────────────────────────────
 cd "${PAGES_CLONE}"
 
-if [[ -z "$(git status --porcelain)" ]]; then
-    echo "Nothing changed since last publish — no commit needed."
-else
-    TIMESTAMP="$(date '+%Y-%m-%d %H:%M')"
-    git add -A
-    git commit -m "report: publish ${TIMESTAMP}"
-    git push origin develop
-    echo ""
-    echo "Pushed to develop branch of askap-leakage-report."
-    echo "To publish live: merge develop -> main on GitHub, then"
-    echo "GitHub Pages will update at: ${PAGES_URL}"
-fi
+TIMESTAMP="$(date '+%Y-%m-%d %H:%M')"
+git add -A
+git commit --allow-empty -m "report: publish ${TIMESTAMP} (forced)"
+git push origin develop
+echo ""
+echo "Pushed to develop branch of askap-leakage-report."
+echo "To publish live: merge develop -> main on GitHub, then"
+echo "GitHub Pages will update at: ${PAGES_URL}"
 
 cd -
