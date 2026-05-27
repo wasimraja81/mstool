@@ -85,9 +85,11 @@ PAGES_URL="https://wasimraja81.github.io/askap-leakage-report/"
 
 # Derive publication subdirectory from DATA_ROOT basename.
 # New convention:
-#   assess_1934-ref_ws-4788        -> ref_ws-4788/baseline
-#   assess_1934-ref_ws-4788-qcorr  -> ref_ws-4788/qcorr
-#   assess_1934-ref_ws-5316        -> ref_ws-5316/baseline
+#   assess_1934-ref_ws-4788               -> ref_ws-4788/baseline
+#   assess_1934-ref_ws-4788-qcorr         -> ref_ws-4788/qcorr
+#   assess_1934-ref_ws-5316               -> ref_ws-5316/baseline
+#   assess_1934-ref_ws-5316-<label>       -> ref_ws-5316-<label>/baseline
+#   ref_ws-5316-<label>                   -> ref_ws-5316-<label>/baseline
 # Legacy fallback (old naming):
 #   reffield-average               -> ref_ws-4788/baseline
 #   reffield-average-qcorr         -> ref_ws-4788/qcorr
@@ -99,6 +101,11 @@ if [[ "${_data_base}" =~ ^assess_1934-ref_ws-([0-9]+)(-qcorr)?$ ]]; then
     else
         PAGES_SUBDIR="${_ref_ws_id}/baseline"
     fi
+elif [[ "${_data_base}" =~ ^(assess_1934-ref_ws-[0-9]+-(.+)|ref_ws-[0-9]+-(.+))$ ]]; then
+    # Named-test variant: assess_1934-ref_ws-NNNN-<label> or ref_ws-NNNN-<label>
+    # Strip leading assess_1934- if present, then publish as <basename>/baseline
+    _stripped="${_data_base#assess_1934-}"
+    PAGES_SUBDIR="${_stripped}/baseline"
 elif [[ "${_data_base}" == "reffield-average-qcorr" ]]; then
     PAGES_SUBDIR="ref_ws-4788/qcorr"
 elif [[ "${_data_base}" == "reffield-average" ]]; then
