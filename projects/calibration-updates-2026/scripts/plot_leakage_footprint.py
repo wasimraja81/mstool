@@ -25,6 +25,11 @@ import xarray as xr
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Circle, Wedge
 
+from build_phase1_master_table import (
+    parse_exclude_indices,
+    parse_manifest_rows,
+)
+
 
 # ── Parse beam offsets from a footprintOutput file ──────────────────────
 def parse_footprint(fp_path: Path):
@@ -43,10 +48,10 @@ def parse_footprint(fp_path: Path):
     return offsets
 
 
-def load_and_validate_footprint(data_root: Path, atol=1e-6):
+def load_and_validate_footprint(data_root: Path, atol=1e-6, selected_sb_refs=None):
     """
     Load ALL footprintOutput-*.txt files, validate that beam offsets are
-    identical across every SB_REF, and return the consensus offsets.
+    identical across the selected SB_REFs, and return the consensus offsets.
 
     Raises RuntimeError if any footprint disagrees.
     Returns dict  beam_index -> (x_deg, y_deg).
@@ -57,6 +62,17 @@ def load_and_validate_footprint(data_root: Path, atol=1e-6):
     )
     if not fp_files:
         raise FileNotFoundError("No footprintOutput-*.txt found under data root")
+
+    if selected_sb_refs is not None:
+        selected_sb_refs = {str(sb) for sb in selected_sb_refs}
+        fp_files = [
+            fp for fp in fp_files
+            if any(f"SB_REF-{sb}" in fp.as_posix() for sb in selected_sb_refs)
+        ]
+        if not fp_files:
+            raise FileNotFoundError(
+                "No footprintOutput-*.txt found for the selected SB_REFs under data root"
+            )
 
     reference = None      # dict beam -> (x, y)
     reference_file = None  # path of the first file used as reference
@@ -675,6 +691,28 @@ def main():
         help="Top-level data directory",
     )
     parser.add_argument(
+        "--manifest",
+        default=None,
+        help="Optional manifest file; when given, only selected SB_REFs are validated",
+    )
+    parser.add_argument(
+        "--start-index",
+        type=int,
+        default=0,
+        help="First manifest row index to include",
+    )
+    parser.add_argument(
+        "--end-index",
+        type=int,
+        default=999,
+        help="Last manifest row index to include",
+    )
+    parser.add_argument(
+        "--exclude-indices",
+        default=None,
+        help="Comma-separated manifest indices or ranges to exclude",
+    )
+    parser.add_argument(
         "--field",
         default=None,
         help="Plot only this reference field (default: all)",
@@ -688,8 +726,17 @@ def main():
 
     ds = xr.open_dataset(cube_path)
 
+    selected_sb_refs = None
+    if args.manifest:
+        manifest_path = Path(args.manifest)
+        if manifest_path.exists():
+            exclude_ranges = parse_exclude_indices(args.exclude_indices)
+            rows = parse_manifest_rows(manifest_path, args.start_index, args.end_index, exclude_ranges)
+            selected_sb_refs = [row["sb_ref"] for row in rows]
+            print(f"Selected {len(selected_sb_refs)} SB_REFs from manifest slice")
+
     # ── Validate all footprints and get consensus offsets ───────────────
-    offsets = load_and_validate_footprint(data_root)
+    offsets = load_and_validate_footprint(data_root, selected_sb_refs=selected_sb_refs)
     print(f"Using {len(offsets)} beam offsets from validated footprints")
 
     # ── Output directory ────────────────────────────────────────────────
