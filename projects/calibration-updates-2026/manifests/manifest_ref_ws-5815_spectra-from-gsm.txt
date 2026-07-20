@@ -1,0 +1,27 @@
+# Manifest for copy_and_combine_assessment_results.sh
+#
+# This file can fully drive copy+combine without editing the script.
+#
+# -----------------------------
+# Optional config directives
+# -----------------------------
+REMOTE=raj030@setonix-dm03.pawsey.org.au
+HPC_BASE_DIR=/scratch/askaprt/raj030/tickets/axa-3649-component-models/assess_1934-ref_ws-5815-spectra-from-gsm
+ODC_WEIGHT_ID=5845
+LOCAL_BASE=/Users/raj030/DATA/reffield-average/ref_ws-5815-spectra-from-gsm
+AMP_STRATEGY=multiply
+DO_PREFLAG_REFTABLE=true
+
+# -----------------------------
+# SB combinations
+# Columns (space or comma-separated):
+# idx sb_ref sb_1934 sb_holo sb_target_1934 [optional tokens]
+# optional tokens (order-independent, must be key=value):
+#   ODC_WEIGHT=<id>  AMP_STRATEGY=<value>  DO_PREFLAG_REFTABLE=<true|false>  REF_FIELDNAME=<name>
+# -----------------------------
+# Use same SB_1934 for old and new to derive the Q-correction factors 
+#     SB_HOLO: 86536
+# SB_OLD_1934: 86678
+# SB_NEW_1934: 86678
+0 86679 86678 86536 86678 REF_FIELDNAME=REF_1612-28 ODC_WEIGHT=5845
+#1 ????? 86678 86536 86678 REF_FIELDNAME=REF_????-28 ODC_WEIGHT=5845
