@@ -19,6 +19,7 @@ Q_CORR_VARIANT="bpcal"
 Q_CORR_REF_WS=""
 Q_CORR_ALLOW_MISMATCH="false"
 REF_TEMPLATE=""
+SCI_TEMPLATE=""
 
 usage() {
   cat <<EOF
@@ -36,6 +37,7 @@ Options:
   --experiment baseline|qcorr  Experiment type; qcorr appends -qcorr to HPC work dir (default: baseline)
   --q-corr-allow-mismatch VAL Allow ref_ws mismatch: true/false (default: false)
   --template FILE             Pipeline config template passed to start_refField.slurm (default: run_refField.sh)
+  --sci-template FILE         Science-field config template passed to start_1934s.slurm (default: run_1934Field.sh)
   --dry-run                   Print sbatch commands without submitting
   -h, --help                  Show this help
 
@@ -89,6 +91,10 @@ while [[ $# -gt 0 ]]; do
       REF_TEMPLATE="$2"
       shift 2
       ;;
+    --sci-template)
+      SCI_TEMPLATE="$2"
+      shift 2
+      ;;
     --dry-run)
       DRY_RUN=1
       shift
@@ -126,10 +132,13 @@ fi
 if [[ -n "${Q_CORR_REF_WS}" ]]; then
     ref_cmd+=(--q-corr-ref-ws "${Q_CORR_REF_WS}")
 fi
+sci_cmd=(sbatch --parsable "${SCI_SCRIPT}" --manifest "${MANIFEST_FILE}")
 if [[ -n "${REF_TEMPLATE}" ]]; then
     ref_cmd+=(--template "${REF_TEMPLATE}")
 fi
-sci_cmd=(sbatch --parsable "${SCI_SCRIPT}" --manifest "${MANIFEST_FILE}")
+if [[ -n "${SCI_TEMPLATE:-}" ]]; then
+    sci_cmd+=(--template "${SCI_TEMPLATE}")
+fi
 if [[ -n "${EXPERIMENT}" ]]; then
   ref_cmd+=(--experiment "${EXPERIMENT}")
   sci_cmd+=(--experiment "${EXPERIMENT}")
