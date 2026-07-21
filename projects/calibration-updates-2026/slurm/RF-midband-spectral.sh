@@ -5,7 +5,6 @@ ACCOUNT=askaprt
 if [ "${CLUSTER}" == "setonix" ]; then
     PRIORITY_DEFAULT=high
 fi
-JOB_TIME_DEFAULT=8:00:00
 
 #====================================
 DO_1934_CAL=false
@@ -15,10 +14,7 @@ DO_LEAKAGE_CAL_CONT=false
 DO_SPLIT_TIMEWISE=false
 DO_PREFLAG_SCIENCE=true
 
-#data location and selection:
-DIR_SB=/askapbuffer/scott/askap-scheduling-blocks
-DO_STAGE_FOR_CASDA_REF=true
-REF_TABLE_DESTINATION="/askapbuffer/payne/askapops/bandpass-processing"
+DO_STAGE_FOR_CASDA_REF=false
 
 TABLE_BANDPASS=/askapbuffer/payne/askapops/bandpass-processing/%s/BPCAL/calparameters.1934_bp.SB%s.tab
 TABLE_LEAKAGE=/askapbuffer/payne/askapops/bandpass-processing/%s/BPCAL/calparameters.1934_bpleakage.SB%s.tab
@@ -63,8 +59,8 @@ BANDPASS_MINUV=0
 UVRANGE_FLAG_1934="0~200m"
 UVRANGE_FLAG_SCIENCE="0~200m"
 
-# CASDA storage
-DO_STAGE_FOR_CASDA_REF=true
-WRITE_CASDA_READY=true
-TRANSITION_SB=true
-PROJECT_ID=AS114
+ASKAP_MODULE_DIR=/askapbuffer/payne/raj030/askaprtModules
+BPTOOL_VERSION=2.8.0
+CONVOLVE_VERSION=3.0.0_ubuntu24
+ASKAPSOFT_VERSION=1.23.1 #was: develop-20251117
+ASKAPPY_VERSION=2.9.1
