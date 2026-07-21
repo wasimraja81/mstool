@@ -1163,7 +1163,10 @@ def run_upstream_pipeline(
         (
             "Footprint plots (dL + QU)",
             [python, str(scripts_dir / "plot_leakage_footprint.py"),
-             "--data-root", str(data_root)],
+               "--data-root", str(data_root),
+               "--manifest", str(manifest_path),
+               "--start-index", str(start_index),
+               "--end-index", str(end_index)],
         ),
     ]
 

@@ -77,9 +77,9 @@ done
 
 if [[ "${EARLY_DRY_RUN_PARSE}" != "true" ]]; then
     module use /askapbuffer/payne/raj030/askaprtModules
-    module load askappipeline/axa-3877-implement-q-correction-factors
+    #module load askappipeline/axa-3877-implement-q-correction-factors
     #module load askappipeline/axa-3859-fix-generate-parset-for-offset-fields
-    #module load askappipeline/2.23.1
+    module load askappipeline/2.24.1
     #module load askappipeline/axa-3729-flag-bad-data-in-reference-tables
 fi
 
@@ -627,7 +627,7 @@ if [ "${DO_FIND_BANDPASS}" == "true" ]; then
             cat >>${configNow1} << EOF
 DIR_SB=${DIR_SB}
 BP_UPDATE_MODIFY_AMP_STRATEGY=${ampStrategyNow}
-BPTOOL_VERSION=2.8.0-rc.1
+BPTOOL_VERSION=2.8.0
 DO_PREFLAG_REFTABLE=${doPreflagNow}
 APPLY_PREFLAGS_DIRECTLY_REFTABLE=${doPreflagNow}
 # Q-correction of residual X/Y gain amplitude imbalance (values passed via CLI args)
