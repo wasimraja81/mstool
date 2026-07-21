@@ -18,6 +18,7 @@ Q_CORR_CSV=""
 Q_CORR_VARIANT="bpcal"
 Q_CORR_REF_WS=""
 Q_CORR_ALLOW_MISMATCH="false"
+REF_TEMPLATE=""
 
 usage() {
   cat <<EOF
@@ -34,6 +35,7 @@ Options:
   --q-corr-ref-ws VAL         Override ref_ws for CSV row selection (default: from pipeline metadata)
   --experiment baseline|qcorr  Experiment type; qcorr appends -qcorr to HPC work dir (default: baseline)
   --q-corr-allow-mismatch VAL Allow ref_ws mismatch: true/false (default: false)
+  --template FILE             Pipeline config template passed to start_refField.slurm (default: run_refField.sh)
   --dry-run                   Print sbatch commands without submitting
   -h, --help                  Show this help
 
@@ -83,6 +85,10 @@ while [[ $# -gt 0 ]]; do
       Q_CORR_ALLOW_MISMATCH="$2"
       shift 2
       ;;
+    --template)
+      REF_TEMPLATE="$2"
+      shift 2
+      ;;
     --dry-run)
       DRY_RUN=1
       shift
@@ -110,6 +116,7 @@ fi
 [[ -f "${SCI_SCRIPT}" ]] || { echo "ERROR: Missing script: ${SCI_SCRIPT}"; exit 1; }
 
 # Q-correction flags are ref-stage only — start_1934s.slurm does not accept them.
+# --template is also ref-stage only.
 ref_cmd=(sbatch --parsable "${REF_SCRIPT}" --manifest "${MANIFEST_FILE}"
     --q-corr-variant "${Q_CORR_VARIANT}"
     --q-corr-allow-mismatch "${Q_CORR_ALLOW_MISMATCH}")
@@ -118,6 +125,9 @@ if [[ -n "${Q_CORR_CSV}" ]]; then
 fi
 if [[ -n "${Q_CORR_REF_WS}" ]]; then
     ref_cmd+=(--q-corr-ref-ws "${Q_CORR_REF_WS}")
+fi
+if [[ -n "${REF_TEMPLATE}" ]]; then
+    ref_cmd+=(--template "${REF_TEMPLATE}")
 fi
 sci_cmd=(sbatch --parsable "${SCI_SCRIPT}" --manifest "${MANIFEST_FILE}")
 if [[ -n "${EXPERIMENT}" ]]; then
