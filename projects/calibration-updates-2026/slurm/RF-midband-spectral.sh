@@ -16,8 +16,8 @@ DO_PREFLAG_SCIENCE=true
 
 DO_STAGE_FOR_CASDA_REF=false
 
-TABLE_BANDPASS=/askapbuffer/payne/askapops/bandpass-processing/%s/BPCAL/calparameters.1934_bp.SB%s.tab
-TABLE_LEAKAGE=/askapbuffer/payne/askapops/bandpass-processing/%s/BPCAL/calparameters.1934_bpleakage.SB%s.tab
+TABLE_BANDPASS=/askapbuffer/payne/raj030/bandpass-processing/askap-bandpass/BPCAL/calparameters.1934_bp.SB%s.tab
+TABLE_LEAKAGE=/askapbuffer/payne/raj030/bandpass-processing/askap-bandpass/BPCAL/calparameters.1934_bpleakage.SB%s.tab
 
 # 20250509 - Use the 'separate' mode instead of 'combined' to avoid issues from askapsoft/1.18.3 with changed casacore version
 FILETYPE_MSSPLIT=separate
