@@ -16,6 +16,7 @@ END_INDEX=""
 BEAM_START=""
 BEAM_END=""
 EXPERIMENT="baseline"
+MS_TAG=""
 
 usage() { cat <<EOF
 Usage: $(basename "$0") [options]
@@ -29,6 +30,8 @@ Options:
   --beam-start N             First beam index (default: 0)
   --beam-end N               Last beam index (default: 35)
   --experiment baseline|qcorr  Appends -qcorr to HPC_BASE_DIR when qcorr (default: baseline)
+  --ms-tag TAG               MS filename tag (default: Bandpass_closepack36_920MHz_0.9_1MHz;
+                             midband: Bandpass_square_6x6_1272MHz_0.9_1MHz)
   -h, --help                 Show this help
 EOF
 }
@@ -41,6 +44,7 @@ while [[ $# -gt 0 ]]; do
         --beam-start)  BEAM_START="$2";    shift 2 ;;
         --beam-end)    BEAM_END="$2";      shift 2 ;;
         --experiment)  EXPERIMENT="$2";    shift 2 ;;
+        --ms-tag)      MS_TAG="$2";        shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "ERROR: Unknown argument '$1'"; exit 1 ;;
     esac
@@ -58,5 +62,6 @@ CMD=("${SCRIPTS}"/assess_possum_1934s.sh --manifest "${MANIFEST_FILE}")
 [[ -n "${BEAM_START}" ]]  && CMD+=(--beam-start "${BEAM_START}")
 [[ -n "${BEAM_END}" ]]    && CMD+=(--beam-end "${BEAM_END}")
 [[ -n "${_hpc_base}" ]]   && CMD+=(--hpc-base-dir "${_hpc_base}")
+[[ -n "${MS_TAG}" ]]       && CMD+=(--ms-tag "${MS_TAG}")
 
 "${CMD[@]}"

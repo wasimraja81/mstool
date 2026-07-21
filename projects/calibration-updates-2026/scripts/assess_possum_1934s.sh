@@ -31,6 +31,7 @@ ESB_OVERRIDE="${ESB_OVERRIDE:-}"
 BEAM_START="${BEAM_START:-0}"
 BEAM_END="${BEAM_END:-35}"
 DRY_RUN="false"
+MS_TAG="Bandpass_closepack36_920MHz_0.9_1MHz"
 
 DIR_SB=/askapbuffer/payne/raj030/askap-scheduling-blocks
 # WORK_DIR is set from HPC_BASE_DIR in the manifest (overridable via --hpc-base-dir).
@@ -60,6 +61,8 @@ Options:
   --beam-start N         Start beam index (default: 0)
   --beam-end N           End beam index (default: 35)
     --dry-run              Print planned actions without running averageMS.py
+  --ms-tag TAG           MS filename tag (default: Bandpass_closepack36_920MHz_0.9_1MHz;
+                         midband: Bandpass_square_6x6_1272MHz_0.9_1MHz)
   --hpc-base-dir PATH    Override HPC_BASE_DIR from manifest (e.g. for --experiment qcorr)
   -h, --help             Show this help
 EOF
@@ -94,6 +97,10 @@ while [[ $# -gt 0 ]]; do
         --dry-run)
             DRY_RUN="true"
             shift
+            ;;
+        --ms-tag)
+            MS_TAG="$2"
+            shift 2
             ;;
         --hpc-base-dir)
             HPC_BASE_DIR_CLI="$2"
@@ -392,6 +399,7 @@ echo "INFO - averageMS script: ${AVERAGE_MS_SCRIPT}"
 echo "INFO - Tuple index range: ${bSB}..${eSB}"
 echo "INFO - Beam range: ${BEAM_START}..${BEAM_END}"
 echo "INFO - Dry run: ${DRY_RUN}"
+echo "INFO - MS_TAG: ${MS_TAG}"
 
 for (( iSB=${bSB}; iSB<=${eSB}; iSB++ )); do
     sbRefNow=${refFieldList[${iSB}]}
@@ -442,13 +450,13 @@ for (( iSB=${bSB}; iSB<=${eSB}; iSB++ )); do
         printf -v beamNow "%02d" $((10#${iBeam}))
         fieldNow="B1934-638_beam${iBeam}"
 
-        msNow="${fieldNow}/${fieldNow}/scienceData.Bandpass_closepack36_920MHz_0.9_1MHz.SB${sbCalNow}.${fieldNow}.beam${beamNow}.ms"
-        outFileNow="${plotDir}/scienceData.Bandpass_closepack36_920MHz_0.9_1MHz.SB${sbCalNow}.${fieldNow}.beam${beamNow}.txt"
-        plotFileNow="${plotDir}/scienceData.Bandpass_closepack36_920MHz_0.9_1MHz.SB${sbCalNow}.${fieldNow}.beam${beamNow}.png"
+        msNow="${fieldNow}/${fieldNow}/scienceData.${MS_TAG}.SB${sbCalNow}.${fieldNow}.beam${beamNow}.ms"
+        outFileNow="${plotDir}/scienceData.${MS_TAG}.SB${sbCalNow}.${fieldNow}.beam${beamNow}.txt"
+        plotFileNow="${plotDir}/scienceData.${MS_TAG}.SB${sbCalNow}.${fieldNow}.beam${beamNow}.png"
 
-        msNowLeakageCal="${fieldNow}/${fieldNow}/scienceData.Bandpass_closepack36_920MHz_0.9_1MHz.SB${sbCalNow}.${fieldNow}.beam${beamNow}_averaged_cal.leakage.ms"
-        outFileNowLeakageCal="${plotDir}/scienceData.Bandpass_closepack36_920MHz_0.9_1MHz.SB${sbCalNow}.${fieldNow}.beam${beamNow}.lcal.txt"
-        plotFileNowLeakageCal="${plotDir}/scienceData.Bandpass_closepack36_920MHz_0.9_1MHz.SB${sbCalNow}.${fieldNow}.beam${beamNow}.lcal.png"
+        msNowLeakageCal="${fieldNow}/${fieldNow}/scienceData.${MS_TAG}.SB${sbCalNow}.${fieldNow}.beam${beamNow}_averaged_cal.leakage.ms"
+        outFileNowLeakageCal="${plotDir}/scienceData.${MS_TAG}.SB${sbCalNow}.${fieldNow}.beam${beamNow}.lcal.txt"
+        plotFileNowLeakageCal="${plotDir}/scienceData.${MS_TAG}.SB${sbCalNow}.${fieldNow}.beam${beamNow}.lcal.png"
 
         echo "INFO - Assessing tuple ${iSB}, beam ${beamNow}, field ${fieldNow}"
 
