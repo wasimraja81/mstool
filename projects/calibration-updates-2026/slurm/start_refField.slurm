@@ -627,7 +627,6 @@ if [ "${DO_FIND_BANDPASS}" == "true" ]; then
             cat >>${configNow1} << EOF
 DIR_SB=${DIR_SB}
 BP_UPDATE_MODIFY_AMP_STRATEGY=${ampStrategyNow}
-BPTOOL_VERSION=2.8.0
 DO_PREFLAG_REFTABLE=${doPreflagNow}
 APPLY_PREFLAGS_DIRECTLY_REFTABLE=${doPreflagNow}
 # Q-correction of residual X/Y gain amplitude imbalance (values passed via CLI args)
