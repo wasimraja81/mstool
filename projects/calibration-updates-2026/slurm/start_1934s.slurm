@@ -520,8 +520,16 @@ do
         tupleProcessingDir=${WORK_DIR}/ODC-${odcWeightNow}/SB_REF-${sbRefNow}_SB_1934-${sb1934Now}_SB_HOLO-${holoSBNow}${strategySuffixNow}
     scienceProcessingDir="${tupleProcessingDir}/1934-processing-SB-${sbCalNow}"
 
+        # Resolve bandpass table path once per tuple — smooth variant when DO_BANDPASS_SMOOTH=true in template
+        _do_smooth=$(grep -E '^DO_BANDPASS_SMOOTH=' "${SCIENCE_CONFIG_TEMPLATE}" | tail -1 | cut -d= -f2 | tr -d '[:space:]')
+        if [[ "${_do_smooth}" == "true" ]]; then
+            _bp_tab="${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab.smooth"
+        else
+            _bp_tab="${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab"
+        fi
+
         if [ "${REQUIRE_STAGE1_PRODUCTS}" == "true" ]; then
-            expectedBandpassTable="${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab"
+            expectedBandpassTable="${_bp_tab}"
             expectedLeakageTable="${tupleProcessingDir}/BPCAL/calparameters.1934_bpleakage.SB${sbRefNow}.tab"
 
             missingStage1=0
@@ -556,14 +564,6 @@ do
             mkdir -p "${FIELD_NOW}"
             cd ${FIELD_NOW}
             cat "${SCIENCE_CONFIG_TEMPLATE}" >"${configNow1}"
-
-            # Determine correct bandpass table path: smooth variant when DO_BANDPASS_SMOOTH=true in template
-            _do_smooth=$(grep -E '^DO_BANDPASS_SMOOTH=' "${SCIENCE_CONFIG_TEMPLATE}" | tail -1 | cut -d= -f2 | tr -d '[:space:]')
-            if [[ "${_do_smooth}" == "true" ]]; then
-                _bp_tab="${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab.smooth"
-            else
-                _bp_tab="${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab"
-            fi
 
             cat >> "${configNow1}" <<EOF
 FIELD_SELECTION_SCIENCE="${FIELD_NOW}"
