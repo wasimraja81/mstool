@@ -49,7 +49,7 @@ CMD=("${SLURM}"/submit_pipeline.sh --stage 1934 --manifest "${MANIFEST_FILE}")
 [[ -n "${EXPERIMENT}" ]]  && CMD+=(--experiment "${EXPERIMENT}")
 if [[ -n "${SCI_TEMPLATE}" ]]; then
     SCI_TEMPLATE="$(realpath "${SCI_TEMPLATE}")"
-    CMD+=(--template "${SCI_TEMPLATE}")
+    CMD+=(--sci-template "${SCI_TEMPLATE}")
 fi
 
 "${CMD[@]}"
