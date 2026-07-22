@@ -556,6 +556,15 @@ do
             mkdir -p "${FIELD_NOW}"
             cd ${FIELD_NOW}
             cat "${SCIENCE_CONFIG_TEMPLATE}" >"${configNow1}"
+
+            # Determine correct bandpass table path: smooth variant when DO_BANDPASS_SMOOTH=true in template
+            _do_smooth=$(grep -E '^DO_BANDPASS_SMOOTH=' "${SCIENCE_CONFIG_TEMPLATE}" | tail -1 | cut -d= -f2 | tr -d '[:space:]')
+            if [[ "${_do_smooth}" == "true" ]]; then
+                _bp_tab="${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab.smooth"
+            else
+                _bp_tab="${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab"
+            fi
+
             cat >> "${configNow1}" <<EOF
 FIELD_SELECTION_SCIENCE="${FIELD_NOW}"
 SUBMIT_JOBS=true
@@ -564,7 +573,7 @@ BEAMLIST="${iField}"
 DO_CONTCUBE_IMAGING=false
 DO_VALIDATION_POSSUM=false
 DO_CONVOLVE_CONT=false
-TABLE_BANDPASS=${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab
+TABLE_BANDPASS=${_bp_tab}
 TABLE_LEAKAGE=${tupleProcessingDir}/BPCAL/calparameters.1934_bpleakage.SB${sbRefNow}.tab
 DIR_SB=${DIR_SB}
 BP_UPDATE_MODIFY_AMP_STRATEGY=${ampStrategyNow}
