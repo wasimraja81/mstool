@@ -59,6 +59,9 @@ CMD=("${SLURM}"/submit_pipeline.sh --stage ref --manifest "${MANIFEST_FILE}")
 [[ -n "${Q_CORR_VARIANT}" ]]        && CMD+=(--q-corr-variant "${Q_CORR_VARIANT}")
 [[ -n "${Q_CORR_REF_WS}" ]]         && CMD+=(--q-corr-ref-ws "${Q_CORR_REF_WS}")
 [[ -n "${Q_CORR_ALLOW_MISMATCH}" ]] && CMD+=(--q-corr-allow-mismatch "${Q_CORR_ALLOW_MISMATCH}")
-[[ -n "${REF_TEMPLATE}" ]]          && CMD+=(--template "${REF_TEMPLATE}")
+if [[ -n "${REF_TEMPLATE}" ]]; then
+    REF_TEMPLATE="$(realpath "${REF_TEMPLATE}")"
+    CMD+=(--template "${REF_TEMPLATE}")
+fi
 
 "${CMD[@]}"

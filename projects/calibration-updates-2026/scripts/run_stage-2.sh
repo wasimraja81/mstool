@@ -47,6 +47,9 @@ CMD=("${SLURM}"/submit_pipeline.sh --stage 1934 --manifest "${MANIFEST_FILE}")
 [[ -n "${START_INDEX}" ]] && CMD+=(--start-index "${START_INDEX}")
 [[ -n "${END_INDEX}" ]]   && CMD+=(--end-index "${END_INDEX}")
 [[ -n "${EXPERIMENT}" ]]  && CMD+=(--experiment "${EXPERIMENT}")
-[[ -n "${SCI_TEMPLATE}" ]] && CMD+=(--template "${SCI_TEMPLATE}")
+if [[ -n "${SCI_TEMPLATE}" ]]; then
+    SCI_TEMPLATE="$(realpath "${SCI_TEMPLATE}")"
+    CMD+=(--template "${SCI_TEMPLATE}")
+fi
 
 "${CMD[@]}"
