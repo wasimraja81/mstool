@@ -520,16 +520,18 @@ do
         tupleProcessingDir=${WORK_DIR}/ODC-${odcWeightNow}/SB_REF-${sbRefNow}_SB_1934-${sb1934Now}_SB_HOLO-${holoSBNow}${strategySuffixNow}
     scienceProcessingDir="${tupleProcessingDir}/1934-processing-SB-${sbCalNow}"
 
-        # Resolve bandpass table path once per tuple — smooth variant when DO_BANDPASS_SMOOTH=true in template
+        # Resolve bandpass table path for existence check — smooth variant when DO_BANDPASS_SMOOTH=true in template
+        # Note: TABLE_BANDPASS in the config always uses the plain .tab path; processASKAP.sh appends .smooth internally.
+        _bp_tab_plain="${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab"
         _do_smooth=$(grep -E '^DO_BANDPASS_SMOOTH=' "${SCIENCE_CONFIG_TEMPLATE}" | tail -1 | cut -d= -f2 | tr -d '[:space:]')
         if [[ "${_do_smooth}" == "true" ]]; then
-            _bp_tab="${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab.smooth"
+            _bp_tab_check="${_bp_tab_plain}.smooth"
         else
-            _bp_tab="${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab"
+            _bp_tab_check="${_bp_tab_plain}"
         fi
 
         if [ "${REQUIRE_STAGE1_PRODUCTS}" == "true" ]; then
-            expectedBandpassTable="${_bp_tab}"
+            expectedBandpassTable="${_bp_tab_check}"
             expectedLeakageTable="${tupleProcessingDir}/BPCAL/calparameters.1934_bpleakage.SB${sbRefNow}.tab"
 
             missingStage1=0
@@ -573,7 +575,7 @@ BEAMLIST="${iField}"
 DO_CONTCUBE_IMAGING=false
 DO_VALIDATION_POSSUM=false
 DO_CONVOLVE_CONT=false
-TABLE_BANDPASS=${_bp_tab}
+TABLE_BANDPASS=${_bp_tab_plain}
 TABLE_LEAKAGE=${tupleProcessingDir}/BPCAL/calparameters.1934_bpleakage.SB${sbRefNow}.tab
 DIR_SB=${DIR_SB}
 BP_UPDATE_MODIFY_AMP_STRATEGY=${ampStrategyNow}
