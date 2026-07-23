@@ -579,7 +579,6 @@ TABLE_BANDPASS=${_bp_tab_plain}
 TABLE_LEAKAGE=${tupleProcessingDir}/BPCAL/calparameters.1934_bpleakage.SB${sbRefNow}.tab
 DIR_SB=${DIR_SB}
 BP_UPDATE_MODIFY_AMP_STRATEGY=${ampStrategyNow}
-DO_RAPID_SURVEY=true
 DO_MOSAIC=false
 DO_ALT_IMAGER_CONT=false
 NUM_CORES_CONTIMG_SCI=4
