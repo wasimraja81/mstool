@@ -12,3 +12,4 @@ __pycache__/
 projects/calibration-updates-2026/reports/
 projects/calibration-updates-2026/metadata/
 scratch/*
+projects/calibration-updates-2026/slurm/mstool.code-workspace
