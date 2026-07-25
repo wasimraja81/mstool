@@ -23,6 +23,26 @@ fi
 DO_PREFLAG_SCIENCE=true
 
 DO_BANDPASS_SMOOTH=true
+# Disable preflagging generation for stage-2 1934 (midband) processing.
+#
+# Why this is safe here:
+#   In stage-1, preflags are derived from the 1934 bandpass SB (sb_1934 column
+#   in the manifest) and propagated into the updated reference-field table. In
+#   stage-2 we re-process the *same* 1934 SB (sb_target_1934 == sb_1934 in the
+#   manifest), so no new preflagging is needed — the flags were already derived
+#   from this exact data and applied upstream.
+#
+# Why it is needed (technical):
+#   When DO_BANDPASS_SMOOTH=true, stage-1 only produces the .smooth table; the
+#   plain .tab is absent. copyCalibration.sh requires the plain .tab to generate
+#   preflags unless BANDPASS_CATEGORY=calibration_update, but reference-field SBs
+#   with processing_category=science in their scheduling-block metadata do not
+#   satisfy that condition and the pipeline errors out.
+#
+# WARNING: This assumption breaks if sb_target_1934 != sb_1934 (i.e. the 1934 SB
+#   processed in stage-2 differs from the one used to derive the bandpass in
+#   stage-1). Check the manifest before re-using this template in that scenario.
+DO_GENERATE_PREFLAGS=false
 DO_SPLIT_TIMEWISE=false
 
 # 20250509 - Use the 'separate' mode instead of 'combined' to avoid issues from askapsoft/1.18.3 with changed casacore version
