@@ -579,7 +579,13 @@ TABLE_BANDPASS=${_bp_tab_plain}
 TABLE_LEAKAGE=${tupleProcessingDir}/BPCAL/calparameters.1934_bpleakage.SB${sbRefNow}.tab
 DIR_SB=${DIR_SB}
 BP_UPDATE_MODIFY_AMP_STRATEGY=${ampStrategyNow}
-BANDPASS_CATEGORY=calibration_update
+# Disable preflagging generation: when DO_BANDPASS_SMOOTH=true, stage-1 only
+# produces the .smooth table; the plain .tab is absent. copyCalibration.sh
+# requires the plain .tab to generate preflags unless BANDPASS_CATEGORY=calibration_update,
+# but reference fields with processing_category=science in their SB metadata do not
+# satisfy that condition and will error out. Turning off preflag generation avoids
+# that check entirely for stage-2 1934 processing.
+DO_GENERATE_PREFLAGS=false
 DO_MOSAIC=false
 DO_ALT_IMAGER_CONT=false
 NUM_CORES_CONTIMG_SCI=4
