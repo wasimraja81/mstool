@@ -20,7 +20,6 @@ if [ "${CLUSTER}" == "setonix" ]; then
     ACCOUNT=askaprt
 fi
 
-DO_PREFLAG_SCIENCE=true
 
 DO_BANDPASS_SMOOTH=true
 # Disable preflagging generation for stage-2 1934 (midband) processing.
@@ -43,6 +42,7 @@ DO_BANDPASS_SMOOTH=true
 #   processed in stage-2 differs from the one used to derive the bandpass in
 #   stage-1). Check the manifest before re-using this template in that scenario.
 DO_GENERATE_PREFLAGS=false
+DO_PREFLAG_SCIENCE=false
 USE_FLAG_DIRECTIVES=false
 DO_SPLIT_TIMEWISE=false
 
