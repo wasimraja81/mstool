@@ -450,7 +450,10 @@ for (( iSB=${bSB}; iSB<=${eSB}; iSB++ )); do
         printf -v beamNow "%02d" $((10#${iBeam}))
         fieldNow="B1934-638_beam${iBeam}"
 
-        msNow="${fieldNow}/${fieldNow}/scienceData.${MS_TAG}.SB${sbCalNow}.${fieldNow}.beam${beamNow}.ms"
+        # Always use _averaged.ms: for continuum datasets this is a symlink to
+        # the averaged MS; for spectral-line (midband) datasets the pipeline
+        # produces a distinct _averaged.ms that must be used explicitly.
+        msNow="${fieldNow}/${fieldNow}/scienceData.${MS_TAG}.SB${sbCalNow}.${fieldNow}.beam${beamNow}_averaged.ms"
         outFileNow="${plotDir}/scienceData.${MS_TAG}.SB${sbCalNow}.${fieldNow}.beam${beamNow}.txt"
         plotFileNow="${plotDir}/scienceData.${MS_TAG}.SB${sbCalNow}.${fieldNow}.beam${beamNow}.png"
 
