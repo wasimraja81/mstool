@@ -89,14 +89,15 @@ _MEDIA_FILE_SPECS = [
 ]
 
 
-def _media_stem(sb_ref, sb_1934, sb_holo, sb_target):
+def _media_stem(sb_ref, sb_1934, sb_holo, sb_target, ms_tag="Bandpass_closepack36_920MHz_0.9_1MHz"):
     return (
         f"SB_REF-{sb_ref}_SB_1934-{sb_1934}_SB_HOLO-{sb_holo}_SB_TARGET_1934-{sb_target}_"
-        f"scienceData.Bandpass_closepack36_920MHz_0.9_1MHz.SB{sb_target}"
+        f"scienceData.{ms_tag}.SB{sb_target}"
     )
 
 
-def copy_media_files(manifest_rows: list, data_root: Path, media_dir: Path) -> dict:
+def copy_media_files(manifest_rows: list, data_root: Path, media_dir: Path,
+                     ms_tag: str = "Bandpass_closepack36_920MHz_0.9_1MHz") -> dict:
     """Copy assessment media files into phase3/media/SB_REF-{r}/.
 
     Returns dict: sb_ref -> {'stem': str, 'present': set_of_filenames}
@@ -108,7 +109,7 @@ def copy_media_files(manifest_rows: list, data_root: Path, media_dir: Path) -> d
         sb_1934   = row["sb_1934"]
         sb_holo   = row["sb_holo"]
         sb_target = row["sb_target"]
-        stem = _media_stem(sb_ref, sb_1934, sb_holo, sb_target)
+        stem = _media_stem(sb_ref, sb_1934, sb_holo, sb_target, ms_tag=ms_tag)
         src_dir = (
             data_root
             / f"SB_REF-{sb_ref}_SB_1934-{sb_1934}_SB_HOLO-{sb_holo}_{amp_suffix}"
@@ -1279,6 +1280,14 @@ def main():
              "footprints, PAF overlays, PAF movies) and regenerate only the HTML report from "
              "existing data in --output-dir.  Useful for quickly previewing layout changes.",
     )
+    parser.add_argument(
+        "--ms-tag",
+        default="Bandpass_closepack36_920MHz_0.9_1MHz",
+        metavar="TAG",
+        help="MS filename tag used to locate assessment media files "
+             "(default: Bandpass_closepack36_920MHz_0.9_1MHz; "
+             "midband: Bandpass_square_6x6_1272MHz_0.9_1MHz).",
+    )
     args = parser.parse_args()
 
     data_root = Path(args.data_root)
@@ -1315,7 +1324,8 @@ def main():
     if manifest_path and manifest_path.exists():
         manifest_rows = parse_manifest(manifest_path)
         print(f"Parsed {len(manifest_rows)} manifest rows from {manifest_path}")
-        media_info = copy_media_files(manifest_rows, data_root, media_dir)
+        media_info = copy_media_files(manifest_rows, data_root, media_dir,
+                                          ms_tag=args.ms_tag)
         convert_pdfs_to_pngs(media_info, media_dir)
         n_copied = sum(len(v["present"]) for v in media_info.values())
         print(f"Media ready for {len(media_info)} SB_REFs ({n_copied} files total under {media_dir})")

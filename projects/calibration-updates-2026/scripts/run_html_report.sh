@@ -90,6 +90,7 @@ START_INDEX="0"
 END_INDEX="49"
 EXPERIMENT="baseline"
 FORCE=""
+MS_TAG=""
 
 usage() { cat <<EOF
 Usage: $(basename "$0") [options]
@@ -101,6 +102,9 @@ Options:
   --start-index N              First manifest row index (default: 0)
   --end-index N                Last manifest row index (default: 49)
   --experiment baseline|qcorr  Appends -qcorr to DATA_ROOT when qcorr (default: baseline)
+  --ms-tag TAG                 MS filename tag for locating media files
+                               (default: Bandpass_closepack36_920MHz_0.9_1MHz;
+                                midband: Bandpass_square_6x6_1272MHz_0.9_1MHz)
   --force                      Force regeneration of PAF overlays, movies, and dQ/dU plots
   -h, --help                   Show this help
 EOF
@@ -112,6 +116,7 @@ while [[ $# -gt 0 ]]; do
         --start-index) START_INDEX="$2";   shift 2 ;;
         --end-index)   END_INDEX="$2";     shift 2 ;;
         --experiment)  EXPERIMENT="$2";    shift 2 ;;
+        --ms-tag)      MS_TAG="$2";        shift 2 ;;
         --force)       FORCE="--force";    shift ;;
         -h|--help) usage; exit 0 ;;
         *)
@@ -145,6 +150,7 @@ source "${REPO_ROOT}/.venv/bin/activate"
      --pol-sources \
      --highlight-frac-pol 0.10 \
      --package           "${DATA_ROOT}/final_mvp_share" \
+     ${MS_TAG:+--ms-tag "${MS_TAG}"} \
      ${FORCE}
 
 # ─────────────────────────────────────────────────────────────────────────────
