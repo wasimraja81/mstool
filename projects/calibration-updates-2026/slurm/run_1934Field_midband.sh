@@ -43,6 +43,7 @@ DO_BANDPASS_SMOOTH=true
 #   processed in stage-2 differs from the one used to derive the bandpass in
 #   stage-1). Check the manifest before re-using this template in that scenario.
 DO_GENERATE_PREFLAGS=false
+USE_FLAG_DIRECTIVES=false
 DO_SPLIT_TIMEWISE=false
 
 # 20250509 - Use the 'separate' mode instead of 'combined' to avoid issues from askapsoft/1.18.3 with changed casacore version
