@@ -67,6 +67,34 @@ def parse_manifest(path: Path) -> list:
     return rows
 
 
+def candidate_id(sb_ref: str, sb_1934: str) -> str:
+    sb_ref = str(sb_ref).strip()
+    sb_1934 = str(sb_1934).strip()
+    return f"{sb_ref}@{sb_1934}" if sb_1934 else sb_ref
+
+
+def parse_candidate_id(token: str) -> tuple[str, str]:
+    token = str(token).strip()
+    if "@" in token:
+        sb_ref, sb_1934 = token.split("@", 1)
+        return sb_ref.strip(), sb_1934.strip()
+    return token, ""
+
+
+def candidate_label(token: str) -> str:
+    sb_ref, sb_1934 = parse_candidate_id(token)
+    if sb_1934:
+        return f"SB_REF-{sb_ref} / OLD_SB_1934-{sb_1934}"
+    return f"SB_REF-{sb_ref}"
+
+
+def candidate_slug(token: str) -> str:
+    sb_ref, sb_1934 = parse_candidate_id(token)
+    if sb_1934:
+        return f"SB_REF-{sb_ref}_SB_1934-{sb_1934}"
+    return f"SB_REF-{sb_ref}"
+
+
 # ---------------------------------------------------------------------------
 # Media file helpers
 # ---------------------------------------------------------------------------
@@ -100,7 +128,7 @@ def copy_media_files(manifest_rows: list, data_root: Path, media_dir: Path,
                      ms_tag: str = "Bandpass_closepack36_920MHz_0.9_1MHz") -> dict:
     """Copy assessment media files into phase3/media/SB_REF-{r}/.
 
-    Returns dict: sb_ref -> {'stem': str, 'present': set_of_filenames}
+    Returns dict: candidate_id(sb_ref@sb_1934) -> {'stem': str, 'present': set, 'media_rel_dir': str}
     """
     amp_suffix = "AMP_STRATEGY-multiply-insituPreflags"
     result = {}
@@ -109,6 +137,7 @@ def copy_media_files(manifest_rows: list, data_root: Path, media_dir: Path,
         sb_1934   = row["sb_1934"]
         sb_holo   = row["sb_holo"]
         sb_target = row["sb_target"]
+        cand_id = candidate_id(sb_ref, sb_1934)
         stem = _media_stem(sb_ref, sb_1934, sb_holo, sb_target, ms_tag=ms_tag)
         src_dir = (
             data_root
@@ -116,10 +145,11 @@ def copy_media_files(manifest_rows: list, data_root: Path, media_dir: Path,
             / f"1934-processing-SB-{sb_target}"
             / "assessment_results"
         )
+        media_rel_dir = candidate_slug(cand_id)
         if not src_dir.is_dir():
-            result[sb_ref] = {"stem": stem, "present": set()}
+            result[cand_id] = {"stem": stem, "present": set(), "media_rel_dir": media_rel_dir}
             continue
-        dst_dir = media_dir / f"SB_REF-{sb_ref}"
+        dst_dir = media_dir / media_rel_dir
         dst_dir.mkdir(parents=True, exist_ok=True)
         present = set()
         for tmpl, _kind, _vtag in _MEDIA_FILE_SPECS:
@@ -140,7 +170,7 @@ def copy_media_files(manifest_rows: list, data_root: Path, media_dir: Path,
             present.add(png.name)
         for png in sorted(dst_dir.glob(f"{stem}.combined_beams*_p0*.png")):
             present.add(png.name)
-        result[sb_ref] = {"stem": stem, "present": present}
+        result[cand_id] = {"stem": stem, "present": present, "media_rel_dir": media_rel_dir}
     return result
 
 
@@ -156,10 +186,10 @@ def convert_pdfs_to_pngs(media_info: dict, media_dir: Path, dpi: int = 150) -> N
     if gs_bin is None:
         print("WARNING: gs (Ghostscript) not found – skipping PDF→PNG conversion.")
         return
-    for sb_ref, info in media_info.items():
+    for cand_id, info in media_info.items():
         stem    = info["stem"]
         present = info["present"]
-        dst_dir = media_dir / f"SB_REF-{sb_ref}"
+        dst_dir = media_dir / info.get("media_rel_dir", candidate_slug(cand_id))
         if not dst_dir.is_dir():
             continue
         for vtag in ("", ".lcal"):
@@ -175,7 +205,7 @@ def convert_pdfs_to_pngs(media_info: dict, media_dir: Path, dpi: int = 150) -> N
                 if png_path.exists():
                     present.add(png_fname)  # already done
                     continue
-                print(f"  [{sb_ref}] PDF→PNG page {page_num} [{vtag or 'bpcal'}] … ", end="", flush=True)
+                print(f"  [{cand_id}] PDF→PNG page {page_num} [{vtag or 'bpcal'}] … ", end="", flush=True)
                 subprocess.run(
                     [
                         gs_bin, "-q", "-dBATCH", "-dNOPAUSE", "-dSAFER",
@@ -419,7 +449,8 @@ def build_spectra_cards(manifest_rows: list, media_info: dict,
                         paf_movie_info: dict = None) -> str:
     """Return HTML for the 'Downloads (GIF / PDF)' section.
 
-    One <details id='sbref-{r}'> card per SB_REF, sorted by ODC then field.
+    One <details id='sbref-{r}'> card per candidate, where candidate is
+    SB_REF + SB_1934 (old-1934 disambiguation).
     Each card contains GIF animation buttons and combined_beams PDF/PNG links
     for both calibration variants (bpcal / lcal).  MP4s, all-beams PNGs,
     beamwise stats, and PAF plots are now shown inline in the summary tables.
@@ -427,20 +458,22 @@ def build_spectra_cards(manifest_rows: list, media_info: dict,
     ordered = sorted(
         [
             r for r in manifest_rows
-            if r["sb_ref"] in media_info and media_info[r["sb_ref"]]["present"]
+            if candidate_id(r["sb_ref"], r["sb_1934"]) in media_info
+            and media_info[candidate_id(r["sb_ref"], r["sb_1934"])]["present"]
         ],
-        key=lambda r: (r["odc_weight"], r["ref_fieldname"], r["sb_ref"]),
+        key=lambda r: (r["odc_weight"], r["ref_fieldname"], r["sb_ref"], r["sb_1934"]),
     )
     cards = []
     for row in ordered:
+        cand_id = candidate_id(row["sb_ref"], row["sb_1934"])
         sb_ref  = row["sb_ref"]
-        info    = media_info[sb_ref]
+        info    = media_info[cand_id]
         stem    = info["stem"]
         present = info["present"]
         odc     = row["odc_weight"]
         field   = row["ref_fieldname"]
-        card_id = f"sbref-{sb_ref}"
-        rel     = f"{media_rel_prefix}/SB_REF-{sb_ref}"
+        card_id = f"sbref-{candidate_slug(cand_id)}"
+        rel     = f"{media_rel_prefix}/{info.get('media_rel_dir', candidate_slug(cand_id))}"
 
         # ── GIFs + combined_beams PDF/PNG per variant ──────────────────
         variant_sections = []
@@ -482,6 +515,7 @@ def build_spectra_cards(manifest_rows: list, media_info: dict,
 
         summary_text = (
             f"SB_REF-{html.escape(sb_ref)}"
+            f"&nbsp;&nbsp;/&nbsp;&nbsp;OLD_SB_1934-{html.escape(row['sb_1934'])}"
             f"&nbsp;&nbsp;&middot;&nbsp;&nbsp;ODC-{html.escape(odc)}"
             f"&nbsp;&nbsp;&middot;&nbsp;&nbsp;{html.escape(field)}"
         )
@@ -615,7 +649,7 @@ def build_summary_table(rows, plots_dir=None, media_map=None, paf_overlay_info=N
     If plots_dir is given, the reference-field cell links to the individual
     footprint PNG for that (field, ODC, variant) combination.
 
-    If media_map is given ({sb_ref: {'stem': str, 'present': set}}), the
+    If media_map is given ({candidate_id: {'stem': str, 'present': set}}), the
     sb_ref_values column gains anchor + download links (↓pdf, ↓mp4, ↓gif).
 
     paf_overlay_info and paf_movie_info ({sb_ref: relative_path}) are used to
@@ -631,7 +665,7 @@ def build_summary_table(rows, plots_dir=None, media_map=None, paf_overlay_info=N
         "variant": "Variant",
         "ref_fieldname": "Reference field",
         "n_candidates": "n_obs(f)",
-        "sb_ref_values": "Observed SB_REF IDs",
+        "sb_ref_values": "Observed candidates (SB_REF + old SB_1934)",
         "beam_median_l_over_i": "μ⁽ᵇ⁾",
         "beam_mad_l_over_i": "MAD⁽ᵇ⁾",
         "beam_min_l_over_i": "min⁽ᵇ⁾",
@@ -719,18 +753,20 @@ def build_summary_table(rows, plots_dir=None, media_map=None, paf_overlay_info=N
                 parts = [p.strip() for p in str(v).split(";") if p.strip()]
                 badge_parts = []
                 for sb in parts:
-                    anchor = f"#sbref-{sb}"
+                    sb_ref, _sb_1934 = parse_candidate_id(sb)
+                    slug = candidate_slug(sb)
+                    anchor = f"#sbref-{slug}"
                     link_html = (
                         f"<a href='{html.escape(anchor)}'"
-                        f" onclick=\"openSpectraCard('sbref-{html.escape(sb)}');return false;\">"
-                        f"SB_REF-{html.escape(sb)}</a>"
+                        f" onclick=\"openSpectraCard('sbref-{html.escape(slug)}');return false;\">"
+                        f"{html.escape(candidate_label(sb))}</a>"
                     )
                     btns = []
                     m = media_map.get(sb) if media_map else None
                     if m:
                         stem = m["stem"]
                         present = m["present"]
-                        rel = f"media/SB_REF-{sb}"
+                        rel = f"media/{m.get('media_rel_dir', slug)}"
                         mp4_stokes = f"{stem}.beams_stokes{vtag}.mp4"
                         if mp4_stokes in present:
                             href = f"{rel}/{quote(mp4_stokes)}"
@@ -751,11 +787,11 @@ def build_summary_table(rows, plots_dir=None, media_map=None, paf_overlay_info=N
                         if lstats in present:
                             href = f"{rel}/{quote(lstats)}"
                             btns.append(f"<button class='media-btn media-btn--beamwise' onclick=\"openModal('{href}','img')\">&#128200;&nbsp;beamwise</button>")
-                    if paf_overlay_info and sb in paf_overlay_info:
-                        href = f"plots/{quote(paf_overlay_info[sb])}"
+                    if paf_overlay_info and sb_ref in paf_overlay_info:
+                        href = f"plots/{quote(paf_overlay_info[sb_ref])}"
                         btns.append(f"<button class='media-btn media-btn--paf' onclick=\"openModal('{href}','img')\">&#128444;&nbsp;PAF</button>")
-                    if paf_movie_info and sb in paf_movie_info:
-                        href = f"plots/{quote(paf_movie_info[sb])}"
+                    if paf_movie_info and sb_ref in paf_movie_info:
+                        href = f"plots/{quote(paf_movie_info[sb_ref])}"
                         btns.append(f"<button class='media-btn media-btn--paf-movie' onclick=\"openModal('{href}','video')\">&#9654;&nbsp;PAF</button>")
                     if btns:
                         btn_inner = "".join(btns)
@@ -960,20 +996,22 @@ def write_csv_viewer(output_dir: Path, csv_filename: str, title: str, column_hel
                             parts.forEach((sbRaw, idx) => {{
                                 const sb = String(sbRaw).trim();
                                 const link = plotLookup[sb] || '';
+                                const [sbRef, sb1934] = sb.includes('@') ? sb.split('@', 2) : [sb, ''];
+                                const label = sb1934 ? `SB_REF-${{sbRef}} / OLD_SB_1934-${{sb1934}}` : `SB_REF-${{sbRef}}`;
                                 if (idx > 0) td.appendChild(document.createTextNode(' ; '));
                                 if (link) {{
                                     const a = document.createElement('a');
                                     a.href = link;
                                     a.target = '_self';
                                     a.rel = 'noopener';
-                                    a.textContent = `SB_REF-${{sb}}`;
+                                    a.textContent = label;
                                     a.addEventListener('click', (ev) => {{
                                         ev.preventDefault();
                                         window.location.href = link;
                                     }});
                                     td.appendChild(a);
                                 }} else {{
-                                    td.appendChild(document.createTextNode(`SB_REF-${{sb}} (missing)`));
+                                    td.appendChild(document.createTextNode(`${{label}} (missing)`));
                                 }}
                             }});
                         }}
@@ -1052,12 +1090,13 @@ def assemble_package(
 
     # ── media: PNG + MP4 only ─────────────────────────────────────────
     n_png = n_mp4 = 0
-    for sb_ref, info in media_info.items():
+    for cand_id, info in media_info.items():
         present = info.get("present", set())
         if not present:
             continue
-        src_dir = phase3_dir / "media" / f"SB_REF-{sb_ref}"
-        dst_dir = package_dir / "media" / f"SB_REF-{sb_ref}"
+        media_rel_dir = info.get("media_rel_dir", candidate_slug(cand_id))
+        src_dir = phase3_dir / "media" / media_rel_dir
+        dst_dir = package_dir / "media" / media_rel_dir
         dst_dir.mkdir(parents=True, exist_ok=True)
         for fname in sorted(present):
             if not (fname.endswith(".png") or fname.endswith(".mp4")):
@@ -1735,7 +1774,7 @@ def main():
      <b>Bandpass calibrated</b> (bpcal) and <b>Bandpass + Leakage on-axis calibrated</b> (lcal) variants are shown in separate tables.<br>
      Plot badges on the <i>Reference field</i> column link to per-ODC and all-ODC footprint heatmaps (see legend below).
      SB_REF media (Stokes/pol.degree MP4, combined-beams PNG, beamwise stats, PAF overlay and movie) are accessible
-     via the drop-down trigger on each SB_REF ID in the <i>Observed SB_REF IDs</i> column.</p>
+    via the drop-down trigger on each candidate in the <i>Observed candidates (SB_REF + old SB_1934)</i> column.</p>
 
   <h2>Column legend</h2>
   <p class='meta'><b>Notation convention:</b> the superscript in parentheses denotes the index (dimension) over which the statistic is computed.
@@ -1747,8 +1786,8 @@ def main():
       <tr><td>ODC weight</td><td>ODC WEIGHTS ID</td></tr>
       <tr><td>Variant</td><td>Bandpass calibrated (bpcal) or Bandpass + Leakage on-axis calibrated (lcal)</td></tr>
       <tr><td>Reference field</td><td>Name (with skyPos) of the field used for calibration</td></tr>
-      <tr><td>n_obs(f)</td><td>Number of independent observations for this field (per ODC weight)</td></tr>
-      <tr><td>Observed SB_REF IDs</td><td>Links to the leakage statistics card for each individual SB_REF observation</td></tr>
+    <tr><td>n_obs(f)</td><td>Number of independent observations for this field (per ODC weight), where observation identity is SB_REF + old SB_1934</td></tr>
+    <tr><td>Observed candidates (SB_REF + old SB_1934)</td><td>Links to leakage cards for each individual candidate (SB_REF combined with old SB_1934)</td></tr>
       <tr><td>&mu;&#8317;&#7495;&#8318;</td><td>Median across beams of \\(\\mu_{{b,f}}^{{(s)}}\\)</td></tr>
       <tr><td>MAD&#8317;&#7495;&#8318;</td><td>MAD across beams of \\(\\mu_{{b,f}}^{{(s)}}\\) &mdash; beam-to-beam spread</td></tr>
       <tr><td>min&#8317;&#7495;&#8318;</td><td>Minimum across beams of \\(\\mu_{{b,f}}^{{(s)}}\\)</td></tr>
