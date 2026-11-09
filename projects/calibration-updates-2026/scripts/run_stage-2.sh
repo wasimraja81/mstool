@@ -15,6 +15,7 @@ START_INDEX=""
 END_INDEX=""
 EXPERIMENT=""
 SCI_TEMPLATE=""
+DRY_RUN=""
 
 usage() { cat <<EOF
 Usage: $(basename "$0") [options]
@@ -27,6 +28,7 @@ Options:
   --end-index N                Last manifest row index (inclusive)
   --experiment baseline|qcorr  Experiment type; qcorr appends -qcorr to HPC dir (default: baseline)
   --template FILE              Science-field config template (default: run_1934Field.sh)
+  --dry-run                    Print the sbatch command; do not submit
   -h, --help                   Show this help
 EOF
 }
@@ -38,6 +40,7 @@ while [[ $# -gt 0 ]]; do
         --end-index)   END_INDEX="$2";     shift 2 ;;
         --experiment)  EXPERIMENT="$2";    shift 2 ;;
         --template)    SCI_TEMPLATE="$2";  shift 2 ;;
+        --dry-run)     DRY_RUN="true";     shift ;;
         -h|--help) usage; exit 0 ;;
         *) echo "ERROR: Unknown argument '$1'"; exit 1 ;;
     esac
@@ -51,5 +54,6 @@ if [[ -n "${SCI_TEMPLATE}" ]]; then
     SCI_TEMPLATE="$(realpath "${SCI_TEMPLATE}")"
     CMD+=(--sci-template "${SCI_TEMPLATE}")
 fi
+[[ -n "${DRY_RUN}" ]] && CMD+=(--dry-run)
 
 "${CMD[@]}"

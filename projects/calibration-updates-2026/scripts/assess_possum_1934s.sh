@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if command -v module >/dev/null 2>&1; then
-    module load singularity/4.1.0-askap
+    module load singularity/4.3.5-askap
     module use /askapbuffer/payne/raj030/askaprtModules
     module load askappy/2.9.1
 fi

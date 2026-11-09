@@ -18,6 +18,7 @@ Q_CORR_VARIANT=""
 Q_CORR_REF_WS=""
 Q_CORR_ALLOW_MISMATCH=""
 REF_TEMPLATE=""
+DRY_RUN=""
 
 usage() { cat <<EOF
 Usage: $(basename "$0") [options]
@@ -33,6 +34,7 @@ Options:
   --q-corr-ref-ws N                Override ref_ws for CSV row selection (escape hatch)
   --q-corr-allow-mismatch true     Allow ref_ws mismatch (escape hatch)
   --template FILE                  Pipeline config template (default: run_refField.sh)
+  --dry-run                        Print the sbatch command; do not submit
   -h, --help                       Show this help
 EOF
 }
@@ -47,6 +49,7 @@ while [[ $# -gt 0 ]]; do
         --q-corr-ref-ws)         Q_CORR_REF_WS="$2";         shift 2 ;;
         --q-corr-allow-mismatch) Q_CORR_ALLOW_MISMATCH="$2"; shift 2 ;;
         --template)              REF_TEMPLATE="$2";          shift 2 ;;
+        --dry-run)               DRY_RUN="true";             shift ;;
         -h|--help) usage; exit 0 ;;
         *) echo "ERROR: Unknown argument '$1'"; exit 1 ;;
     esac
@@ -63,5 +66,6 @@ if [[ -n "${REF_TEMPLATE}" ]]; then
     REF_TEMPLATE="$(realpath "${REF_TEMPLATE}")"
     CMD+=(--template "${REF_TEMPLATE}")
 fi
+[[ -n "${DRY_RUN}" ]] && CMD+=(--dry-run)
 
 "${CMD[@]}"
