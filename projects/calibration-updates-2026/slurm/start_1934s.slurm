@@ -74,7 +74,8 @@ if [[ "${EARLY_DRY_RUN_PARSE}" != "true" ]]; then
     module use /askapbuffer/payne/raj030/askaprtModules
     #module load askappipeline/axa-3877-implement-q-correction-factors
     #module load askappipeline/axa-3859-fix-generate-parset-for-offset-fields
-    module load askappipeline/2.24.1
+    #module load askappipeline/2.25.0
+    module load askappipeline/2.27.1
     #module load askappipeline/axa-3741-allow-general-processing-of-1934-fields
     #module load askappipeline/axa-3729-flag-bad-data-in-reference-tables
 fi
@@ -111,6 +112,7 @@ BSB_OVERRIDE="${BSB_OVERRIDE:-}"
 ESB_OVERRIDE="${ESB_OVERRIDE:-}"
 DRY_RUN_PARSE=false
 EXPERIMENT=""
+SCI_TEMPLATE_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -134,6 +136,10 @@ while [[ $# -gt 0 ]]; do
             DRY_RUN_PARSE=true
             shift
             ;;
+        --template)
+            SCI_TEMPLATE_OVERRIDE="$2"
+            shift 2
+            ;;
         *)
             echo "ERROR: Unknown argument '$1'"
             exit 1
@@ -146,11 +152,15 @@ DIR_SB=/askapbuffer/payne/raj030/askap-scheduling-blocks
 # WORK_DIR is set from HPC_BASE_DIR in the manifest; --experiment qcorr appends -qcorr at runtime.
 EXPERIMENT="${EXPERIMENT:-baseline}"
 WORK_DIR=""
-SCIENCE_CONFIG_TEMPLATE="${SCRIPT_DIR}/run_1934Field.sh"
+if [[ -n "${SCI_TEMPLATE_OVERRIDE}" ]]; then
+    SCIENCE_CONFIG_TEMPLATE="${SCI_TEMPLATE_OVERRIDE}"
+else
+    SCIENCE_CONFIG_TEMPLATE="${SCRIPT_DIR}/run_1934Field.sh"
+fi
 echo "INFO - SCIENCE_CONFIG_TEMPLATE: ${SCIENCE_CONFIG_TEMPLATE}"
 if [[ ! -f "${SCIENCE_CONFIG_TEMPLATE}" ]]; then
     echo "ERROR: Missing 1934-field template: ${SCIENCE_CONFIG_TEMPLATE}"
-    echo "ERROR: Ensure run_1934Field.sh exists in the slurm directory on HPC clone."
+    echo "ERROR: Ensure the template file exists and is readable."
     exit 1
 fi
 
@@ -511,8 +521,18 @@ do
         tupleProcessingDir=${WORK_DIR}/ODC-${odcWeightNow}/SB_REF-${sbRefNow}_SB_1934-${sb1934Now}_SB_HOLO-${holoSBNow}${strategySuffixNow}
     scienceProcessingDir="${tupleProcessingDir}/1934-processing-SB-${sbCalNow}"
 
+        # Resolve bandpass table path for existence check — smooth variant when DO_BANDPASS_SMOOTH=true in template
+        # Note: TABLE_BANDPASS in the config always uses the plain .tab path; processASKAP.sh appends .smooth internally.
+        _bp_tab_plain="${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab"
+        _do_smooth=$(grep -E '^DO_BANDPASS_SMOOTH=' "${SCIENCE_CONFIG_TEMPLATE}" | tail -1 | cut -d= -f2 | tr -d '[:space:]')
+        if [[ "${_do_smooth}" == "true" ]]; then
+            _bp_tab_check="${_bp_tab_plain}.smooth"
+        else
+            _bp_tab_check="${_bp_tab_plain}"
+        fi
+
         if [ "${REQUIRE_STAGE1_PRODUCTS}" == "true" ]; then
-            expectedBandpassTable="${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab"
+            expectedBandpassTable="${_bp_tab_check}"
             expectedLeakageTable="${tupleProcessingDir}/BPCAL/calparameters.1934_bpleakage.SB${sbRefNow}.tab"
 
             missingStage1=0
@@ -547,6 +567,7 @@ do
             mkdir -p "${FIELD_NOW}"
             cd ${FIELD_NOW}
             cat "${SCIENCE_CONFIG_TEMPLATE}" >"${configNow1}"
+
             cat >> "${configNow1}" <<EOF
 FIELD_SELECTION_SCIENCE="${FIELD_NOW}"
 SUBMIT_JOBS=true
@@ -555,11 +576,10 @@ BEAMLIST="${iField}"
 DO_CONTCUBE_IMAGING=false
 DO_VALIDATION_POSSUM=false
 DO_CONVOLVE_CONT=false
-TABLE_BANDPASS=${tupleProcessingDir}/BPCAL/calparameters.1934_bp.SB${sbRefNow}.tab
+TABLE_BANDPASS=${_bp_tab_plain}
 TABLE_LEAKAGE=${tupleProcessingDir}/BPCAL/calparameters.1934_bpleakage.SB${sbRefNow}.tab
 DIR_SB=${DIR_SB}
 BP_UPDATE_MODIFY_AMP_STRATEGY=${ampStrategyNow}
-DO_RAPID_SURVEY=true
 DO_MOSAIC=false
 DO_ALT_IMAGER_CONT=false
 NUM_CORES_CONTIMG_SCI=4

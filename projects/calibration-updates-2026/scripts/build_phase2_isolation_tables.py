@@ -52,7 +52,20 @@ def mad(values):
     return median([abs(v - med) for v in clean])
 
 
-def find_stats_plot_png(assessment_dir, variant, sb_ref=None):
+def _candidate_id(sb_ref, sb_1934):
+    sb_ref = str(sb_ref).strip()
+    sb_1934 = str(sb_1934).strip()
+    return f"{sb_ref}@{sb_1934}" if sb_1934 else sb_ref
+
+
+def _candidate_parts(candidate_id):
+    if "@" in str(candidate_id):
+        sb_ref, sb_1934 = str(candidate_id).split("@", 1)
+        return sb_ref.strip(), sb_1934.strip()
+    return str(candidate_id).strip(), ""
+
+
+def find_stats_plot_png(assessment_dir, variant, sb_ref=None, sb_1934=None):
     if not assessment_dir:
         return ""
     path = Path(assessment_dir)
@@ -67,6 +80,12 @@ def find_stats_plot_png(assessment_dir, variant, sb_ref=None):
         specific = [p for p in matches if sb_token in p.name]
         if specific:
             matches = specific
+
+    if sb_1934:
+        sb1934_token = f"SB_1934-{sb_1934}_"
+        specific_1934 = [p for p in matches if sb1934_token in p.name]
+        if specific_1934:
+            matches = specific_1934
 
     variant_lower = str(variant).strip().lower()
     if variant_lower == "lcal":
@@ -114,7 +133,7 @@ def aggregate_beam_x_field_at_fixed_odc(rows):
             grouped_q[key].append(row["leak_q_over_i_pct"])
         if row["leak_u_over_i_pct"] is not None:
             grouped_u[key].append(row["leak_u_over_i_pct"])
-        sb_refs[key].add(row["sb_ref"])
+        sb_refs[key].add(_candidate_id(row["sb_ref"], row.get("sb_1934", "")))
 
     out = []
     for key, vals in grouped.items():
@@ -160,7 +179,7 @@ def aggregate_beam_x_odc_at_fixed_field(rows):
             grouped_q[key].append(row["leak_q_over_i_pct"])
         if row["leak_u_over_i_pct"] is not None:
             grouped_u[key].append(row["leak_u_over_i_pct"])
-        sb_refs[key].add(row["sb_ref"])
+        sb_refs[key].add(_candidate_id(row["sb_ref"], row.get("sb_1934", "")))
 
     out = []
     for key, vals in grouped.items():
@@ -390,16 +409,23 @@ def main():
         field_key = (row["odc_weight"], row["variant"], row["ref_fieldname"])
         odc_key = (row["ref_fieldname"], row["variant"], row["odc_weight"])
         sb_ref_value = str(row["sb_ref"])
-        sb_refs_by_field_candidate[field_key].add(sb_ref_value)
-        sb_refs_by_odc_candidate[odc_key].add(sb_ref_value)
+        sb_1934_value = str(row.get("sb_1934", ""))
+        candidate_id = _candidate_id(sb_ref_value, sb_1934_value)
+        sb_refs_by_field_candidate[field_key].add(candidate_id)
+        sb_refs_by_odc_candidate[odc_key].add(candidate_id)
 
-        cache_key = (row.get("assessment_dir", ""), row["variant"], sb_ref_value)
+        cache_key = (row.get("assessment_dir", ""), row["variant"], candidate_id)
         if cache_key not in plot_cache:
-            plot_cache[cache_key] = find_stats_plot_png(row.get("assessment_dir", ""), row["variant"], sb_ref_value)
+            plot_cache[cache_key] = find_stats_plot_png(
+                row.get("assessment_dir", ""),
+                row["variant"],
+                sb_ref_value,
+                sb_1934_value,
+            )
         plot_path = plot_cache[cache_key]
         if plot_path:
-            plot_links_by_field_candidate[field_key][sb_ref_value] = plot_path
-            plot_links_by_odc_candidate[odc_key][sb_ref_value] = plot_path
+            plot_links_by_field_candidate[field_key][candidate_id] = plot_path
+            plot_links_by_odc_candidate[odc_key][candidate_id] = plot_path
 
     beam_x_field = aggregate_beam_x_field_at_fixed_odc(rows)
     beam_x_odc = aggregate_beam_x_odc_at_fixed_field(rows)

@@ -59,15 +59,32 @@ MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*", "h", "+"]
 MANIFEST_DEFAULT = "projects/calibration-updates-2026/manifests/sb_manifest_reffield_average.txt"
 
 
+def candidate_key(sb_ref, sb_1934):
+    sb_ref_s = str(sb_ref).strip()
+    sb_1934_s = str(sb_1934).strip()
+    return f"{sb_ref_s}@{sb_1934_s}" if sb_1934_s else sb_ref_s
+
+
+def candidate_label(token):
+    token = str(token)
+    if "@" in token:
+        sb_ref_s, sb_1934_s = token.split("@", 1)
+        return f"REF {sb_ref_s} / old1934 {sb_1934_s}"
+    return f"REF {token}"
+
+
 def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
                 ylabel: str, output_dir: Path, show: bool, ylim: Optional[float] = 5.0,
                 mean_per_beam: Optional[pd.Series] = None):
     """Generate one figure (single axes) for a single ref_fieldname."""
+    df_field = df_field.copy()
+    df_field["candidate_id"] = [candidate_key(r, s) for r, s in zip(df_field["sb_ref"], df_field.get("sb_1934", ""))]
+
     odcs = sorted(df_field["odc_weight"].unique())
     odc_colours = {odc: cm.tab10(i / max(len(odcs) - 1, 1)) for i, odc in enumerate(odcs)}
 
-    sbs = sorted(df_field["sb_ref"].unique())
-    sb_markers = {sb: MARKERS[i % len(MARKERS)] for i, sb in enumerate(sbs)}
+    candidates = sorted(df_field["candidate_id"].unique())
+    candidate_markers = {cand: MARKERS[i % len(MARKERS)] for i, cand in enumerate(candidates)}
 
     fig, ax = plt.subplots(figsize=(9, 5))
     fig.suptitle(f"{field}  —  {ylabel} signed (%) vs beam  —  variant: {variant}",
@@ -75,8 +92,8 @@ def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
 
     for odc in odcs:
         colour = odc_colours[odc]
-        for sb in sbs:
-            row = df_field[(df_field["odc_weight"] == odc) & (df_field["sb_ref"] == sb)
+        for cand in candidates:
+            row = df_field[(df_field["odc_weight"] == odc) & (df_field["candidate_id"] == cand)
                            ].sort_values("beam")
             if row.empty:
                 continue
@@ -84,7 +101,7 @@ def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
                 row["beam"],
                 row[quantity],
                 color=colour,
-                marker=sb_markers[sb],
+                marker=candidate_markers[cand],
                 markersize=4,
                 linewidth=0.9,
                 alpha=0.75,
@@ -120,16 +137,16 @@ def make_figure(df_field: pd.DataFrame, field: str, variant: str, quantity: str,
     ]
     sb_handles = [
         mlines.Line2D([], [], color="grey",
-                      marker=sb_markers[sb], markersize=6, linewidth=0, label=f"SB {sb}")
-        for sb in sbs
+                      marker=candidate_markers[cand], markersize=6, linewidth=0, label=candidate_label(cand))
+        for cand in candidates
     ]
     mean_handle = (
         [mlines.Line2D([], [], color="black", linewidth=2.0, linestyle="-",
                        marker="o", markersize=4, label="Mean (all obs)")]
         if mean_per_beam is not None and not mean_per_beam.empty else []
     )
-    ax.legend(handles=mean_handle + odc_handles + sb_handles, title="ODC / SB_REF",
-              title_fontsize=8, fontsize=7, framealpha=0.8,
+    ax.legend(handles=mean_handle + odc_handles + sb_handles, title="ODC / candidate",
+              title_fontsize=8, fontsize=6.6, framealpha=0.8,
               loc="upper right", ncol=2)
 
     plt.tight_layout()
@@ -562,12 +579,15 @@ def main():
     if not manifest_path.is_absolute():
         manifest_path = (_scripts_dir / ".." / ".." / ".." / args.manifest).resolve()
 
-    selected_sbrefs = None
+    selected_candidates = None
     manifest_fields = None  # ordered unique field names from manifest
     if manifest_path.exists():
         exclude_ranges = parse_exclude_indices(args.exclude_indices)
         rows = parse_manifest_rows(manifest_path, args.start_index, args.end_index, exclude_ranges)
-        selected_sbrefs = {int(r["sb_ref"]) for r in rows}
+        selected_candidates = {
+            candidate_key(r["sb_ref"], r.get("sb_1934", ""))
+            for r in rows
+        }
         # preserve first-appearance order of field names across manifest rows
         seen = {}
         for r in rows:
@@ -575,7 +595,7 @@ def main():
             if fn and fn not in seen:
                 seen[fn] = True
         manifest_fields = list(seen.keys())
-        print(f"Manifest {manifest_path.name}: {len(selected_sbrefs)} SB_REFs, "
+        print(f"Manifest {manifest_path.name}: {len(selected_candidates)} candidates (SB_REF+old1934), "
               f"{len(manifest_fields)} unique fields "
               f"(indices {args.start_index}–{args.end_index}, excl {args.exclude_indices!r})")
     else:
@@ -585,9 +605,16 @@ def main():
     df = pd.read_csv(csv_path)
     print(f"Loaded {len(df)} rows from {csv_path}")
 
-    if selected_sbrefs is not None:
-        df = df[df["sb_ref"].isin(selected_sbrefs)]
-        print(f"After manifest filter: {len(df)} rows ({df['sb_ref'].nunique()} SB_REFs)")
+    if "sb_1934" not in df.columns:
+        df["sb_1934"] = ""
+    df["candidate_id"] = [candidate_key(r, s) for r, s in zip(df["sb_ref"], df["sb_1934"])]
+
+    if selected_candidates is not None:
+        df = df[df["candidate_id"].isin(selected_candidates)]
+        print(
+            f"After manifest filter: {len(df)} rows "
+            f"({df['candidate_id'].nunique()} candidates; {df['sb_ref'].nunique()} SB_REFs)"
+        )
 
     # ── ref_ws consistency check ──────────────────────────────────────────────
     # All selected SB_REFs must share the same holography solution (ref_ws) so

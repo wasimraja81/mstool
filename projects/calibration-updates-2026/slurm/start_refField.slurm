@@ -79,7 +79,8 @@ if [[ "${EARLY_DRY_RUN_PARSE}" != "true" ]]; then
     module use /askapbuffer/payne/raj030/askaprtModules
     #module load askappipeline/axa-3877-implement-q-correction-factors
     #module load askappipeline/axa-3859-fix-generate-parset-for-offset-fields
-    module load askappipeline/2.24.1
+    #module load askappipeline/2.25.0
+    module load askappipeline/2.27.1
     #module load askappipeline/axa-3729-flag-bad-data-in-reference-tables
 fi
 
@@ -119,6 +120,7 @@ Q_CORR_CSV_EXPLICIT=0
 Q_CORR_VARIANT="bpcal"
 Q_CORR_REF_WS=""
 Q_CORR_ALLOW_MISMATCH="false"
+REF_TEMPLATE_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -159,6 +161,10 @@ while [[ $# -gt 0 ]]; do
             DRY_RUN_PARSE=true
             shift
             ;;
+        --template)
+            REF_TEMPLATE_OVERRIDE="$2"
+            shift 2
+            ;;
         *)
             echo "ERROR: Unknown argument '$1'"
             exit 1
@@ -182,11 +188,15 @@ EXPERIMENT="${EXPERIMENT:-baseline}"
 WORK_DIR=""
 FETCHED_DIR="/askapbuffer/payne/dmitchell/askap-scheduling-blocks"
 #FETCHED_DIR="/scratch/askaprt/tgalvin/racs_low3"
-REF_CONFIG_TEMPLATE="${SCRIPT_DIR}/run_refField.sh"
+if [[ -n "${REF_TEMPLATE_OVERRIDE}" ]]; then
+    REF_CONFIG_TEMPLATE="${REF_TEMPLATE_OVERRIDE}"
+else
+    REF_CONFIG_TEMPLATE="${SCRIPT_DIR}/run_refField.sh"
+fi
 echo "INFO - REF_CONFIG_TEMPLATE: ${REF_CONFIG_TEMPLATE}"
 if [[ ! -f "${REF_CONFIG_TEMPLATE}" ]]; then
     echo "ERROR: Missing reference-field template: ${REF_CONFIG_TEMPLATE}"
-    echo "ERROR: Ensure run_refField.sh exists in the slurm directory on HPC clone."
+    echo "ERROR: Ensure the template file exists and is readable."
     exit 1
 fi
 refFieldList=(56572 \
@@ -627,7 +637,6 @@ if [ "${DO_FIND_BANDPASS}" == "true" ]; then
             cat >>${configNow1} << EOF
 DIR_SB=${DIR_SB}
 BP_UPDATE_MODIFY_AMP_STRATEGY=${ampStrategyNow}
-BPTOOL_VERSION=2.8.0
 DO_PREFLAG_REFTABLE=${doPreflagNow}
 APPLY_PREFLAGS_DIRECTLY_REFTABLE=${doPreflagNow}
 # Q-correction of residual X/Y gain amplitude imbalance (values passed via CLI args)
